@@ -1,7 +1,7 @@
 import { Text, Title3, makeStyles, tokens } from "@fluentui/react-components";
 import { ClipboardTaskListLtrRegular } from "@fluentui/react-icons";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import type { TestPlanSummary } from "../types";
 
 const useStyles = makeStyles({

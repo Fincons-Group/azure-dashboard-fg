@@ -19,7 +19,7 @@ node --version
 npm --version
 ```
 
-You should see version numbers printed (e.g. `v22.14.0`). If you instead see an error, restart your computer and try again.
+You should see version numbers printed (e.g. `v22.22.0` or newer). If you instead see an error, restart your computer and try again.
 
 ## 2. Get the project files
 

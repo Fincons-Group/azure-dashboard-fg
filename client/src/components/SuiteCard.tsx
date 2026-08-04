@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Text, Title3, makeStyles, tokens } from "@fluentui/react-components";
 import { FolderRegular, BugRegular } from "@fluentui/react-icons";
 import { useTranslation } from "react-i18next";

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Accordion, Text, Title2, makeStyles, tokens } from "@fluentui/react-components";
@@ -411,7 +411,7 @@ export function DashboardPage() {
                                                     allTestCases.filter(
                                                         (tc) =>
                                                             tc.suiteName ===
-                                                                suiteName &&
+                                                            suiteName &&
                                                             String(
                                                                 tc.priority
                                                             ) === priority
