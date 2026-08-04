@@ -12,6 +12,21 @@ Se preferisci fare tutto in modo automatico con AI, puoi usare anche la skill in
 1. Installa Node.js LTS da https://nodejs.org
 2. Installa Git for Windows da https://git-scm.com/download/win
 
+### Opzionale: installare VS Code (consigliato)
+
+Se vuoi usare la skill automatica o lavorare in modo piu comodo, installa anche VS Code:
+
+1. Vai su https://code.visualstudio.com
+2. Clicca Download for Windows
+3. Avvia l'installer e lascia le opzioni predefinite
+4. Durante l'installazione, abilita queste voci se presenti:
+   - Add to PATH
+   - Add "Open with Code" nel menu contestuale
+5. Apri VS Code e fai Sign in (opzionale ma utile per Copilot)
+6. Installa l'estensione "GitHub Copilot" da Extensions
+
+Se non installi VS Code, puoi comunque seguire tutta questa guida manuale con PowerShell.
+
 Apri PowerShell e verifica:
 
 ```powershell
@@ -138,3 +153,40 @@ Se non vuoi seguire manualmente tutti i passaggi, usa la skill:
 - `.claude/skills/setup-windows-it/SKILL.md`
 
 La skill guida e verifica automaticamente prerequisiti, setup e build.
+
+### Come richiamarla in Copilot Chat
+
+Apri Copilot Chat dentro VS Code e scrivi un prompt semplice, ad esempio:
+
+```text
+Usa la skill setup-windows-it per configurare questo repository da zero su Windows.
+```
+
+Oppure:
+
+```text
+Esegui la procedura setup-windows-it: verifica prerequisiti, installa dipendenze, configura .env e avvia il progetto.
+```
+
+### Come richiamarla in Claude
+
+Se usi Claude con questa repository aperta, puoi chiedere in modo diretto:
+
+```text
+Usa la skill setup-windows-it e guidami passo-passo sul mio PC Windows.
+```
+
+Suggerimento: specifica sempre che vuoi output in italiano e che parti da zero.
+
+### Se non hai VS Code
+
+Nessun problema: puoi seguire questa guida manuale dall'inizio alla fine usando solo:
+1. PowerShell
+2. Git
+3. Node.js
+
+In questo caso la skill automatica non e disponibile come esecuzione diretta, perche e pensata per agenti AI che leggono la repository aperta in un ambiente compatibile (es. VS Code con Copilot Chat).
+
+Alternativa pratica:
+1. usa questa guida manuale;
+2. se vuoi comunque aiuto AI, copia i passaggi in un assistente esterno e chiedi supporto passo-passo, eseguendo i comandi tu in PowerShell.
