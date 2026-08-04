@@ -1,50 +1,54 @@
 # Azure DevOps Dashboard
 
-A dashboard that pulls test plan, test run, and defect data from Azure DevOps and shows it in one place.
+Dashboard che raccoglie dati da Azure DevOps (test plan, test run, defect) e li mostra in un unico punto.
 
-This guide assumes **zero coding experience**. Just follow the steps in order.
+Versione inglese: [README.en.md](README.en.md)
 
-## 1. Install Node.js
+Questa guida e pensata anche per chi ha **zero esperienza tecnica**.
 
-This project needs a program called **Node.js** to run. If you don't have it yet:
+## 1. Installa Node.js
 
-1. Go to [nodejs.org](https://nodejs.org).
-2. Download the **LTS** version and run the installer.
-3. Click "Next" through the installer with the default options.
+Il progetto richiede **Node.js**.
 
-To check it worked, open a terminal (on Windows: search for "PowerShell" in the Start menu) and type:
+1. Vai su [nodejs.org](https://nodejs.org)
+2. Scarica la versione **LTS**
+3. Avvia l'installer e conferma le opzioni predefinite
+
+Verifica in PowerShell:
 
 ```
 node --version
 npm --version
 ```
 
-You should see version numbers printed (e.g. `v22.22.0` or newer). If you instead see an error, restart your computer and try again.
+Requisito minimo: `v22.22.0` o superiore.
 
-## 2. Get the project files
+Se non trovi subito la patch `22.22.0`, installa la LTS piu recente della major 22 (o successiva). Se la shell mostra ancora una versione vecchia, chiudi e riapri PowerShell.
 
-If you received this project as a `.zip` file, extract it anywhere on your computer (e.g. your Desktop).
+## 2. Ottieni i file del progetto
 
-If you're using Git, clone the repository instead:
+Se hai ricevuto un `.zip`, estrailo dove preferisci.
+
+Se usi Git:
 
 ```
 git clone <repository-url>
 ```
 
-## 3. Open a terminal in the project folder
+## 3. Apri un terminale nella cartella progetto
 
-1. Open the project folder in File Explorer.
-2. In the address bar at the top, type `powershell` and press Enter. This opens a terminal already pointed at the right folder.
+1. Apri la cartella in Esplora File
+2. Nella barra indirizzi digita `powershell` e premi Invio
 
-## 4. Install the project's dependencies
+## 4. Installa le dipendenze
 
-This downloads all the code libraries the project needs. In the terminal, run:
+Da root progetto:
 
 ```
 npm install
 ```
 
-Then do the same inside the `client` folder:
+Poi dentro `client`:
 
 ```
 cd client
@@ -52,59 +56,60 @@ npm install
 cd ..
 ```
 
-This can take a minute or two. You'll see a progress bar - just wait for it to finish.
+## 5. Configura i file ambiente
 
-## 5. Set up your configuration files
+Servono due file:
+- root: `.env`
+- frontend: `client/.env`
 
-The app needs two configuration files: one for the backend (project root) and one for the frontend (`client` folder).
+### Backend
 
-In normal (production-like) use, people also have to sign in with a Microsoft account before they can see anything. For just trying the dashboard out locally, you can skip that entirely - the steps below set that up.
+1. Copia `.env.example` in `.env`
+2. Compila almeno:
+   - `AZDO_PAT`
+   - `AZDO_ORG`
+   - `AZDO_PROJECT`
+3. Per test locale lascia `SKIP_AUTH=true`
 
-### Backend config
+### Frontend
 
-1. Find the file named `.env.example` in the project's root folder.
-2. Make a copy of it and rename the copy to `.env` (just `.env`, nothing else).
-3. Open `.env` in any text editor (Notepad works fine) and fill in:
-   - `AZDO_PAT` - your Azure DevOps Personal Access Token (ask whoever manages your Azure DevOps for one, or generate it yourself under Azure DevOps > User Settings > Personal Access Tokens).
-   - `AZDO_ORG` - your Azure DevOps organization name.
-   - `AZDO_PROJECT` - your Azure DevOps project name.
-   - Leave `SKIP_AUTH=true` as it is - this is what skips the Microsoft sign-in screen. The other Entra/`PRIVILEGED_*` fields below it are only used when `SKIP_AUTH` is off, so you can ignore them.
-4. Save the file.
+1. Copia `client/.env.example` in `client/.env`
+2. Per test locale lascia `VITE_SKIP_AUTH=true`
 
-### Frontend config
+Non condividere mai token o credenziali contenute nei file `.env`.
 
-1. Find `client/.env.example`.
-2. Make a copy and rename it to `client/.env`.
-3. You can leave every value in this file exactly as it is - they're placeholders that are never actually used while `VITE_SKIP_AUTH=true` is set, since sign-in is skipped.
-4. Save the file.
+## 6. Avvia l'app
 
-**Never share your `.env` file or your token with anyone** - it works like a password.
-
-## 6. Run the app
-
-Back in the terminal (at the project's root folder, not inside `client`), run:
+Da root progetto:
 
 ```
 npm run dev:all
 ```
 
-Wait until you see messages saying the server and the client are running. Then open your web browser and go to:
+Poi apri:
 
 ```
 http://localhost:3000
 ```
 
-You should see the dashboard directly - no sign-in screen, since `SKIP_AUTH` is on. To stop the app, go back to the terminal and press `Ctrl + C`.
+Per fermare: `Ctrl + C` nel terminale.
 
-## Troubleshooting
+Se ci sono processi bloccati o porte occupate:
 
-- **"npm is not recognized"**: Node.js isn't installed correctly. Re-do step 1 and restart your terminal.
-- **Blank page or errors about Azure DevOps**: double-check the values in your root `.env` file (step 5) - typos in the org/project name or an expired token are the most common causes.
-- **Nothing happens after `npm run dev:all`**: make sure you ran `npm install` in both the root folder and the `client` folder (step 4).
-- **A "502" or "Bad Gateway" error, or the page looks stuck**: a server from a previous `npm run dev:all` run may still be holding the ports. Press `Ctrl + C` in the terminal, then run `npm run kill:dev` to clean up any leftover processes, and try `npm run dev:all` again.
-- **"My Work Items" page is empty**: that page only shows items assigned to the owner of the `AZDO_PAT` token. If that person currently has no active Tasks or Bugs assigned, an empty list is expected.
+```
+npm run kill:dev
+npm run dev:all
+```
 
-## Italian onboarding (Windows)
+## Problemi comuni
 
-- Manual guide (Italian): `docs/guida-windows-da-zero-it.md`
-- Automatic AI skill (Italian): `.claude/skills/setup-windows-it/SKILL.md`
+- **"npm is not recognized"**: Node.js non e installato correttamente. Reinstalla Node.js e riapri il terminale.
+- **Errori Azure DevOps**: ricontrolla `AZDO_PAT`, `AZDO_ORG`, `AZDO_PROJECT` nel `.env`.
+- **L'app non parte con `npm run dev:all`**: verifica di aver eseguito `npm install` sia in root sia in `client`.
+- **Errore 502 o pagina bloccata**: esegui `npm run kill:dev` e poi rilancia `npm run dev:all`.
+- **Pagina "My Work Items" vuota**: mostra solo item assegnati al proprietario del token `AZDO_PAT`.
+
+## Onboarding Italiano (Windows)
+
+- Guida completa italiana: `docs/guida-windows-da-zero-it.md`
+- Skill AI automatica italiana: `.claude/skills/setup-windows-it/SKILL.md`
