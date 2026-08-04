@@ -1,0 +1,46 @@
+{
+  "name": "poc-azure-dashboard",
+  "version": "1.0.0",
+  "description": "poc",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "cross-env PORT=3001 tsx watch src/server.ts",
+    "dev:client": "npm run dev --prefix client",
+    "dev:all": "concurrently \"npm:dev\" \"npm:dev:client\"",
+    "build:client": "npm run build --prefix client",
+    "build": "npm run build:client",
+    "start": "tsx src/server.ts",
+    "kill:dev": "node scripts/kill-dev.js"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^5.17.3",
+    "@azure/msal-node": "^5.4.2",
+    "@types/nodemailer": "^8.0.1",
+    "axios": "^1.18.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "jwks-rsa": "^3.2.0",
+    "node-cron": "^4.5.0",
+    "nodemailer": "^9.0.1",
+    "resend": "^6.17.2",
+    "tsx": "^4.22.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^25.9.3",
+    "concurrently": "^9.2.3",
+    "cross-env": "^7.0.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}

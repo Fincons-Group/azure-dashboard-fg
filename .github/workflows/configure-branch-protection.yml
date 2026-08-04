@@ -1,0 +1,105 @@
+name: Configure Branch Protection
+
+# Applies two repository rulesets to the main branch:
+#   Rule 1 – No direct pushes: all changes must go through a pull request.
+#   Rule 2 – Required checks: Lint and Trivy Security Scan must pass before merging.
+#
+# The repo-ruleset API requires "Administration: write" on the repo, which the
+# default GITHUB_TOKEN can never be granted (it isn't a valid permissions-block
+# scope). Add a PAT with that access as the repo secret RULESET_ADMIN_TOKEN
+# (classic PAT with "repo" scope, or fine-grained PAT/GitHub App with
+# "Administration: write") before running this workflow.
+#
+# Trigger manually (workflow_dispatch), or re-run whenever this file changes.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/configure-branch-protection.yml
+
+permissions:
+  contents: read
+
+jobs:
+  apply-rulesets:
+    name: Apply branch-protection rulesets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Apply branch protection rulesets
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.RULESET_ADMIN_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            // Helper: delete an existing ruleset by name if it exists (idempotent re-runs)
+            async function deleteIfExists(name) {
+              const { data: existing } = await github.rest.repos.getRepoRulesets({ owner, repo });
+              for (const rs of existing) {
+                if (rs.name === name) {
+                  await github.rest.repos.deleteRepoRuleset({ owner, repo, ruleset_id: rs.id });
+                }
+              }
+            }
+
+            // ── Rule 1: No direct pushes – all changes must go through a pull request ──
+            await deleteIfExists('Require pull request on main');
+            await github.rest.repos.createRepoRuleset({
+              owner,
+              repo,
+              name: 'Require pull request on main',
+              target: 'branch',
+              enforcement: 'active',
+              conditions: {
+                ref_name: { include: ['refs/heads/main'], exclude: [] }
+              },
+              rules: [
+                // Blocks force-pushes
+                { type: 'non_fast_forward' },
+                // Requires all changes to arrive via a pull request
+                {
+                  type: 'pull_request',
+                  parameters: {
+                    required_approving_review_count: 0,
+                    dismiss_stale_reviews_on_push: false,
+                    require_code_owner_review: false,
+                    require_last_push_approval: false,
+                    required_review_thread_resolution: false
+                  }
+                }
+              ]
+            });
+            console.log('✅ Ruleset "Require pull request on main" applied.');
+
+            // ── Rule 2: Required status checks ──────────────────────────────────────────
+            // Check-run names come from each workflow's job display name:
+            //   • lint.yml                   → job key "lint"                 → "lint"
+            //   • tst-security-scan-trivy.yml → job name "Trivy – fs / secret / IaC"
+            await deleteIfExists('Require status checks on main');
+            await github.rest.repos.createRepoRuleset({
+              owner,
+              repo,
+              name: 'Require status checks on main',
+              target: 'branch',
+              enforcement: 'active',
+              conditions: {
+                ref_name: { include: ['refs/heads/main'], exclude: [] }
+              },
+              rules: [
+                {
+                  type: 'required_status_checks',
+                  parameters: {
+                    strict_required_status_checks_policy: true,
+                    required_status_checks: [
+                      { context: 'lint' },
+                      { context: 'Trivy – fs / secret / IaC' }
+                    ]
+                  }
+                }
+              ]
+            });
+            console.log('✅ Ruleset "Require status checks on main" applied.');

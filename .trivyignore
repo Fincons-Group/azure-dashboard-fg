@@ -1,0 +1,21 @@
+# GHSA-qwww-vcr4-c8h2 (react-router, via react-router-dom@7.18.0): CSRF bypass
+# in "unstable RSC" (React Server Components) code paths only. This app is a
+# Vite SPA using react-router-dom with BrowserRouter and does not use any
+# unstable_RSC APIs, so it is not exploitable here. Fixed version (8.3.0)
+# requires migrating off react-router-dom (merged into react-router in v8).
+# Revisit when doing a planned react-router major-version upgrade.
+GHSA-qwww-vcr4-c8h2
+
+# CVE-2026-14257 / GHSA-mh99-v99m-4gvg (brace-expansion memory-exhaustion DoS):
+# the GHSA advisory only lists 5.0.8 as "patched" and doesn't record the
+# maintainer's backport releases for older major lines. client/package.json's
+# overrides pin brace-expansion to 1.1.17 (under minimatch@3.1.5) and 2.1.3
+# (under minimatch@5.1.9) - both verified by inspecting the published tarball
+# to contain the actual fix (EXPANSION_MAX_LENGTH bound, same code as 5.0.8)
+# while keeping the old callable-function export those minimatch versions
+# require. Forcing 5.0.8 there instead breaks at runtime: 5.0.8 changed the
+# export from a function to an object ({ expand, ... }), which minimatch@3.x/
+# 5.x (pulled in transitively via exceljs -> archiver -> glob/readdir-glob)
+# cannot consume. Re-check if exceljs/archiver ever bump their glob/minimatch
+# versions.
+CVE-2026-14257

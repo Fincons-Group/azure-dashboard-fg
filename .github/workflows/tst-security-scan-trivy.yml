@@ -1,0 +1,158 @@
+name: Trivy Security Scan
+# Scans: (1) filesystem vulnerabilities in npm deps, (2) secret detection, (3) IaC / misconfiguration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy-scan:
+    name: Trivy – fs / secret / IaC
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      # Direct .deb install from GitHub releases – plain HTTPS, no git clone involved.
+      # Pinned to the version bundled with trivy-action v0.36.0.
+      - name: Install Trivy
+        run: |
+          wget -q "https://github.com/aquasecurity/trivy/releases/download/v0.70.0/trivy_0.70.0_Linux-64bit.deb"
+          sudo dpkg -i trivy_0.70.0_Linux-64bit.deb
+          rm trivy_0.70.0_Linux-64bit.deb
+          wget -q "https://raw.githubusercontent.com/aquasecurity/trivy/v0.70.0/contrib/html.tpl" -O /tmp/trivy-html.tpl
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            trivy-db-${{ runner.os }}-
+
+      # ── 1. Filesystem scan – vulnerabilities in npm dependencies
+      - name: Trivy – Filesystem scan
+        run: |
+          trivy fs . \
+            --scanners vuln \
+            --severity CRITICAL,HIGH,MEDIUM,LOW \
+            --exit-code 1 \
+            --format table \
+            --cache-dir ~/.cache/trivy \
+            --skip-dirs node_modules
+        env:
+          TRIVY_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Trivy – Filesystem scan (json + html report)
+        if: always()
+        run: |
+          trivy fs . \
+            --scanners vuln \
+            --severity CRITICAL,HIGH,MEDIUM,LOW \
+            --exit-code 0 \
+            --format json \
+            --output trivy-fs.json \
+            --cache-dir ~/.cache/trivy \
+            --skip-dirs node_modules
+          trivy fs . \
+            --scanners vuln \
+            --severity CRITICAL,HIGH,MEDIUM,LOW \
+            --exit-code 0 \
+            --format template \
+            --template "@/tmp/trivy-html.tpl" \
+            --output trivy-fs.html \
+            --cache-dir ~/.cache/trivy \
+            --skip-dirs node_modules
+        env:
+          TRIVY_GITHUB_TOKEN: ${{ github.token }}
+
+      # ── 2. Secret detection – API keys, passwords, tokens in source
+      #    ⚠️  If .env.prd (or any .env.*) is committed with real secrets this
+      #    step will fail. Add .env* to .gitignore and scrub git history, or
+      #    create a .trivyignore file to suppress known false-positives.
+      - name: Trivy – Secret detection
+        if: always()
+        run: |
+          trivy fs . \
+            --scanners secret \
+            --exit-code 1 \
+            --format table \
+            --cache-dir ~/.cache/trivy
+        env:
+          TRIVY_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Trivy – Secret detection (json + html report)
+        if: always()
+        run: |
+          trivy fs . \
+            --scanners secret \
+            --exit-code 0 \
+            --format json \
+            --output trivy-secrets.json \
+            --cache-dir ~/.cache/trivy
+          trivy fs . \
+            --scanners secret \
+            --exit-code 0 \
+            --format template \
+            --template "@/tmp/trivy-html.tpl" \
+            --output trivy-secrets.html \
+            --cache-dir ~/.cache/trivy
+        env:
+          TRIVY_GITHUB_TOKEN: ${{ github.token }}
+
+      # ── 3. IaC / Misconfiguration scan – GitHub Actions YAMLs, Dockerfiles, etc.
+      - name: Trivy – IaC / Misconfiguration scan
+        if: always()
+        run: |
+          trivy config . \
+            --severity CRITICAL,HIGH,MEDIUM,LOW \
+            --exit-code 1 \
+            --format table \
+            --cache-dir ~/.cache/trivy
+        env:
+          TRIVY_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Trivy – IaC scan (json + html report)
+        if: always()
+        run: |
+          trivy config . \
+            --severity CRITICAL,HIGH,MEDIUM,LOW \
+            --exit-code 0 \
+            --format json \
+            --output trivy-iac.json \
+            --cache-dir ~/.cache/trivy
+          trivy config . \
+            --severity CRITICAL,HIGH,MEDIUM,LOW \
+            --exit-code 0 \
+            --format template \
+            --template "@/tmp/trivy-html.tpl" \
+            --output trivy-iac.html \
+            --cache-dir ~/.cache/trivy
+        env:
+          TRIVY_GITHUB_TOKEN: ${{ github.token }}
+
+      # ── Upload all reports as a downloadable artifact (Actions → run → Artifacts)
+      - name: Upload scan artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-reports
+          path: |
+            trivy-fs.json
+            trivy-fs.html
+            trivy-secrets.json
+            trivy-secrets.html
+            trivy-iac.json
+            trivy-iac.html
+          retention-days: 5
