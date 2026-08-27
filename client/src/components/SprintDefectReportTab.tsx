@@ -36,7 +36,6 @@ import {
 } from "../api/graphMail";
 import {
   buildEmailPrefaceHtml,
-  buildEmailSignatureHtml,
   buildStatusReportCardEmailBodyHtml,
   buildStatusReportCardEmailDocument,
   buildStatusReportCardFilename,
@@ -281,7 +280,6 @@ export function SprintDefectReportTab({
   includeDeadline = true,
   enableEmailPreface = false,
   enableEmailClosing = false,
-  enableEmailSignature = false,
   project,
 }: {
   stats: DefectStats;
@@ -299,10 +297,6 @@ export function SprintDefectReportTab({
   // Lets the sender type a free-text note below the card preview, appended
   // after the report in the sent email only (mirrors enableEmailPreface).
   enableEmailClosing?: boolean;
-  // Appends an editable business-card-style signature (name/title/company/
-  // address/phone) at the very end of the sent email, below the closing
-  // note - fixed visual style, see buildEmailSignatureHtml.
-  enableEmailSignature?: boolean;
   // Scopes the plan/plan-overview lookups below to a specific Azure DevOps
   // project.
   project?: string;
@@ -393,20 +387,6 @@ export function SprintDefectReportTab({
   const [fromDisplayName, setFromDisplayName] = useState("");
   const [emailPrefaceText, setEmailPrefaceText] = useState("");
   const [emailClosingText, setEmailClosingText] = useState("");
-  const [signatureName, setSignatureName] = useState("Anderson Cahet");
-  const [signatureTitle, setSignatureTitle] = useState(
-    "Senior QA Automation Engineer / SDET",
-  );
-  const [signatureCompany, setSignatureCompany] = useState("FINCONS SPA");
-  const [signatureCity, setSignatureCity] = useState("Lecce");
-  const [signatureAddressLine1, setSignatureAddressLine1] = useState(
-    "Viale Aldo Moro, 36",
-  );
-  const [signatureAddressLine2, setSignatureAddressLine2] =
-    useState("73100 Lecce");
-  const [signaturePhone, setSignaturePhone] = useState(
-    "Mob. +39 3516196464",
-  );
   const statusCardRef = useRef<HTMLDivElement>(null);
   const dashboardLinkRef = useRef<HTMLAnchorElement>(null);
   const statusCardPreviewRef = useRef<HTMLDivElement>(null);
@@ -801,18 +781,7 @@ export function SprintDefectReportTab({
     const bodyHtml = buildStatusReportCardEmailDocument(
       (enableEmailPreface ? buildEmailPrefaceHtml(emailPrefaceText) : "") +
         buildStatusReportCardEmailBodyHtml(cardData, t) +
-        (enableEmailClosing ? buildEmailPrefaceHtml(emailClosingText) : "") +
-        (enableEmailSignature
-          ? buildEmailSignatureHtml({
-              name: signatureName,
-              title: signatureTitle,
-              company: signatureCompany,
-              city: signatureCity,
-              addressLine1: signatureAddressLine1,
-              addressLine2: signatureAddressLine2,
-              phone: signaturePhone,
-            })
-          : ""),
+        (enableEmailClosing ? buildEmailPrefaceHtml(emailClosingText) : ""),
     );
 
     emailReportMutation.mutate({
@@ -955,101 +924,6 @@ export function SprintDefectReportTab({
             resize="vertical"
             onChange={(_, data) => setEmailClosingText(data.value)}
           />
-        </div>
-      )}
-
-      {enableEmailSignature && (
-        <div className={styles.emailPrefaceArea}>
-          <Text weight="semibold">
-            {t(
-              "defectManagementPage.sprintReport.statusCard.emailSignatureLabel",
-            )}
-          </Text>
-          <div className={styles.statusCardControls}>
-            <Field
-              label={t(
-                "defectManagementPage.sprintReport.statusCard.emailSignatureNameLabel",
-              )}
-              className={styles.statusCardField}
-            >
-              <Input
-                value={signatureName}
-                onChange={(_, data) => setSignatureName(data.value)}
-              />
-            </Field>
-            <Field
-              label={t(
-                "defectManagementPage.sprintReport.statusCard.emailSignatureTitleLabel",
-              )}
-              className={styles.statusCardField}
-            >
-              <Input
-                value={signatureTitle}
-                onChange={(_, data) => setSignatureTitle(data.value)}
-              />
-            </Field>
-          </div>
-          <div className={styles.statusCardControls}>
-            <Field
-              label={t(
-                "defectManagementPage.sprintReport.statusCard.emailSignatureCompanyLabel",
-              )}
-              className={styles.statusCardField}
-            >
-              <Input
-                value={signatureCompany}
-                onChange={(_, data) => setSignatureCompany(data.value)}
-              />
-            </Field>
-            <Field
-              label={t(
-                "defectManagementPage.sprintReport.statusCard.emailSignatureCityLabel",
-              )}
-              className={styles.statusCardField}
-            >
-              <Input
-                value={signatureCity}
-                onChange={(_, data) => setSignatureCity(data.value)}
-              />
-            </Field>
-          </div>
-          <div className={styles.statusCardControls}>
-            <Field
-              label={t(
-                "defectManagementPage.sprintReport.statusCard.emailSignatureAddressLabel",
-              )}
-              className={styles.statusCardField}
-            >
-              <Input
-                value={signatureAddressLine1}
-                onChange={(_, data) => setSignatureAddressLine1(data.value)}
-              />
-            </Field>
-            <Field
-              label={t(
-                "defectManagementPage.sprintReport.statusCard.emailSignatureAddressLine2Label",
-              )}
-              className={styles.statusCardField}
-            >
-              <Input
-                value={signatureAddressLine2}
-                onChange={(_, data) => setSignatureAddressLine2(data.value)}
-              />
-            </Field>
-          </div>
-          <div className={styles.statusCardControls}>
-            <Field
-              label={t(
-                "defectManagementPage.sprintReport.statusCard.emailSignaturePhoneLabel",
-              )}
-              className={styles.statusCardField}
-            >
-              <Input
-                value={signaturePhone}
-                onChange={(_, data) => setSignaturePhone(data.value)}
-              />
-            </Field>
-          </div>
         </div>
       )}
 
