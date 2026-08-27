@@ -936,6 +936,49 @@ export function buildEmailPrefaceHtml(prefaceText: string): string {
   );
 }
 
+export interface EmailSignatureData {
+    name: string;
+    title: string;
+    company: string;
+    city: string;
+    addressLine1: string;
+    addressLine2: string;
+    phone: string;
+}
+
+const SIGNATURE_ACCENT = "#8b1e3f";
+const SIGNATURE_RULE = "#c9c9c9";
+
+// Renders the sender's business-card-style signature (name/title/company/
+// address/phone) below the status card in the sent email - a fixed visual
+// style (maroon bold name, italic title, muted address block) rather than
+// a free-text note, since that's what distinguishes a signature block from
+// the plain-paragraph emailClosingText note above it.
+export function buildEmailSignatureHtml(sig: EmailSignatureData): string {
+    if (!sig.name.trim()) {
+        return "";
+    }
+
+    const line = (text: string, style: string) =>
+        text.trim()
+            ? `<tr><td style="padding:0 0 6px 0;${style}">${escapeHtml(text)}</td></tr>`
+            : "";
+
+    return (
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${LIGHT_PAGE_BG}" style="background-color:${LIGHT_PAGE_BG};padding:16px 0 0;">` +
+        `<tr><td align="center">` +
+        `<table role="presentation" width="${EMAIL_CARD_WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:${EMAIL_CARD_WIDTH}px;max-width:100%;border-top:1px solid ${SIGNATURE_RULE};padding-top:12px;font-family:${EMAIL_FONT_FAMILY};">` +
+        line(sig.name, `font-size:15px;font-weight:700;color:${SIGNATURE_ACCENT};`) +
+        line(sig.title, `font-size:12px;font-style:italic;color:${LIGHT_INK_MUTED};`) +
+        line(sig.company, `font-size:12px;color:${LIGHT_INK_MUTED};`) +
+        line(sig.city, `font-size:12px;font-weight:700;color:${LIGHT_INK};`) +
+        line(sig.addressLine1, `font-size:12px;color:${LIGHT_INK_MUTED};`) +
+        line(sig.addressLine2, `font-size:12px;color:${LIGHT_INK_MUTED};`) +
+        line(sig.phone, `font-size:12px;color:${LIGHT_INK_MUTED};`) +
+        `</table></td></tr></table>`
+    );
+}
+
 // Wraps the fragment as a standalone document so it opens/renders correctly
 // on its own (fonts, background) when the downloaded file is opened directly
 // in a browser - the intended flow is: open the file, select-all, copy, then

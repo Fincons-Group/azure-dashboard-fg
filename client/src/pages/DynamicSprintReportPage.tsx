@@ -258,6 +258,7 @@ export function DynamicSprintReportPage() {
                                     includeDeadline={false}
                                     enableEmailPreface
                                     enableEmailClosing
+                                    enableEmailSignature
                                 />
                             </>
                         )}
