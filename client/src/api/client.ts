@@ -1,77 +1,49 @@
-import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import type {
-    SuiteStat,
-    DashboardResponse,
-    RunCard,
-    AutomationDashboardResponse,
-    ExecutionTrendResponse,
     TestPlanSummary,
-    TestSuiteSummary,
     DefectDashboardResponse,
     DefectFilters,
-    CommonErrorsResponse,
-    WorkItemSummary,
-    MyWorkItemsMode,
     PlanOverviewResponse,
-    TestPlanProgressResponse,
-    BugInfo,
-    DeleteTestCaseItem,
-    DeleteTestCasesResult,
-    ReleaseReadinessResponse,
-    NavBadgesResponse,
     IterationNode,
+    ProjectSummary,
+    AreaPathNode,
 } from "../types";
-import { loginRequest } from "../authConfig";
-import { msalInstance } from "../msalInstance";
 import i18n from "../i18n";
+import { loadStoredAzdoConnection } from "../azdoConnection";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
-const skipAuth = import.meta.env.VITE_SKIP_AUTH === "true";
+const LOCAL_API_BASE_URL = "http://localhost:4174";
 
-async function getAccessToken(): Promise<string> {
-    const account =
-        msalInstance.getActiveAccount() ??
-        msalInstance.getAllAccounts()[0];
-
-    if (!account) {
-        throw new Error("No signed-in account");
+function getApiBaseUrl(): string {
+    if (import.meta.env.VITE_API_BASE_URL) {
+        return import.meta.env.VITE_API_BASE_URL;
     }
 
-    try {
-        const result = await msalInstance.acquireTokenSilent({
-            ...loginRequest,
-            account,
-        });
-
-        return result.accessToken;
-    } catch (error) {
-        if (error instanceof InteractionRequiredAuthError) {
-            await msalInstance.acquireTokenRedirect({
-                ...loginRequest,
-                account,
-            });
-        }
-
-        throw error;
-    }
+    return window.location.port === "4173" ? LOCAL_API_BASE_URL : "";
 }
 
-async function authorizedFetch(
+function buildRequestHeaders(
+    headers?: HeadersInit
+): Headers {
+    const nextHeaders = new Headers(headers);
+    const connection = loadStoredAzdoConnection();
+
+    if (connection?.pat) {
+        nextHeaders.set("x-ado-pat", connection.pat);
+    }
+
+    if (connection?.org) {
+        nextHeaders.set("x-ado-org", connection.org);
+    }
+
+    return nextHeaders;
+}
+
+async function apiFetch(
     path: string,
     init: RequestInit = {}
 ): Promise<Response> {
-    if (skipAuth) {
-        return fetch(`${API_BASE_URL}${path}`, init);
-    }
-
-    const accessToken = await getAccessToken();
-
-    return fetch(`${API_BASE_URL}${path}`, {
+    return fetch(`${getApiBaseUrl()}${path}`, {
         ...init,
-        headers: {
-            ...init.headers,
-            Authorization: `Bearer ${accessToken}`,
-        },
+        headers: buildRequestHeaders(init.headers),
     });
 }
 
@@ -97,7 +69,7 @@ async function throwForErrorResponse(
 }
 
 async function getJson<T>(url: string): Promise<T> {
-    const res = await authorizedFetch(url);
+    const res = await apiFetch(url);
 
     if (!res.ok) {
         await throwForErrorResponse(
@@ -109,82 +81,48 @@ async function getJson<T>(url: string): Promise<T> {
     return res.json();
 }
 
-export function fetchSuites(): Promise<
-    Record<string, SuiteStat>
-> {
-    return getJson("/api/suites");
-}
-
-export function fetchDashboard(
+export function fetchPlans(
+    project?: string,
+    areaPath?: string,
     iteration?: string
-): Promise<DashboardResponse> {
-    const qs = iteration
-        ? `?iteration=${encodeURIComponent(iteration)}`
-        : "";
-
-    return getJson(`/api/dashboard${qs}`);
-}
-
-export function fetchRuns(): Promise<RunCard[]> {
-    return getJson("/api/runs");
-}
-
-export function fetchPlans(): Promise<TestPlanSummary[]> {
-    return getJson("/api/plans");
-}
-
-export function fetchIterations(): Promise<IterationNode[]> {
-    return getJson("/api/iterations");
-}
-
-export function fetchPlanSuites(
-    planId: number
-): Promise<TestSuiteSummary[]> {
-    return getJson(`/api/plans/${planId}/suites`);
-}
-
-export function fetchPlanOverview(
-    planId: number
-): Promise<PlanOverviewResponse> {
-    return getJson(`/api/plans/${planId}/overview`);
-}
-
-export function fetchPlanProgress(
-    planId: number
-): Promise<TestPlanProgressResponse> {
-    return getJson(`/api/plans/${planId}/progress`);
-}
-
-export function fetchPlanProgressBugs(
-    planId: number,
-    suiteIds: number[]
-): Promise<BugInfo[]> {
-    const qs = suiteIds.length ? `?suiteIds=${suiteIds.join(",")}` : "";
-
-    return getJson(`/api/plans/${planId}/progress/bugs${qs}`);
-}
-
-export function fetchAutomationDashboard(
-    planId?: number,
-    iteration?: string
-): Promise<AutomationDashboardResponse> {
+): Promise<TestPlanSummary[]> {
     const params = new URLSearchParams();
 
-    if (planId != null) params.set("planId", String(planId));
+    if (project) params.set("project", project);
+    if (areaPath) params.set("areaPath", areaPath);
     if (iteration) params.set("iteration", iteration);
 
     const qs = params.toString();
-    const url = qs ? `/api/automation?${qs}` : "/api/automation";
 
-    return getJson(url);
+    return getJson(`/api/plans${qs ? `?${qs}` : ""}`);
 }
 
-export function fetchExecutionTrend(): Promise<ExecutionTrendResponse> {
-    return getJson("/api/execution-trend");
+export function fetchIterations(project?: string): Promise<IterationNode[]> {
+    const qs = project ? `?project=${encodeURIComponent(project)}` : "";
+
+    return getJson(`/api/iterations${qs}`);
+}
+
+export function fetchProjects(): Promise<ProjectSummary[]> {
+    return getJson("/api/projects");
+}
+
+export function fetchAreaPaths(project: string): Promise<AreaPathNode[]> {
+    return getJson(`/api/areas?project=${encodeURIComponent(project)}`);
+}
+
+export function fetchPlanOverview(
+    planId: number,
+    project?: string
+): Promise<PlanOverviewResponse> {
+    const qs = project ? `?project=${encodeURIComponent(project)}` : "";
+
+    return getJson(`/api/plans/${planId}/overview${qs}`);
 }
 
 export function fetchDefects(
-    filters?: DefectFilters
+    filters?: DefectFilters,
+    project?: string
 ): Promise<DefectDashboardResponse> {
     const params = new URLSearchParams();
 
@@ -192,6 +130,7 @@ export function fetchDefects(
     if (filters?.area) params.set("area", filters.area);
     if (filters?.environment) params.set("environment", filters.environment);
     if (filters?.targetVersion) params.set("targetVersion", filters.targetVersion);
+    if (project) params.set("project", project);
     filters?.suites?.forEach((suite) => params.append("suite", suite));
 
     const qs = params.toString();
@@ -199,72 +138,13 @@ export function fetchDefects(
     return getJson(`/api/defects${qs ? `?${qs}` : ""}`);
 }
 
-export function fetchReleaseReadiness(
-    iteration?: string
-): Promise<ReleaseReadinessResponse> {
-    const qs = iteration
-        ? `?iteration=${encodeURIComponent(iteration)}`
-        : "";
-
-    return getJson(`/api/release-readiness${qs}`);
+export interface RefreshResult {
+    refreshed: boolean;
+    retryAfterMs?: number;
 }
 
-export function fetchNavBadges(): Promise<NavBadgesResponse> {
-    return getJson("/api/nav-badges");
-}
-
-export function fetchCommonErrors(): Promise<CommonErrorsResponse> {
-    return getJson("/api/common-errors");
-}
-
-export function fetchMyWorkItems(
-    mode: MyWorkItemsMode
-): Promise<WorkItemSummary[]> {
-    return getJson(`/api/my-work-items?mode=${mode}`);
-}
-
-export async function sendEmailReport(payload: {
-    subject: string;
-    bodyHtml: string;
-    pdfBase64?: string;
-    filename?: string;
-    fromName: string;
-}): Promise<void> {
-    const res = await authorizedFetch("/api/email-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-        await throwForErrorResponse(
-            res,
-            `Email report failed (${res.status})`
-        );
-    }
-}
-
-export async function deleteTestCases(
-    items: DeleteTestCaseItem[]
-): Promise<DeleteTestCasesResult> {
-    const res = await authorizedFetch("/api/test-cases/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
-    });
-
-    if (!res.ok) {
-        await throwForErrorResponse(
-            res,
-            `Delete failed (${res.status})`
-        );
-    }
-
-    return res.json();
-}
-
-export async function postRefresh(): Promise<void> {
-    const res = await authorizedFetch("/api/refresh", {
+export async function postRefresh(): Promise<RefreshResult> {
+    const res = await apiFetch("/api/refresh", {
         method: "POST",
     });
 
@@ -274,4 +154,6 @@ export async function postRefresh(): Promise<void> {
             `Refresh failed (${res.status})`
         );
     }
+
+    return res.json();
 }

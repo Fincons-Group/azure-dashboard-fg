@@ -58,7 +58,7 @@ This can take a minute or two. You'll see a progress bar - just wait for it to f
 
 The app needs two configuration files: one for the backend (project root) and one for the frontend (`client` folder).
 
-In normal (production-like) use, people also have to sign in with a Microsoft account before they can see anything. For just trying the dashboard out locally, you can skip that entirely - the steps below set that up.
+There's no Microsoft sign-in wall - the dashboard is visible to anyone who can reach it, and access is really gated by whether `AZDO_PAT` below is valid: if it works, data loads; if not, the dashboard renders an empty screen.
 
 ### Backend config
 
@@ -68,14 +68,13 @@ In normal (production-like) use, people also have to sign in with a Microsoft ac
    - `AZDO_PAT` - your Azure DevOps Personal Access Token (ask whoever manages your Azure DevOps for one, or generate it yourself under Azure DevOps > User Settings > Personal Access Tokens).
    - `AZDO_ORG` - your Azure DevOps organization name.
    - `AZDO_PROJECT` - your Azure DevOps project name.
-   - Leave `SKIP_AUTH=true` as it is - this is what skips the Microsoft sign-in screen. The other Entra/`PRIVILEGED_*` fields below it are only used when `SKIP_AUTH` is off, so you can ignore them.
 4. Save the file.
 
 ### Frontend config
 
 1. Find `client/.env.example`.
 2. Make a copy and rename it to `client/.env`.
-3. You can leave every value in this file exactly as it is - they're placeholders that are never actually used while `VITE_SKIP_AUTH=true` is set, since sign-in is skipped.
+3. Leave `VITE_SKIP_OWNER_CHECK=true` as-is unless you're restricting "Plan Progress"/"Remove Test Cases" to a single owner. Optionally fill in `VITE_MY_EMAIL`/`VITE_MY_NAME` so the "My Work Items" assigned/created/mentioned tabs know who "me" is.
 4. Save the file.
 
 **Never share your `.env` file or your token with anyone** - it works like a password.
@@ -94,7 +93,9 @@ Wait until you see messages saying the server and the client are running. Then o
 http://localhost:3000
 ```
 
-You should see the dashboard directly - no sign-in screen, since `SKIP_AUTH` is on. To stop the app, go back to the terminal and press `Ctrl + C`.
+You should see the dashboard directly - no sign-in screen. To stop the app, go back to the terminal and press `Ctrl + C`.
+
+The first time you load the app, a **Project** dropdown opens at the top of the page - pick a project (it lists every Azure DevOps project your `AZDO_PAT` token can see, not just the one in `.env`) before any data loads. You can also narrow further by Area Path and Sprint. Your choice is remembered in the browser for next time; use the **Change scope** button to pick a different project later.
 
 ## Troubleshooting
 
@@ -102,7 +103,7 @@ You should see the dashboard directly - no sign-in screen, since `SKIP_AUTH` is 
 - **Blank page or errors about Azure DevOps**: double-check the values in your root `.env` file (step 5) - typos in the org/project name or an expired token are the most common causes.
 - **Nothing happens after `npm run dev:all`**: make sure you ran `npm install` in both the root folder and the `client` folder (step 4).
 - **A "502" or "Bad Gateway" error, or the page looks stuck**: a server from a previous `npm run dev:all` run may still be holding the ports. Press `Ctrl + C` in the terminal, then run `npm run kill:dev` to clean up any leftover processes, and try `npm run dev:all` again.
-- **"My Work Items" page is empty**: that page only shows items assigned to the owner of the `AZDO_PAT` token. If that person currently has no active Tasks or Bugs assigned, an empty list is expected.
+- **"My Work Items" page is empty on the "Assigned to me"/"Created by me" tabs**: set `VITE_MY_EMAIL` in `client/.env` to your Azure DevOps email.
 
 ## Italian onboarding (Windows)
 

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
 import { Sidebar } from "./layout/Sidebar";
 import { TopBar } from "./layout/TopBar";
+import { ScopeBar } from "./ScopeBar/ScopeBar";
 import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from "../layoutConstants";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "sidebarCollapsed";
@@ -35,6 +36,11 @@ const useStyles = makeStyles({
         gap: tokens.spacingVerticalL,
         boxSizing: "border-box",
     },
+    contentWide: {
+        // Report page: ReportSidebar takes real horizontal space alongside
+        // the report content, so the usual 1200px column feels cramped.
+        maxWidth: "1600px",
+    },
 });
 
 function getInitialCollapsed(): boolean {
@@ -44,9 +50,13 @@ function getInitialCollapsed(): boolean {
 export function PageLayout({
     title,
     children,
+    hideAreaSprintScope = false,
+    wide = false,
 }: {
     title: string;
     children: ReactNode;
+    hideAreaSprintScope?: boolean;
+    wide?: boolean;
 }) {
     const styles = useStyles();
     const [collapsed, setCollapsed] = useState(getInitialCollapsed);
@@ -70,8 +80,16 @@ export function PageLayout({
                 )}
             >
                 <TopBar title={title} />
+                <ScopeBar hideAreaSprint={hideAreaSprintScope} />
 
-                <div className={styles.content}>{children}</div>
+                <div
+                    className={mergeClasses(
+                        styles.content,
+                        wide && styles.contentWide
+                    )}
+                >
+                    {children}
+                </div>
             </div>
         </div>
     );

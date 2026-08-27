@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     Button,
     Text,
@@ -7,14 +7,16 @@ import {
     makeStyles,
     tokens,
 } from "@fluentui/react-components";
-import { ArrowSyncRegular } from "@fluentui/react-icons";
+import { useState } from "react";
+import { ArrowSyncRegular, QuestionCircleRegular } from "@fluentui/react-icons";
 import { useTranslation } from "react-i18next";
-import { useMsal } from "@azure/msal-react";
 import { NAV_HEIGHT, RAIL_BG, RAIL_FG, RAIL_FG_ACTIVE } from "../../layoutConstants";
 import { postRefresh } from "../../api/client";
+import { clearStoredAzdoConnection } from "../../azdoConnection";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { ThemeSwitcher } from "../ThemeSwitcher";
 import { TestGraphMailButton } from "../TestGraphMailButton";
+import { GettingStartedGuide } from "../GettingStartedGuide";
 
 // Colors are hardcoded (not theme tokens) to match the Sidebar rail, which
 // is also always dark regardless of the light/dark content theme - see
@@ -70,11 +72,20 @@ const useStyles = makeStyles({
 export function TopBar({ title }: { title: string }) {
     const styles = useStyles();
     const { t } = useTranslation();
-    const { instance, accounts } = useMsal();
-    const activeAccount = instance.getActiveAccount() ?? accounts[0];
+    const queryClient = useQueryClient();
+    const [helpOpen, setHelpOpen] = useState(false);
 
     const refreshMutation = useMutation({
         mutationFn: postRefresh,
+        onSuccess: (result) => {
+            // Only the server clearing its caches means there's anything new
+            // to show - a throttled ("already up to date") response leaves
+            // every page's data exactly as it was, so refetching would just
+            // replay the same server-cached values for nothing.
+            if (result.refreshed) {
+                void queryClient.invalidateQueries();
+            }
+        },
     });
 
     return (
@@ -91,6 +102,18 @@ export function TopBar({ title }: { title: string }) {
                         })}
                     </Text>
                 )}
+
+                {refreshMutation.isSuccess &&
+                    !refreshMutation.data.refreshed && (
+                        <Text className={styles.welcome}>
+                            {t("nav.refreshUpToDate", {
+                                minutes: Math.ceil(
+                                    (refreshMutation.data.retryAfterMs ?? 0) /
+                                        60000
+                                ),
+                            })}
+                        </Text>
+                    )}
 
                 <Button
                     appearance="subtle"
@@ -112,19 +135,37 @@ export function TopBar({ title }: { title: string }) {
                     )}
                 </Button>
 
-                {activeAccount && (
-                    <Text className={styles.welcome}>
-                        {t("nav.welcome", {
-                            name: activeAccount.name ?? activeAccount.username,
-                        })}
-                    </Text>
-                )}
-
                 <TestGraphMailButton />
+
+                <Button
+                    appearance="subtle"
+                    className={styles.refreshButton}
+                    onClick={() => {
+                        clearStoredAzdoConnection();
+                        localStorage.removeItem("azureDashboardScope");
+                        window.location.reload();
+                    }}
+                >
+                    {t("nav.changePat")}
+                </Button>
+
+                <Button
+                    appearance="subtle"
+                    className={styles.refreshButton}
+                    icon={<QuestionCircleRegular />}
+                    onClick={() => setHelpOpen(true)}
+                >
+                    {t("nav.help")}
+                </Button>
 
                 <LanguageSwitcher />
                 <ThemeSwitcher />
             </div>
+
+            <GettingStartedGuide
+                open={helpOpen}
+                onClose={() => setHelpOpen(false)}
+            />
         </div>
     );
 }

@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -28,13 +28,13 @@ jobs:
       # Pinned to the version bundled with trivy-action v0.36.0.
       - name: Install Trivy
         run: |
-          wget -q "https://github.com/aquasecurity/trivy/releases/download/v0.70.0/trivy_0.70.0_Linux-64bit.deb"
+          wget -q --https-only "https://github.com/aquasecurity/trivy/releases/download/v0.70.0/trivy_0.70.0_Linux-64bit.deb"
           sudo dpkg -i trivy_0.70.0_Linux-64bit.deb
           rm trivy_0.70.0_Linux-64bit.deb
-          wget -q "https://raw.githubusercontent.com/aquasecurity/trivy/v0.70.0/contrib/html.tpl" -O /tmp/trivy-html.tpl
+          wget -q --https-only "https://raw.githubusercontent.com/aquasecurity/trivy/v0.70.0/contrib/html.tpl" -O /tmp/trivy-html.tpl
 
       - name: Cache Trivy DB
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/trivy
           key: trivy-db-${{ runner.os }}-${{ github.run_id }}

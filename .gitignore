@@ -1,3 +1,9 @@
 node_modules/
 .claude/
 .env
+sprint-dsi-analysis.html
+src/scripts/_debugWiql.mjs
+src/scripts/analyzeDsiDuplicates.ts
+dist/
+server/**/*.js
+!server/proxy.js

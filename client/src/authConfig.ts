@@ -31,7 +31,3 @@ export const msalConfig: Configuration = {
         },
     },
 };
-
-export const loginRequest = {
-    scopes: [import.meta.env.VITE_ENTRA_API_SCOPE],
-};

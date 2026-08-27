@@ -1,688 +1,265 @@
 {
-    "common": {
-        "title": "QA Dashboard"
+  "common": {
+    "title": "QA Dashboard"
+  },
+  "nav": {
+    "primary": "Principale",
+    "home": "Vai alla home",
+    "dynamicSprintReport": "Report Sprint",
+    "refresh": "Aggiorna Ora",
+    "refreshing": "Aggiornamento...",
+    "refreshFailed": "Aggiornamento non riuscito: {{message}}",
+    "refreshUpToDate": "Già aggiornato (riprova tra {{minutes}}m)",
+    "help": "Guida",
+    "testGraphLogin": "Login",
+    "testGraphLogout": "Logout",
+    "testGraphSigningIn": "Accesso in corso...",
+    "testGraphSigningOut": "Disconnessione in corso...",
+    "testGraphLoginFailed": "Accesso non riuscito: {{message}}",
+    "testGraphLogoutFailed": "Disconnessione non riuscita: {{message}}",
+    "collapseSidebar": "Comprimi barra laterale",
+    "expandSidebar": "Espandi barra laterale",
+    "changePat": "Cambia PAT"
+  },
+  "azdoPatSteps": {
+    "step1": "In Azure DevOps apri il tuo profilo (in alto a destra) e vai su Impostazioni Utente > Personal Access Token.",
+    "step2": "Clicca su \"New Token\", assegna un nome e imposta gli ambiti su Work Items (Read) e Test Plans (Read).",
+    "step3": "Clicca su \"Create\" e copia subito il token - Azure DevOps lo mostra una sola volta.",
+    "step4": "Nella dashboard clicca su \"Cambia PAT\" (o usa la schermata iniziale) e inserisci il nome della tua organizzazione insieme al PAT.",
+    "step5": "I valori restano solo nel local storage di questo browser e vengono inviati soltanto al processo locale della dashboard."
+  },
+  "onboardingGuide": {
+    "title": "Per iniziare",
+    "intro": "Una breve panoramica su come inviare un report via email e collegare la dashboard ad Azure DevOps da questo browser.",
+    "emailSection": {
+      "title": "Inviare un report via email",
+      "statusReport": "Report di stato completo: nella pagina Report Sprint, clicca su \"Login\" nella barra in alto per accedere con il tuo account Microsoft, poi inserisci i destinatari nella sezione \"Email Status Card\" e clicca \"Send Email\". Visibile solo se abilitato."
     },
-    "nav": {
-        "primary": "Principale",
-        "home": "Vai alla home",
-        "suites": "Sfoglia per Suite",
-        "dashboard": "Dashboard Completa",
-        "runs": "Ultime 10 Esecuzioni",
-        "plans": "Piani di Test",
-        "planOverview": "Panoramica Piano",
-        "planProgress": "Report Avanzamento",
-        "automation": "Automazione",
-        "automationDashboard": "Dashboard Automazione",
-        "execution": "Esecuzione Test",
-        "defects": "Gestione Difetti",
-        "sprintReport": "Report Sprint",
-        "plurifondSprintReport": "Report Sprint Plurifond",
-        "commonErrors": "Errori Comuni",
-        "myWorkItems": "I Miei Elementi",
-        "removeTestCases": "Rimuovi Test Case",
-        "releaseReadiness": "Prontezza al Rilascio",
-        "refresh": "Aggiorna Ora",
-        "refreshing": "Aggiornamento...",
-        "refreshFailed": "Aggiornamento non riuscito: {{message}}",
-        "welcome": "Benvenuto, {{name}}",
-        "signOut": "Esci",
-        "testGraphLogin": "Login",
-        "testGraphLogout": "Logout",
-        "testGraphSigningIn": "Accesso in corso...",
-        "testGraphSigningOut": "Disconnessione in corso...",
-        "testGraphLoginFailed": "Accesso non riuscito: {{message}}",
-        "testGraphLogoutFailed": "Disconnessione non riuscita: {{message}}",
-        "collapseSidebar": "Comprimi barra laterale",
-        "expandSidebar": "Espandi barra laterale"
+    "azdoSection": {
+      "title": "Collegarsi ad Azure DevOps",
+      "intro": "Il pacchetto locale carica i dati solo dopo che hai salvato in questo browser la tua organizzazione Azure DevOps e il PAT:"
     },
-    "signInPage": {
-        "title": "QA Dashboard",
-        "subtitle": "Accedi con il tuo account Microsoft per continuare.",
-        "signIn": "Accedi con Microsoft"
+    "navSectionTitle": "Cosa trovi nel menu",
+    "navSections": {
+      "dynamic-sprint-report": "Crea un report filtrato per area path, sprint e piano di test."
     },
-    "outcome": {
-        "Passed": "Passed",
-        "Failed": "Failed",
-        "Blocked": "Blocked",
-        "NotApplicable": "N/A",
-        "Paused": "In Pausa",
-        "InProgress": "In Corso",
-        "NotRun": "Non Eseguito",
-        "ariaLabel": "Risultato: {{outcome}}"
+    "gotIt": "Capito"
+  },
+  "azdoConnectionError": {
+    "title": "Impossibile raggiungere Azure DevOps",
+    "message": "La dashboard non è riuscita a caricare i dati da Azure DevOps. Di solito significa che organizzazione o PAT salvati sono assenti, scaduti o non validi.",
+    "retry": "Riprova",
+    "changePat": "Cambia PAT"
+  },
+  "outcome": {
+    "Passed": "Passed",
+    "Failed": "Failed",
+    "Blocked": "Blocked",
+    "NotApplicable": "N/A",
+    "Paused": "In Pausa",
+    "InProgress": "In Corso",
+    "NotRun": "Non Eseguito"
+  },
+  "planOverviewPage": {
+    "exporting": "Esportazione...",
+    "sendEmail": "Invia report via email",
+    "emailSending": "Invio del report via email in corso...",
+    "emailSent": "Report inviato via email.",
+    "emailFailed": "Invio del report via email non riuscito: {{message}}"
+  },
+  "defectManagementPage": {
+    "stats": {
+      "days": "{{value}}"
     },
-    "suitesPage": {
-        "empty": "Nessuna suite trovata."
-    },
-    "dashboardPage": {
-        "title": "QA Dashboard",
-        "lastRefresh": "Ultimo Aggiornamento: {{date}} (durata cache: 5 minuti)",
-        "priority": "Priorità {{value}}",
-        "emptyFiltered": "Nessun test case corrisponde ai filtri attuali.",
-        "emailSending": "Invio del report via email in corso...",
-        "emailSent": "Report inviato via email.",
-        "emailFailed": "Invio del report via email non riuscito: {{message}}",
-        "stats": {
-            "total": "Test Case Totali",
-            "withOpenBugs": "Con Bug Aperti",
-            "withoutOpenBugs": "Senza Bug Aperti",
-            "activeBugs": "Bug Attivi",
-            "closedBugs": "Bug Chiusi",
-            "passed": "Superati",
-            "failed": "Falliti",
-            "blocked": "Bloccati",
-            "notApplicable": "Non Applicabili",
-            "notRun": "Non Eseguiti",
-            "passRate": "Percentuale di Successo",
-            "passRateExclNA": "Percentuale di Successo (escl. N/A)"
-        }
-    },
-    "runsPage": {
-        "title": "QA Dashboard - Ultime 10 Esecuzioni",
-        "empty": "Nessuna esecuzione di test trovata."
-    },
-    "plansPage": {
-        "title": "Piani di Test",
-        "empty": "Nessun piano di test trovato."
-    },
-    "planDetailPage": {
-        "title": "Piano di Test {{id}}",
-        "backToPlans": "Torna ai Piani di Test",
-        "openInAzureDevOps": "Apri in Azure DevOps",
-        "suitesTitle": "Suite di Test",
-        "empty": "Nessuna suite di test trovata.",
-        "suiteEmpty": "Nessun test case in questa suite."
-    },
-    "planOverviewPage": {
-        "title": "Panoramica Piano",
-        "exportPdf": "Esporta come PDF",
-        "exporting": "Esportazione...",
-        "sendEmail": "Invia report via email",
-        "emailSending": "Invio del report via email in corso...",
-        "emailSent": "Report inviato via email.",
-        "emailFailed": "Invio del report via email non riuscito: {{message}}",
-        "email": {
-            "metricColumn": "Metrica",
-            "valueColumn": "Valore"
+    "sprintReport": {
+      "origin": {
+        "testFactory": "Test Factory",
+        "testAgenti": "Test Agenti",
+        "business": "Business"
+      },
+      "statusCard": {
+        "title": "Scheda Stato Sprint",
+        "headerTitleLabel": "Titolo scheda",
+        "headerSubtitleLabel": "Sottotitolo scheda",
+        "updatedAt": "Aggiornato: {{date}}, {{time}}",
+        "uatDeadlineLabel": "Scadenza UAT (opzionale)",
+        "alertTemplate_one": "Chiusura finestra UAT: {{date}} - resta {{count}} giorno lavorativo. È richiesto al System Integrator il piano date di risoluzione dei bug aperti (dettaglio sotto).",
+        "alertTemplate_other": "Chiusura finestra UAT: {{date}} - restano {{count}} giorni lavorativi. È richiesto al System Integrator il piano date di risoluzione dei bug aperti (dettaglio sotto).",
+        "actionsLabel1": "Azione 1 (opzionale)",
+        "actionsLabel2": "Azione 2 (opzionale)",
+        "actionsPlaceholder": "Testo dell'azione",
+        "actionsPresetPlaceholder": "Inserisci un modello...",
+        "actionsPresetAutoSuggested": "Testo suggerito (generato da questo report)",
+        "actionsPreset1SiDeadline": "System Integrator: aggiornare/chiudere i bug entro la deadline",
+        "actionsPreset1SiMissingDates": "System Integrator: date di risoluzione mancanti ({{count}} bug)",
+        "actionsPreset2TestManagementOutOfScope": "Test Management: agente complesso fuori ambito (Sprint 3)",
+        "actionsPreset2TestFunzionaliNotExecutable": "Test funzionali: test case non eseguibili (funzionalità non rilasciate)",
+        "actionsTitle": "Azioni Richieste - evidenze",
+        "exportButton": "Esporta Scheda Stato",
+        "exportPptxButton": "Esporta come PPTX",
+        "downloadHtmlButton": "Scarica HTML",
+        "copyHtmlButton": "Copia per Email/Teams",
+        "copyHtmlButtonCopied": "Copiato!",
+        "emailSectionTitle": "Invia Report via Email",
+        "emailSectionDescription": "Invia la scheda stato qui sotto via email. Aggiungi uno o più destinatari, separati da virgola.",
+        "emailToLabel": "A",
+        "emailCcLabel": "Cc",
+        "emailAddressPlaceholder": "email1@esempio.com, email2@esempio.com",
+        "emailFromNameLabel": "Nome mittente (opzionale)",
+        "emailFromNamePlaceholder": "Mostrato come nome del mittente",
+        "emailPrefaceLabel": "Testo prima del report",
+        "emailPrefacePlaceholder": "Scrivi un messaggio da includere sopra la scheda di stato, es. un saluto o un riepilogo...",
+        "emailClosingLabel": "Testo dopo del report",
+        "emailClosingPlaceholder": "Scrivi un messaggio da includere sotto la scheda di stato, es. saluti o firma...",
+        "openDashboard": "Azure Dashboard",
+        "casesCount": "{{count}} casi",
+        "executed": "eseguito",
+        "passRate": "Pass rate",
+        "suiteProgressTitle": "Avanzamento Esecuzione Test",
+        "suiteGroupsLabel": "Etichette righe (le suite vengono unite automaticamente)",
+        "suiteGroupsLoading": "Caricamento dati suite...",
+        "suiteGroupsWarning": "\"{{group}}\": nessun caso di test corrisponde ({{hint}})",
+        "noPlanSelected": "Nessuna suite ancora corrisponde - controlla i nomi di piano/suite configurati per questa scheda.",
+        "bugStatusTitle": "Stato bug",
+        "bugStatusSubtitle": "(rilevati da {{sources}})",
+        "closedOutOfScopeNote": " (di cui {{count}} out of scope)",
+        "bugsDetected": "{{count}} bug totali rilevati",
+        "bugStatusSummary": "{{effective}} effettivi, {{outOfScope}} out of scope",
+        "stillOpen": "Di cui {{count}} ancora aperti",
+        "statusLabels": {
+          "closed": "Chiusi",
+          "daVerificare": "Da verificare",
+          "inVerifica": "In verifica",
+          "inProgress": "In lavorazione",
+          "new": "Da prendere in carico",
+          "reopened": "Riaperti",
+          "notApplicable": "Non applicabile (out of scope)"
         },
-        "selectPlanPrompt": "Seleziona un piano di test per visualizzare la panoramica.",
-        "planFilter": {
-            "label": "Piano di Test",
-            "placeholder": "Seleziona un piano..."
-        },
-        "suiteFilter": {
-            "label": "Suite"
-        },
-        "selectedSuiteSection": {
-            "title": "Panoramica Suite: {{suite}}",
-            "outcomeTitle": "Suddivisione Risultati Test",
-            "bugsTitle": "Bug per Stato",
-            "noBugs": "Nessun bug collegato ai test case di questa suite."
-        },
-        "stats": {
-            "totalTests": "Test Case Totali",
-            "totalBugs": "Bug Totali",
-            "passRate": "Percentuale di Successo",
-            "passRateExclNA": "Percentuale di Successo (escl. N/A)",
-            "executionRate": "Percentuale di Esecuzione"
-        },
-        "charts": {
-            "outcomeBreakdown": "Suddivisione Risultati Test",
-            "testsBySuite": "Test per Suite",
-            "bugsByState": "Bug per Stato",
-            "bugsBySuite": "Bug per Suite di Test",
-            "otherSuites": "Altro"
-        },
-        "bugsSection": {
-            "title": "Bug",
-            "empty": "Nessun bug collegato ai test case di questo piano."
-        }
-    },
-    "planProgressPage": {
-        "title": "Report Avanzamento",
-        "selectPlanPrompt": "Seleziona un piano di test per visualizzare il report di avanzamento.",
-        "empty": "Nessuna suite basata su requisiti trovata per questo piano.",
-        "planFilter": {
-            "label": "Piano di Test",
-            "placeholder": "Seleziona un piano..."
-        },
-        "suiteFilter": {
-            "label": "Suite di Test",
-            "placeholder": "Tutte le suite",
-            "allSuites": "Tutte le suite",
-            "selectedCount": "{{count}} selezionate"
-        },
-        "summary": {
-            "testPoints": "Casi di Test",
-            "testPointsRun": "Casi di Test Eseguiti",
-            "passRate": "Percentuale di Successo",
-            "passRateExclNA": "Percentuale di Successo (escl. N/A)",
-            "runChart": "% Eseguiti",
-            "passRateChart": "Percentuale di Successo",
-            "executedLabel": "Eseguiti"
-        },
-        "bugsSection": {
-            "title": "Bug",
-            "empty": "Nessun bug aperto collegato ai test case di questo piano."
-        }
-    },
-    "automationDashboardPage": {
-        "title": "Dashboard di Automazione",
-        "minutes": "{{value}} min",
-        "planFilter": {
-            "label": "Piano di Test",
-            "allPlans": "Tutti i Piani"
-        },
-        "emptyForPlan": "Nessun test automatizzato trovato per questo piano.",
+        "severityCaption": "Distribuzione per severity dei {{count}} bug effettivi",
+        "openSeverityCaption": "Distribuzione per severity dei {{count}} bug ancora aperti",
         "kpis": {
-            "automatedTests": "Test Automatizzati",
-            "manualTests": "Test Manuali",
-            "automationCoveragePct": "Copertura di Automazione %",
-            "flakyTests": "Test Instabili",
-            "automationSuccessRate": "Percentuale di Successo Automazione"
+          "testCasesSection": "Stato casi di test",
+          "bugsSection": "Stato bug",
+          "totalTestCases": "Casi di test totali",
+          "notRun": "Casi di test da eseguire",
+          "executedCount": "Casi di test eseguiti",
+          "totalPassed": "Casi di test Passed",
+          "passRate": "Pass Rate (Ok / Totali)",
+          "notApplicable": "Non applicabili",
+          "bugsClosedRatio": "Bug chiusi (di cui {{count}} out of scope)",
+          "criticalBugs": "Bug critici (non chiusi)",
+          "reopenedBugs": "Bug riaperti",
+          "avgClosureTime": "Tempo medio chiusura\nbug (gg)",
+          "effectiveBugsDetected": "Bug Effettivi / Totali",
+          "outOfScopeBugsDetected": "Bug out of scope",
+          "withoutResolutionDate": "Bug senza data di\nrisoluzione",
+          "bugsByUs": "Bug aperti da Test Factory",
+          "bugsByDsi": "Bug aperti da DSI"
         },
-        "ciCd": {
-            "pipelineSuccessRate": "Percentuale di Successo Pipeline",
-            "pipelineFailureRate": "Percentuale di Fallimento Pipeline",
-            "avgPipelineDuration": "Durata Media Pipeline",
-            "testExecutionTime": "Tempo di Esecuzione Test"
+        "kpisHelp": {
+          "totalTestCases": "Tutti i casi di test presenti nel/i piano/i selezionato/i, qualsiasi sia il loro stato.",
+          "executedCount": "Casi con esito Passato, Fallito o Bloccato. Qualsiasi altro esito (Non Applicabile, Da eseguire, In pausa, In corso) non viene conteggiato come eseguito qui - a differenza del badge \"% Eseguiti\" di ogni suite più in basso, che conta anche i Non Applicabile come eseguiti.",
+          "notApplicable": "Casi segnati come Non Applicabile (N/A), cioè non pertinenti per questo sprint.",
+          "notRun": "Casi non ancora eseguiti: Totale meno Eseguiti meno N/A. Include anche eventuali casi In pausa o In corso, perché solo Passato/Fallito/Bloccato contano come \"eseguiti\" qui sopra.",
+          "totalPassed": "Numero totale di casi di test con esito Passato.",
+          "passRate": "Percentuale di casi Passati sul totale dei casi utili (Totale meno N/A). Sono esclusi gli N/A.",
+          "effectiveBugsDetected": "Bug validi rilevati, cioè esclusi quelli fuori perimetro (duplicati, non pertinenti, ecc.) - mostrati come bug effettivi sul totale rilevato.",
+          "outOfScopeBugsDetected": "Bug rilevati ma esclusi dal conteggio principale perché fuori perimetro (duplicati, non riproducibili, non pertinenti).",
+          "bugsByUs": "Bug rilevati dal nostro team di test: ogni bug rilevato (compresi quelli fuori perimetro) la cui origine non è DSI.",
+          "bugsByDsi": "Bug segnalati direttamente da DSI: ogni bug rilevato (compresi quelli fuori perimetro) collegato all'origine DSI.",
+          "bugsClosedRatio": "Percentuale di bug Chiusi sul totale dei bug rilevati (Chiusi diviso Totale), inclusi eventuali bug fuori perimetro chiusi.",
+          "criticalBugs": "Bug di severity Critica ancora aperti, conteggiati solo tra i bug effettivi (in perimetro) - a differenza degli altri conteggi bug di questa scheda, qui i bug fuori perimetro sono esclusi.",
+          "reopenedBugs": "Bug che sono stati riaperti almeno una volta dopo essere stati chiusi, in base alla loro storia completa - indipendentemente dallo stato attuale, e conteggiati su ogni bug rilevato inclusi quelli fuori perimetro.",
+          "avgClosureTime": "Numero medio di giorni tra l'apertura e la chiusura di un bug, calcolato su ogni bug rilevato (compresi quelli fuori perimetro) che ha una data di chiusura effettiva. I bug ancora aperti non vengono conteggiati.",
+          "withoutResolutionDate": "Bug ancora attivi (non Chiusi, non Da verificare, non In verifica) che non hanno ancora una data di risoluzione stimata. Un dato separato dalla media del tempo di chiusura qui sopra, che si basa sulla data di chiusura effettiva di ogni bug."
         },
-        "charts": {
-            "coverageByModule": "Copertura di Automazione per Modulo",
-            "flakyTestRanking": "Classifica Test Instabili",
-            "pipelineSuccessTrend": "Andamento Successo Pipeline"
+        "sectionHelp": {
+          "suiteProgress": "Il \"% Eseguiti\" di ogni suite conta anche i casi Non Applicabile come eseguiti (viene escluso solo Da eseguire) - più ampio della KPI \"Casi di test eseguiti\" qui sopra, che esclude del tutto i Non Applicabile. Pass Rate = Passati ÷ (Totale meno Non Applicabile).",
+          "bugStatus": "Ogni bug rilevato per questo sprint/area, compresi quelli fuori perimetro, raggruppato per stato attuale su Azure DevOps. \"Ancora aperti\" conta solo i bug effettivi (in perimetro) non ancora Chiusi - un numero più ristretto rispetto ai totali qui sopra.",
+          "originBreakdown": "\"Rilevati\" conta ogni bug attribuito a questa origine, compresi quelli fuori perimetro. \"Accettati\" conta solo i bug effettivi (in perimetro) di quella stessa origine. L'origine di un bug è Test Factory di default, a meno che la suite collegata non lo identifichi come Test Agenti, Business o DSI (i bug DSI sono conteggiati nella tile KPI qui sopra, senza un pannello proprio qui)."
+        },
+        "kpiLegend": {
+          "title": "Guida alla Scheda Stato Sprint",
+          "subtitle": "Spiegazione semplice di ogni indicatore mostrato nella scheda, per capire subito come viene calcolato ogni numero.",
+          "columnIndicator": "Indicatore",
+          "columnExplanation": "Come si calcola",
+          "downloadButton": "Scarica Guida (PDF)",
+          "filename": "guida_scheda_stato_sprint"
+        },
+        "originBreakdown": {
+          "title": "Bug per Suite",
+          "toggleLabel": "Includi Bug per Suite (in prova)",
+          "bugsInSuite": "Bug su {{suite}}",
+          "unmatched": "Nessun caso di test corrispondente",
+          "detected": "Bug rilevati",
+          "accepted": "Bug accettati"
         }
-    },
-    "testExecutionPage": {
-        "title": "Esecuzione Test",
-        "sections": {
-            "metrics": "Metriche di Esecuzione",
-            "trends": "Andamenti",
-            "coverage": "Copertura",
-            "visuals": "Visualizzazioni"
-        },
-        "metrics": {
-            "total": "Test Case Totali",
-            "executed": "Test Eseguiti",
-            "passed": "Superati",
-            "failed": "Falliti",
-            "blocked": "Bloccati",
-            "notApplicable": "Non Applicabili",
-            "notRun": "Non Eseguiti"
-        },
-        "trends": {
-            "passRate": "Andamento Percentuale di Successo",
-            "dailyExecution": "Avanzamento Esecuzione Giornaliera",
-            "failedTests": "Andamento Test Falliti"
-        },
-        "coverage": {
-            "tableLabel": "Copertura per suite",
-            "tabs": {
-                "requirements": "Requisiti",
-                "userStory": "User Story",
-                "feature": "Feature"
-            },
-            "columns": {
-                "name": "Nome",
-                "total": "Totale",
-                "executed": "Eseguiti",
-                "coverage": "Copertura %",
-                "passRate": "Percentuale di Successo",
-                "passRateExclNA": "Percentuale di Successo (escl. N/A*)",
-                "passRateNADelta": "Impatto N/A (Δ)"
-            },
-            "footnote": "* I test case N/A sono taggati \"OutOfScope\" in Azure DevOps. Contano comunque come eseguiti e ai fini della Copertura %, ma sono esclusi dalla \"Percentuale di Successo (escl. N/A)\"."
-        },
-        "risk": {
-            "title": "Copertura del Rischio",
-            "tableLabel": "Copertura per priorità",
-            "highRisk": "Alto Rischio",
-            "priorityLabel": "Priorità {{value}}",
-            "columns": {
-                "priority": "Priorità",
-                "total": "Totale",
-                "passRate": "Percentuale di Successo",
-                "failed": "Falliti"
-            }
-        },
-        "visuals": {
-            "executionFunnel": "Funnel di Esecuzione",
-            "burnUp": "Avanzamento Test (Burn-up)",
-            "passFailTrend": "Andamento Superati/Falliti",
-            "totalLine": "Test Case Totali",
-            "executedLine": "Eseguiti (cumulativo)",
-            "funnel": {
-                "total": "Totale",
-                "executed": "Eseguiti",
-                "passed": "Superati"
-            }
-        }
-    },
-    "defectManagementPage": {
-        "title": "Gestione Difetti",
-        "tabs": {
-            "sprintReport": "Report Sprint",
-            "overview": "Panoramica",
-            "quality": "Qualità e Salute del Processo",
-            "resource": "Risorse e Focus"
-        },
-        "stats": {
-            "totalOpen": "Bug Aperti",
-            "totalClosed": "Bug Chiusi",
-            "mttr": "Tempo Medio di Risoluzione",
-            "reopenedBugs": "Bug Riaperti",
-            "reopenRate": "Tasso di Riapertura",
-            "duplicateRate": "Percentuale Bug Duplicati",
-            "bugsPerStory": "Bug per Story",
-            "days": "{{value}}",
-            "notAvailable": "N/D",
-            "notConfigured": "Non configurato",
-            "withoutLinkedTestCase": "Difetti Senza Test Case Collegati",
-            "withoutSuite": "Difetti Senza una Suite",
-            "leakageRate": "Tasso di Fuga dei Difetti",
-            "rejectionRate": "Tasso di Rigetto dei Difetti",
-            "firstTimeFixRate": "Tasso di Risoluzione al Primo Tentativo",
-            "outOfScopeRate": "Tasso Fuori Ambito",
-            "regressionRate": "Tasso di Regressione",
-            "backlogDirection": "Andamento del Backlog",
-            "backlogDirection_growing": "In Crescita",
-            "backlogDirection_stable": "Stabile",
-            "backlogDirection_shrinking": "In Diminuzione"
-        },
-        "charts": {
-            "trend": "Andamento Bug nel Tempo",
-            "opened": "Aperti",
-            "closed": "Chiusi",
-            "openTotal": "Totale Aperti",
-            "bySeverity": "Bug per Gravità",
-            "byPriority": "Bug per Priorità",
-            "byComponent": "Difetti per Componente/Modulo",
-            "byTeam": "Difetti per Team",
-            "byTestSuite": "Bug per Test Suite",
-            "aging": "Anzianità dei Difetti",
-            "reopenDistribution": "Distribuzione Riaperture (Numero di Volte)",
-            "rejectionReasons": "Motivi di Rigetto",
-            "noRejections": "Nessun difetto rigettato nei dati di processo correnti.",
-            "density": "Densità dei Difetti (Bug per Story Point)",
-            "noDensity": "Nessun componente con story point su cui calcolare la densità.",
-            "workload": "Carico di Triage (Bug per Assegnatario)",
-            "noWorkload": "Nessun bug attualmente assegnato.",
-            "backlogTrend": "Tasso di Crescita del Backlog (Apertura vs. Risoluzione)",
-            "backlogDelta": "Aperti - Chiusi",
-            "realVsOutOfScope": "Difetti Reali vs. Fuori Ambito (Solo Chiusi)",
-            "realVsOutOfScopeAll": "Difetti Reali vs. Fuori Ambito (Tutti i Bug)",
-            "realDefects": "Difetti Reali",
-            "outOfScope": "Fuori Ambito",
-            "noClosedDefects": "Nessun difetto chiuso con un motivo di chiusura determinato.",
-            "noDefectsAllBugs": "Nessun bug nei dati correnti.",
-            "outOfScopeBySuite": "Bug Fuori Ambito per Test Suite",
-            "noOutOfScope": "Nessun bug con tag Fuori Ambito nei dati correnti."
-        },
-        "sections": {
-            "withoutLinkedTestCase": "Difetti Senza Test Case Collegati",
-            "excludeClosed": "Escludi difetti chiusi",
-            "noGaps": "Nessun difetto senza un test case collegato.",
-            "withoutSuite": "Difetti Senza una Suite",
-            "noSuiteGaps": "Nessun difetto privo di suite.",
-            "highAttention": "Massima Attenzione (SLA Superati)",
-            "noBreaches": "Nessun difetto supera attualmente la soglia SLA di anzianità.",
-            "openInAdo": "Apri in Azure DevOps →"
-        },
-        "sprintReport": {
-            "title": "Report Difetti di Sprint 1",
-            "stats": {
-                "total": "Bug Rilevati",
-                "effective": "Difetti Effettivi",
-                "outOfScope": "Fuori Ambito",
-                "outOfScopeNote": "Fuori Ambito: bug creati su funzionalità o test case non previsti nello sprint corrente."
-            },
-            "origin": {
-                "dsi": "DSI",
-                "testFactory": "Test Factory",
-                "testAgenti": "Test Agenti",
-                "business": "Business"
-            },
-            "status": {
-                "closed": "Chiusi",
-                "resolved": "Risolti",
-                "inProgress": "In Lavorazione",
-                "new": "Nuovi"
-            },
-            "charts": {
-                "byOrigin": "Difetti Effettivi per Origine",
-                "byStatus": "Difetti Effettivi per Stato",
-                "bySeverity": "Difetti Effettivi per Gravità",
-                "byOpenSeverity": "Difetti Aperti per Gravità",
-                "noEffectiveDefects": "Nessun difetto effettivo nei dati correnti."
-            },
-            "list": {
-                "title": "Bug: {{filter}}",
-                "clear": "Rimuovi filtro",
-                "empty": "Nessun bug corrisponde a questo filtro."
-            },
-            "pdf": {
-                "filename": "report_difetti_sprint",
-                "countColumn": "Conteggio"
-            },
-            "statusCard": {
-                "title": "Scheda Stato Sprint",
-                "headerTitleLabel": "Titolo scheda",
-                "headerSubtitleLabel": "Sottotitolo scheda",
-                "updatedAt": "Aggiornato: {{date}}, {{time}}",
-                "uatDeadlineLabel": "Scadenza UAT (opzionale)",
-                "alertTemplate_one": "Chiusura finestra UAT: {{date}} - resta {{count}} giorno lavorativo. È richiesto al System Integrator il piano date di risoluzione dei bug aperti (dettaglio sotto).",
-                "alertTemplate_other": "Chiusura finestra UAT: {{date}} - restano {{count}} giorni lavorativi. È richiesto al System Integrator il piano date di risoluzione dei bug aperti (dettaglio sotto).",
-                "actionsLabel": "Azioni richieste (opzionale)",
-                "actionsPlaceholder": "Un'azione per paragrafo, separate da una riga vuota",
-                "actionsTitle": "Azioni Richieste - evidenze",
-                "exportButton": "Esporta Scheda Stato",
-                "exportPptxButton": "Esporta come PPTX",
-                "downloadHtmlButton": "Scarica HTML",
-                "copyHtmlButton": "Copia per Email/Teams",
-                "copyHtmlButtonCopied": "Copiato!",
-                "emailSectionTitle": "Invia Report via Email",
-                "emailSectionDescription": "Invia la scheda stato qui sotto via email. Aggiungi uno o più destinatari, separati da virgola.",
-                "emailToLabel": "A",
-                "emailCcLabel": "Cc",
-                "emailAddressPlaceholder": "email1@esempio.com, email2@esempio.com",
-                "emailFromNameLabel": "Nome mittente (opzionale)",
-                "emailFromNamePlaceholder": "Mostrato come nome del mittente",
-                "emailToLabel": "A",
-                "emailCcLabel": "Cc",
-                "emailAddressPlaceholder": "email1@esempio.com, email2@esempio.com",
-                "emailFromNameLabel": "Nome mittente (opzionale)",
-                "emailFromNamePlaceholder": "Mostrato come nome del mittente",
-                "openDashboard": "Apri la dashboard di monitoraggio",
-                "casesCount": "{{count}} casi",
-                "executed": "eseguito",
-                "passRate": "Pass rate",
-                "suiteProgressTitle": "Avanzamento Esecuzione Test",
-                "suiteGroupsLabel": "Etichette righe (le suite vengono unite automaticamente)",
-                "suiteGroupsLoading": "Caricamento dati suite...",
-                "suiteGroupsWarning": "\"{{group}}\": nessun caso di test corrisponde ({{hint}})",
-                "noPlanSelected": "Nessuna suite ancora corrisponde - controlla i nomi di piano/suite configurati per questa scheda.",
-                "bugStatusTitle": "Stato bug",
-                "bugStatusSubtitle": "(rilevati da {{sources}})",
-                "bugsDetected": "{{count}} bug rilevati",
-                "bugStatusSummary": "{{effective}} effettivi, {{outOfScope}} out of scope",
-                "stillOpen": "{{count}} ancora aperti",
-                "statusLabels": {
-                    "closed": "Chiusi",
-                    "resolved": "Da verificare (retest DSI)",
-                    "inProgress": "In lavorazione",
-                    "new": "Nuovi (da prendere in carico)",
-                    "notApplicable": "Non applicabile (out of scope)"
-                },
-                "severityCaption": "Distribuzione per severity dei {{count}} bug effettivi",
-                "openSeverityCaption": "Distribuzione per severity dei {{count}} bug ancora aperti",
-                "kpis": {
-                    "totalTestCases": "Casi di Test Totali",
-                    "passRate": "Pass Rate",
-                    "bugsClosed": "Bug Chiusi ({{percent}}%)",
-                    "criticalBugs": "Bug Critici (non chiusi)",
-                    "reopenedBugs": "Bug riaperti ({{percent}}%)",
-                    "avgClosureTime": "Tempo medio chiusura\nbug (gg)",
-                    "effectiveBugsDetected": "Bug Effettivi Rilevati",
-                    "outOfScopeBugsDetected": "Bug Out of Scope\n(afferente a funzionalità non ancora rilasciate)",
-                    "withoutResolutionDate": "Bug Senza Data di Risoluzione",
-                    "notApplicableRate": "Casi di Test\nNon Applicabili\n('Not applicable')"
-                },
-                "originBreakdown": {
-                    "title": "Bug per Suite",
-                    "toggleLabel": "Includi Bug per Suite (in prova)",
-                    "bugsInSuite": "Bug su {{suite}}",
-                    "unmatched": "Nessun caso di test corrispondente",
-                    "detected": "Bug rilevati",
-                    "accepted": "Bug accettati"
-                }
-            }
-        }
-    },
-    "sprintReportPage": {
-        "title": "Report Sprint"
-    },
-    "plurifondSprintReportPage": {
-        "title": "Report Sprint Plurifond"
-    },
-    "commonErrorsPage": {
-        "title": "Errori Comuni",
-        "empty": "Nessun risultato di test fallito con messaggi di errore trovato.",
-        "kpis": {
-            "totalFailedResults": "Risultati Falliti Totali",
-            "uniqueSignatures": "Firme di Errore Univoche",
-            "topErrorCount": "Occorrenze dell'Errore Principale"
-        },
-        "charts": {
-            "topErrors": "Errori Principali per Frequenza"
-        },
-        "table": {
-            "affectedTestCases": "Test Case Interessati ({{count}})"
-        }
-    },
-    "myWorkItemsPage": {
-        "title": "I Miei Elementi di Lavoro",
-        "empty": "Nessun elemento di lavoro trovato per questa vista.",
-        "emptyAssigned": "Niente assegnato a te al momento - goditi la calma!",
-        "emptyMentioned": "Nessuno ti ha menzionato ultimamente.",
-        "emptyFollowing": "Non stai ancora seguendo nulla.",
-        "emptyCreated": "Non hai ancora creato nessun elemento di lavoro.",
-        "filters": {
-            "assignedToMe": "Assegnati a me",
-            "createdByMe": "Creati da me",
-            "mentioned": "Menzionati",
-            "following": "Seguiti",
-            "bugsOnly": "Solo bug"
-        }
-    },
-    "filterBar": {
-        "areaPath": "Area Path",
-        "allAreas": "Tutte le Aree",
-        "suite": "Suite",
-        "allSuites": "Tutte le Suite",
-        "selectedSuites": "{{count}} selezionate",
-        "priority": "Priorità",
-        "allPriorities": "Tutte le Priorità",
-        "search": "Cerca",
-        "searchPlaceholder": "Cerca per titolo del test case..."
-    },
-    "defectFilterBar": {
-        "iteration": "Sprint/Iterazione",
-        "allIterations": "Tutti gli Sprint",
-        "environment": "Ambiente",
-        "allEnvironments": "Tutti gli Ambienti",
-        "targetVersion": "Versione Target",
-        "allTargetVersions": "Tutte le Versioni Target",
-        "suite": "Suite di Test",
-        "allSuites": "Tutte le Suite di Test",
-        "selectedSuites": "{{count}} selezionate"
-    },
-    "iterationFilter": {
-        "label": "Sprint/Iterazione (Azure)",
-        "all": "Tutte le Iterazioni"
-    },
-    "suiteCard": {
-        "total": "Totale: {{count}}",
-        "summary": "Superati {{passed}} · Falliti {{failed}} · Bloccati {{blocked}} · Non Applicabili {{notApplicable}} · Non Eseguiti {{notRun}}",
-        "openBugs": "Bug aperti: {{count}}",
-        "passRate": "Percentuale di successo: {{rate}}%"
-    },
-    "runCard": {
-        "state": "Stato: {{state}}",
-        "completed": "Completato: {{date}}",
-        "completedNA": "N/D",
-        "total": "Totale: {{count}}",
-        "summary": "Superati {{passed}} · Falliti {{failed}} · Bloccati {{blocked}} · Non Applicabili {{notApplicable}} · Non Eseguiti {{notRun}}",
-        "passRate": "Percentuale di successo: {{rate}}%"
-    },
-    "planCard": {
-        "state": "Stato: {{state}}",
-        "area": "Area: {{areaPath}}",
-        "iteration": "Iterazione: {{iteration}}",
-        "owner": "Responsabile: {{owner}}"
-    },
-    "testCaseItem": {
-        "area": "Area: {{areaPath}}",
-        "bugsLinked": "Bug collegati: {{count}} ({{active}} attivi, {{closed}} chiusi)",
-        "latestRun": "Ultima esecuzione"
-    },
-    "bugsTable": {
-        "columns": {
-            "priority": "Priorità",
-            "id": "ID",
-            "title": "Titolo",
-            "state": "Stato",
-            "creator": "Creatore",
-            "assignee": "Assegnatario"
-        }
-    },
-    "workItemsTable": {
-        "columns": {
-            "priority": "Priorità",
-            "id": "ID",
-            "title": "Titolo",
-            "type": "Tipo",
-            "state": "Stato",
-            "assignee": "Assegnatario",
-            "createdDate": "Data apertura",
-            "createdTime": "Ora apertura",
-            "closedDate": "Data chiusura",
-            "closedTime": "Ora chiusura",
-            "tags": "Tag"
-        },
-        "noTags": "Nessun tag",
-        "filter": {
-            "label": "Filtra",
-            "search": "Cerca...",
-            "selectAll": "(Seleziona tutto)",
-            "blank": "(Vuoti)"
-        }
-    },
-    "pagination": {
-        "previous": "Pagina precedente",
-        "next": "Pagina successiva",
-        "pageOf": "Pagina {{page}} di {{pageCount}}",
-        "itemsPerPage": "Elementi per pagina"
-    },
-    "errorState": {
-        "title": "Si è verificato un errore",
-        "retry": "Riprova",
-        "serviceUnavailable": "Il backend del dashboard non è al momento disponibile. Questo può accadere quando il token di accesso ad Azure DevOps del server (AZDO_PAT) è scaduto, oppure il servizio si sta riavviando. Chiedi a un amministratore di verificarlo, poi riprova tra un minuto."
-    },
-    "loadingState": {
-        "label": "Caricamento"
-    },
-    "themeSwitcher": {
-        "label": "Tema",
-        "light": "Chiaro",
-        "dark": "Scuro"
-    },
-    "languageSwitcher": {
-        "label": "Lingua",
-        "english": "English",
-        "italian": "Italiano"
-    },
-    "exportMenu": {
-        "label": "Esporta",
-        "pdf": "Esporta come PDF",
-        "csv": "Esporta come CSV",
-        "excel": "Esporta come Excel",
-        "email": "Invia report via email"
-    },
-    "removeTestCasesPage": {
-        "title": "Rimuovi Test Case",
-        "planFilter": {
-            "label": "Piano di Test",
-            "placeholder": "Seleziona un piano di test"
-        },
-        "selectPlanFirst": "Seleziona un piano di test per sfogliare e rimuovere i suoi test case.",
-        "selectSuite": "Seleziona tutti i test case in {{suiteName}}",
-        "selectedCount": "{{count}} selezionati",
-        "clearSelection": "Deseleziona tutto",
-        "deleteSelected": "Elimina selezionati",
-        "confirm": {
-            "title": "Eliminare {{count}} test case?",
-            "message": "Questa operazione rimuove definitivamente i seguenti work item Test Case da Azure DevOps (spostati nel Cestino) e da tutte le suite a cui appartengono:",
-            "cancel": "Annulla",
-            "confirm": "Elimina {{count}} test case"
-        },
-        "result": {
-            "successTitle": "{{count}} test case eliminati.",
-            "failedSummary": "{{count}} test case non è stato possibile eliminare.",
-            "errorTitle": "Eliminazione non riuscita"
-        }
-    },
-    "releaseReadinessPage": {
-        "title": "Prontezza al Rilascio",
-        "sprintLabel": "{{name}} ({{start}} – {{end}})",
-        "sprintEnded": "sprint terminato",
-        "rag": {
-            "green": "Verde",
-            "amber": "Giallo",
-            "red": "Rosso"
-        },
-        "gate": {
-            "title": "Release Gate",
-            "passingCount": "{{passing}}/{{total}} criteri tracciati soddisfatti",
-            "criteriaTitle": "Criteri di Accettazione (Test Funzionali e di Non Regressione)",
-            "actualTarget": "{{actual}} (soglia: {{target}})",
-            "notTrackedNote": "Non ancora tracciato (soglia: {{target}})",
-            "status": {
-                "pass": "OK",
-                "block": "BLOCK",
-                "warn": "WARN",
-                "notTracked": "N/D"
-            },
-            "criteria": {
-                "testsExecuted": {
-                    "label": "Test Case Eseguiti",
-                    "description": "Percentuale dei test case manuali pianificati che sono stati effettivamente eseguiti rispetto a quanto previsto nel piano di test."
-                },
-                "testsPassed": {
-                    "label": "Test Superati *",
-                    "description": "Percentuale dei test case manuali eseguiti con esito positivo.",
-                    "note": "* Esclude i test case con esito Non Applicabile: non erano nello scope dello sprint corrente e sono stati aggiunti per errore."
-                },
-                "requirementsCoverage": {
-                    "label": "Copertura dei Requisiti Funzionali",
-                    "description": "Percentuale dei requisiti funzionali coperti da almeno un test case."
-                },
-                "testCaseRelevance": {
-                    "label": "Pertinenza Casi Test",
-                    "description": "Percentuale di casi di test manuali con esito Non Applicabile, ossia fuori scope per il rilascio corrente."
-                },
-                "criticalDefectsOpen": {
-                    "label": "Defect Critici Aperti",
-                    "description": "Numero di defect di severità Critica ancora aperti alla fine del ciclo di test."
-                },
-                "highDefectsOpen": {
-                    "label": "Defect Alti Aperti",
-                    "description": "Numero di defect di severità Alta ancora aperti alla fine del ciclo di test."
-                },
-                "mediumDefectsOpen": {
-                    "label": "Defect Medi Aperti",
-                    "description": "Numero di defect di severità Media ancora aperti alla fine del ciclo di test (solo tracciati, non bloccano il rilascio)."
-                },
-                "lowDefectsOpen": {
-                    "label": "Defect Bassi Aperti",
-                    "description": "Numero di defect di severità Bassa ancora aperti alla fine del ciclo di test (solo tracciati, non bloccano il rilascio)."
-                }
-            }
-        },
-        "stats": {
-            "title": "Metriche dello Sprint",
-            "completionRate": "Tasso di Completamento Test dello Sprint",
-            "executedOfPlanned": "Eseguiti / Pianificati",
-            "carryOver": "Test Case Riportati allo Sprint Successivo",
-            "notYetExecuted": "Non Ancora Eseguiti",
-            "notApplicable": "Non Applicabili",
-            "passRateDelta": "Tasso di Successo vs. Sprint Precedente",
-            "blockingDefects": "Difetti Bloccanti (Critici/Alti)"
-        },
-        "passRateDelta": {
-            "noPriorSprint": "Nessuno sprint precedente"
-        },
-        "blockingDefects": {
-            "title": "Difetti Bloccanti al Rilascio",
-            "empty": "Nessun bug aperto di severità Critica o Alta."
-        }
+      }
     }
+  },
+  "dynamicSprintReportPage": {
+    "title": "Report Sprint",
+    "selectProjectPrompt": "Seleziona un progetto nella barra in alto per iniziare.",
+    "selectAreaPathPrompt": "Seleziona un area path nel pannello laterale per iniziare.",
+    "selectSprintPrompt": "Seleziona uno sprint nel pannello laterale per caricare il report.",
+    "defaultHeaderTitle": "Report di Stato Sprint",
+    "defaultHeaderSubtitle": "Stato di esecuzione dei test"
+  },
+  "reportSidebar": {
+    "title": "Ambito Report",
+    "loadingPlans": "Caricamento piani di test...",
+    "noPlans": "Nessun piano di test trovato per questo sprint.",
+    "noSprints": "Nessuno sprint trovato per questo area path.",
+    "newPlanBadge": "Nuovo"
+  },
+  "scopeBar": {
+    "projectLabel": "Progetto",
+    "projectPlaceholder": "Seleziona un progetto...",
+    "areaPathLabel": "Area Path",
+    "sprintLabel": "Sprint",
+    "allSprints": "Tutti gli Sprint",
+    "changeScope": "Cambia progetto",
+    "done": "Fatto"
+  },
+  "filterBar": {
+    "areaPath": "Area Path",
+    "allAreas": "Tutte le Aree"
+  },
+  "defectFilterBar": {
+    "iteration": "Sprint/Iterazione",
+    "allIterations": "Tutti gli Sprint",
+    "environment": "Ambiente",
+    "allEnvironments": "Tutti gli Ambienti",
+    "targetVersion": "Versione Target",
+    "allTargetVersions": "Tutte le Versioni Target",
+    "suite": "Suite di Test",
+    "allSuites": "Tutte le Suite di Test",
+    "selectedSuites": "{{count}} selezionate"
+  },
+  "errorState": {
+    "title": "Si è verificato un errore",
+    "retry": "Riprova",
+    "serviceUnavailable": "Il backend del dashboard non è al momento disponibile. Questo può accadere quando il token di accesso ad Azure DevOps del server (AZDO_PAT) è scaduto, oppure il servizio si sta riavviando. Chiedi a un amministratore di verificarlo, poi riprova tra un minuto."
+  },
+  "loadingState": {
+    "label": "Caricamento"
+  },
+  "themeSwitcher": {
+    "light": "Chiaro",
+    "dark": "Scuro"
+  },
+  "languageSwitcher": {
+    "label": "Lingua",
+    "english": "English",
+    "italian": "Italiano"
+  },
+  "patSetup": {
+    "title": "Collega il tuo PAT Azure DevOps",
+    "description": "Viene salvato solo nel local storage di questo browser e inviato solo al processo locale della dashboard.",
+    "orgLabel": "Organizzazione Azure DevOps",
+    "orgPlaceholder": "nome-della-tua-organizzazione",
+    "patLabel": "Personal Access Token",
+    "patPlaceholder": "Incolla il tuo PAT",
+    "connect": "Connetti"
+  }
 }

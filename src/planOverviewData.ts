@@ -1,11 +1,15 @@
 import {
-    getTestPlans,
+    getTestPlan,
     getSuites,
     getTestCases,
     getTestPoints,
     getBugWorkItemTypeStates,
 } from "./azdo.js";
-import { buildTestCaseRow, resolveTestPointStatus } from "./dashboardData.js";
+import {
+    buildTestCaseRow,
+    extractReportUrlFromDescription,
+    resolveTestPointStatus,
+} from "./dashboardData.js";
 import type {
     BugInfo,
     Outcome,
@@ -44,7 +48,7 @@ const UNKNOWN_CATEGORY_RANK = Object.keys(
 ).length;
 
 const cache = new Map<
-    number,
+    string,
     { data: PlanOverviewResponse; timestamp: number }
 >();
 
@@ -56,20 +60,23 @@ export function clearPlanOverviewCache(): void {
 
 async function buildPlanRows(
     planId: number,
-    planName: string
+    planName: string,
+    project?: string
 ): Promise<TestCaseRow[]> {
-    const suites = await getSuites(planId);
+    const suites = await getSuites(planId, project);
 
     const rowsBySuite = await Promise.all(
         suites.map(async (suite: any) => {
             const testCases = await getTestCases(
                 planId,
-                suite.id
+                suite.id,
+                project
             );
 
             const testPoints = await getTestPoints(
                 planId,
-                suite.id
+                suite.id,
+                project
             );
 
             const outcomesByTestCase: Record<
@@ -133,7 +140,9 @@ async function buildPlanRows(
                         suite.name,
                         suite.id,
                         outcomesByTestCase,
-                        lastRunByTestCase
+                        lastRunByTestCase,
+                        undefined,
+                        project
                     )
                 )
             );
@@ -144,20 +153,24 @@ async function buildPlanRows(
 }
 
 export async function computePlanOverview(
-    planId: number
+    planId: number,
+    project?: string
 ): Promise<PlanOverviewResponse> {
-    const cached = cache.get(planId);
+    // Plan IDs are only unique within a project, so two different projects
+    // could otherwise collide on the same cache entry - key by both.
+    const cacheKey = `${project ?? ""}:${planId}`;
+    const cached = cache.get(cacheKey);
     const now = Date.now();
 
     if (cached && now - cached.timestamp < CACHE_DURATION_MS) {
         return cached.data;
     }
 
-    const plans = await getTestPlans();
-    const plan = plans.find((p: any) => p.id === planId);
+    const plan = await getTestPlan(planId, project);
     const planName = plan?.name ?? String(planId);
+    const reportUrl = extractReportUrlFromDescription(plan?.description);
 
-    const rows = await buildPlanRows(planId, planName);
+    const rows = await buildPlanRows(planId, planName, project);
 
     const testsBySuiteMap = new Map<string, number>();
     const outcomeCounts: Record<Outcome, number> = {
@@ -218,7 +231,7 @@ export async function computePlanOverview(
         }
     }
 
-    const bugStates = await getBugWorkItemTypeStates();
+    const bugStates = await getBugWorkItemTypeStates(project);
     const stateIndex = new Map<string, number>(
         bugStates.map((s, index) => [s.name, index])
     );
@@ -277,6 +290,7 @@ export async function computePlanOverview(
     const data: PlanOverviewResponse = {
         planId,
         planName,
+        reportUrl,
         totalTestCases: rows.length,
         totalBugs: bugs.length,
         testsBySuite: [...testsBySuiteMap.entries()].map(
@@ -289,7 +303,7 @@ export async function computePlanOverview(
         suites,
     };
 
-    cache.set(planId, { data, timestamp: now });
+    cache.set(cacheKey, { data, timestamp: now });
 
     return data;
 }

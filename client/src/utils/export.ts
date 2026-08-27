@@ -1,199 +1,14 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import ExcelJS from "exceljs";
-import html2canvas from "html2canvas";
 import PptxGenJS from "pptxgenjs";
 import type {
-    BugInfo,
     Outcome,
-    PlanOverviewResponse,
-    PlanOverviewSuiteDetail,
     SprintDefectReport,
-    TestCaseRow,
-    TestPlanProgressCounts,
 } from "../types";
 import type { SuiteProgressGroup } from "../components/StatusReportCard";
-import { passedPercent } from "./progressReport";
-
-export interface ExportableRow {
-    testPlan?: string;
-    suiteName?: string;
-    testCaseTitle?: string;
-    outcome?: string;
-    linkedDefects?: string;
-}
-
-export interface SuiteBugTotal {
-    suiteName: string;
-    totalBugs: number;
-}
-
-export interface SuiteHeaderStats {
-    suiteName: string;
-    total: number;
-    passed: number;
-    failed: number;
-    blocked: number;
-    notApplicable: number;
-    notRun: number;
-    openBugs: number;
-    closedBugs: number;
-}
-
-export function buildSuiteHeaderStats(
-    rows: TestCaseRow[]
-): SuiteHeaderStats {
-    const bugStateById = new Map<number, string>();
-    let passed = 0;
-    let failed = 0;
-    let blocked = 0;
-    let notApplicable = 0;
-    let notRun = 0;
-
-    for (const row of rows) {
-        if (row.outcome === "Passed") {
-            passed++;
-        } else if (row.outcome === "Failed") {
-            failed++;
-        } else if (row.outcome === "Blocked") {
-            blocked++;
-        } else if (row.outcome === "NotApplicable") {
-            notApplicable++;
-        } else {
-            notRun++;
-        }
-
-        for (const bug of row.bugs) {
-            bugStateById.set(bug.id, bug.state);
-        }
-    }
-
-    let openBugs = 0;
-    let closedBugs = 0;
-
-    for (const state of bugStateById.values()) {
-        if (state === "Closed") {
-            closedBugs++;
-        } else {
-            openBugs++;
-        }
-    }
-
-    return {
-        suiteName: rows[0]?.suiteName ?? "",
-        total: rows.length,
-        passed,
-        failed,
-        blocked,
-        notApplicable,
-        notRun,
-        openBugs,
-        closedBugs,
-    };
-}
-
-export function buildSuiteBugTotals(rows: TestCaseRow[]): SuiteBugTotal[] {
-    const bugIdsBySuite = new Map<string, Set<number>>();
-
-    for (const row of rows) {
-        if (!bugIdsBySuite.has(row.suiteName)) {
-            bugIdsBySuite.set(row.suiteName, new Set());
-        }
-
-        const bugIds = bugIdsBySuite.get(row.suiteName)!;
-
-        for (const bug of row.bugs) {
-            bugIds.add(bug.id);
-        }
-    }
-
-    return [...bugIdsBySuite.entries()]
-        .map(([suiteName, bugIds]) => ({
-            suiteName,
-            totalBugs: bugIds.size,
-        }))
-        .sort((a, b) => a.suiteName.localeCompare(b.suiteName));
-}
-
-interface ColumnDef {
-    key: keyof ExportableRow;
-    label: string;
-}
-
-const ALL_COLUMNS: ColumnDef[] = [
-    { key: "testPlan", label: "Test Plan" },
-    { key: "suiteName", label: "Suite Name" },
-    { key: "testCaseTitle", label: "Test Case" },
-    { key: "outcome", label: "Status" },
-    { key: "linkedDefects", label: "Linked Defects" },
-];
-
-function activeColumns(rows: ExportableRow[]): ColumnDef[] {
-    return ALL_COLUMNS.filter((col) =>
-        rows.some((row) => row[col.key] !== undefined)
-    );
-}
-
-export interface ChartImage {
-    title: string;
-    dataUrl: string;
-    width: number;
-    height: number;
-    // "PNG" unless captureFullCanvas was asked for JPEG (see its jpegQuality
-    // option) - jsPDF's addImage() needs to know which codec produced
-    // dataUrl, since passing the wrong one corrupts the embedded image.
-    format?: "PNG" | "JPEG";
-}
-
-// The exported chart image is always placed on a white PDF/email background,
-// regardless of the app's current theme. In dark mode, chart text (legend
-// labels, etc.) renders in a light color that's invisible once pasted onto
-// that white page, so force a fixed dark color on the cloned DOM html2canvas
-// captures rather than on the live (theme-aware) page.
-const EXPORT_TEXT_COLOR = "#242424";
-
-export async function captureChartImage(
-    element: HTMLElement | null,
-    title: string
-): Promise<ChartImage | null> {
-    if (!element) {
-        return null;
-    }
-
-    const canvas = await html2canvas(element, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        onclone: (_document, clonedElement) => {
-            clonedElement.style.backgroundColor = "#ffffff";
-            clonedElement.style.color = EXPORT_TEXT_COLOR;
-
-            clonedElement
-                .querySelectorAll<HTMLElement>("*")
-                .forEach((node) => {
-                    node.style.color = EXPORT_TEXT_COLOR;
-                });
-        },
-    });
-
-    return {
-        title,
-        dataUrl: canvas.toDataURL("image/png"),
-        width: canvas.width,
-        height: canvas.height,
-    };
-}
 
 function sanitizeFilenamePart(value: string): string {
     return value.replace(/[\\/:*?"<>|]+/g, "_").trim();
-}
-
-export function buildPlanOverviewFilename(
-    planName: string,
-    suiteName?: string
-): string {
-    const base = sanitizeFilenamePart(planName);
-    const suite = suiteName ? `_${sanitizeFilenamePart(suiteName)}` : "";
-    return `${base}${suite}.pdf`;
 }
 
 function escapeHtml(value: string): string {
@@ -201,34 +16,6 @@ function escapeHtml(value: string): string {
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
-}
-
-export function buildEmailReportHtml(
-    title: string,
-    rows: [string, string | number][],
-    metricLabel: string,
-    valueLabel: string
-): string {
-    const rowsHtml = rows
-        .map(
-            ([label, value]) =>
-                `<tr>` +
-                `<td style="padding:8px 12px;border:1px solid #d0d0d0;">${escapeHtml(label)}</td>` +
-                `<td style="padding:8px 12px;border:1px solid #d0d0d0;">${escapeHtml(String(value))}</td>` +
-                `</tr>`
-        )
-        .join("");
-
-    return (
-        `<h2 style="font-family:Arial,sans-serif;color:#005a9e;margin:0 0 12px;">${escapeHtml(title)}</h2>` +
-        `<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;width:100%;max-width:480px;">` +
-        `<thead><tr style="background-color:#005a9e;color:#ffffff;">` +
-        `<th style="padding:8px 12px;text-align:left;border:1px solid #d0d0d0;">${escapeHtml(metricLabel)}</th>` +
-        `<th style="padding:8px 12px;text-align:left;border:1px solid #d0d0d0;">${escapeHtml(valueLabel)}</th>` +
-        `</tr></thead>` +
-        `<tbody>${rowsHtml}</tbody>` +
-        `</table>`
-    );
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -244,217 +31,6 @@ function downloadBlob(blob: Blob, filename: string): void {
     // what makes Office prompt to "repair" it on open. Deferring the revoke
     // gives the download a moment to actually start reading first.
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function csvEscape(value: string): string {
-    return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
-
-export function exportToCsv(
-    filename: string,
-    rows: ExportableRow[],
-    suiteBugTotals?: SuiteBugTotal[]
-): void {
-    const columns = activeColumns(rows);
-    const lines: string[] = [];
-
-    if (rows.length > 0) {
-        lines.push(columns.map((col) => csvEscape(col.label)).join(","));
-
-        for (const row of rows) {
-            lines.push(
-                columns
-                    .map((col) => csvEscape(String(row[col.key] ?? "")))
-                    .join(",")
-            );
-        }
-    }
-
-    if (suiteBugTotals && suiteBugTotals.length > 0) {
-        if (lines.length > 0) {
-            lines.push("");
-        }
-        lines.push("Total bugs by suite");
-        lines.push(["Suite Name", "Total Bugs"].map(csvEscape).join(","));
-
-        for (const total of suiteBugTotals) {
-            lines.push(
-                [csvEscape(total.suiteName), String(total.totalBugs)].join(",")
-            );
-        }
-    }
-
-    const blob = new Blob([lines.join("\n")], {
-        type: "text/csv;charset=utf-8;",
-    });
-    downloadBlob(blob, `${filename}.csv`);
-}
-
-export async function exportToExcel(
-    filename: string,
-    rows: ExportableRow[],
-    suiteBugTotals?: SuiteBugTotal[]
-): Promise<void> {
-    const columns = activeColumns(rows);
-    const workbook = new ExcelJS.Workbook();
-
-    if (rows.length > 0) {
-        const sheet = workbook.addWorksheet("Results");
-
-        sheet.columns = columns.map((col) => ({
-            header: col.label,
-            key: col.key,
-            width: 30,
-            style: { alignment: { wrapText: true, vertical: "top" } },
-        }));
-
-        for (const row of rows) {
-            sheet.addRow(
-                columns.reduce<Record<string, string>>((acc, col) => {
-                    acc[col.key] = row[col.key] ?? "";
-                    return acc;
-                }, {})
-            );
-        }
-
-        sheet.getRow(1).font = { bold: true };
-    }
-
-    if (suiteBugTotals && suiteBugTotals.length > 0) {
-        const totalsSheet = workbook.addWorksheet("Bug Totals");
-        totalsSheet.columns = [
-            { header: "Suite Name", key: "suiteName", width: 30 },
-            { header: "Total Bugs", key: "totalBugs", width: 15 },
-        ];
-
-        for (const total of suiteBugTotals) {
-            totalsSheet.addRow(total);
-        }
-
-        totalsSheet.getRow(1).font = { bold: true };
-    }
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    downloadBlob(blob, `${filename}.xlsx`);
-}
-
-function buildPdfDocument(
-    title: string,
-    rows: ExportableRow[],
-    suiteBugTotals?: SuiteBugTotal[],
-    suiteHeader?: SuiteHeaderStats
-): jsPDF {
-    const columns = activeColumns(rows);
-    const doc = new jsPDF({
-        orientation: columns.length > 2 ? "landscape" : "portrait",
-    });
-
-    doc.setFontSize(14);
-    doc.text(title, 14, 15);
-
-    let nextY = 22;
-
-    if (suiteHeader) {
-        doc.setFontSize(11);
-        doc.text(`Suite: ${suiteHeader.suiteName}`, 14, nextY);
-        nextY += 5;
-
-        autoTable(doc, {
-            startY: nextY,
-            head: [
-                [
-                    "Total Tests",
-                    "Passed",
-                    "Failed",
-                    "Not Run",
-                    "Blocked",
-                    "Not Applicable",
-                    "Bugs Open",
-                    "Bugs Closed",
-                ],
-            ],
-            body: [
-                [
-                    String(suiteHeader.total),
-                    String(suiteHeader.passed),
-                    String(suiteHeader.failed),
-                    String(suiteHeader.notRun),
-                    String(suiteHeader.blocked),
-                    String(suiteHeader.notApplicable),
-                    String(suiteHeader.openBugs),
-                    String(suiteHeader.closedBugs),
-                ],
-            ],
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [0, 90, 158] },
-        });
-
-        nextY = (doc as unknown as { lastAutoTable: { finalY: number } })
-            .lastAutoTable.finalY + 10;
-    }
-
-    if (rows.length > 0) {
-        autoTable(doc, {
-            startY: nextY,
-            head: [columns.map((col) => col.label)],
-            body: rows.map((row) =>
-                columns.map((col) => String(row[col.key] ?? ""))
-            ),
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [0, 90, 158] },
-        });
-
-        nextY = (doc as unknown as { lastAutoTable: { finalY: number } })
-            .lastAutoTable.finalY + 10;
-    }
-
-    if (!suiteHeader && suiteBugTotals && suiteBugTotals.length > 0) {
-        doc.setFontSize(12);
-        doc.text("Total bugs by suite", 14, nextY);
-        nextY += 4;
-
-        autoTable(doc, {
-            startY: nextY,
-            head: [["Suite Name", "Total Bugs"]],
-            body: suiteBugTotals.map((total) => [
-                total.suiteName,
-                String(total.totalBugs),
-            ]),
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [0, 90, 158] },
-        });
-    }
-
-    return doc;
-}
-
-export function exportToPdf(
-    filename: string,
-    title: string,
-    rows: ExportableRow[],
-    suiteBugTotals?: SuiteBugTotal[],
-    suiteHeader?: SuiteHeaderStats
-): void {
-    const doc = buildPdfDocument(title, rows, suiteBugTotals, suiteHeader);
-    doc.save(`${filename}.pdf`);
-}
-
-function pdfDocToBase64(doc: jsPDF): string {
-    const dataUri = doc.output("datauristring");
-    return dataUri.substring(dataUri.indexOf(",") + 1);
-}
-
-export function buildPdfBase64(
-    title: string,
-    rows: ExportableRow[],
-    suiteBugTotals?: SuiteBugTotal[],
-    suiteHeader?: SuiteHeaderStats
-): string {
-    const doc = buildPdfDocument(title, rows, suiteBugTotals, suiteHeader);
-    return pdfDocToBase64(doc);
 }
 
 const PDF_MARGIN = 14;
@@ -473,443 +49,20 @@ function ensurePdfSpace(
     return currentY;
 }
 
-const PDF_CHART_GAP = 6;
-const PDF_CHART_ROW_MAX_HEIGHT = 55;
-const PDF_CHART_TITLE_HEIGHT = 8;
-const PDF_CHART_PADDING = 4;
-
-function addChartImagesRow(
-    doc: jsPDF,
-    charts: ChartImage[],
-    startY: number
-): number {
-    if (charts.length === 0) {
-        return startY;
-    }
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const innerWidth = pageWidth - PDF_MARGIN * 2;
-    const columnWidth =
-        (innerWidth - PDF_CHART_GAP * (charts.length - 1)) / charts.length;
-
-    let maxImgHeight = 0;
-
-    const layout = charts.map((chart) => {
-        const aspectRatio = chart.height / chart.width;
-        let imgWidth = columnWidth - PDF_CHART_PADDING * 2;
-        let imgHeight = imgWidth * aspectRatio;
-
-        if (imgHeight > PDF_CHART_ROW_MAX_HEIGHT) {
-            imgHeight = PDF_CHART_ROW_MAX_HEIGHT;
-            imgWidth = imgHeight / aspectRatio;
-        }
-
-        maxImgHeight = Math.max(maxImgHeight, imgHeight);
-
-        return { chart, imgWidth, imgHeight };
-    });
-
-    const rowHeight =
-        PDF_CHART_TITLE_HEIGHT + maxImgHeight + PDF_CHART_PADDING * 2;
-    const y = ensurePdfSpace(doc, startY, rowHeight);
-
-    doc.setDrawColor(200, 200, 200);
-
-    layout.forEach(({ chart, imgWidth, imgHeight }, index) => {
-        const cellX = PDF_MARGIN + index * (columnWidth + PDF_CHART_GAP);
-
-        doc.rect(cellX, y, columnWidth, rowHeight);
-
-        doc.setFontSize(10);
-        doc.text(chart.title, cellX + PDF_CHART_PADDING, y + PDF_CHART_TITLE_HEIGHT);
-
-        const imgX = cellX + (columnWidth - imgWidth) / 2;
-        const imgY = y + PDF_CHART_TITLE_HEIGHT + PDF_CHART_PADDING;
-
-        doc.addImage(chart.dataUrl, "PNG", imgX, imgY, imgWidth, imgHeight);
-    });
-
-    return y + rowHeight + 10;
-}
-
-interface PlanOverviewSuiteSection {
-    suite: PlanOverviewSuiteDetail;
-    chart?: ChartImage | null;
-}
-
-function buildPlanOverviewPdfDocument(
-    data: PlanOverviewResponse,
-    charts: ChartImage[] = [],
-    suiteSection?: PlanOverviewSuiteSection
-): jsPDF {
-    const passRate = data.totalTestCases
-        ? Math.round(
-            (data.outcomeCounts.Passed / data.totalTestCases) * 1000
-        ) / 10
-        : 0;
-
-    const executionRate = data.totalTestCases
-        ? Math.round(
-            ((data.totalTestCases -
-                data.outcomeCounts.NotRun -
-                data.outcomeCounts.NotApplicable) /
-                data.totalTestCases) *
-                1000
-        ) / 10
-        : 0;
-
-    const doc = new jsPDF();
-
-    doc.setFontSize(14);
-    doc.text(`Plan Overview: ${data.planName}`, PDF_MARGIN, 15);
-
-    autoTable(doc, {
-        startY: 22,
-        head: [
-            [
-                "Total Test Cases",
-                "Blocked",
-                "Not Run",
-                "Not Applicable",
-                "Total Bugs",
-                "Pass Rate",
-                "Execution Rate",
-            ],
-        ],
-        body: [
-            [
-                String(data.totalTestCases),
-                String(data.outcomeCounts.Blocked),
-                String(data.outcomeCounts.NotRun),
-                String(data.outcomeCounts.NotApplicable),
-                String(data.totalBugs),
-                `${passRate}%`,
-                `${executionRate}%`,
-            ],
-        ],
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 90, 158] },
-    });
-
-    let nextY =
-        (doc as unknown as { lastAutoTable: { finalY: number } })
-            .lastAutoTable.finalY + 10;
-
-    nextY = addChartImagesRow(doc, charts, nextY);
-
-    if (data.bugs.length > 0) {
-        nextY = ensurePdfSpace(doc, nextY, 20);
-
-        doc.setFontSize(12);
-        doc.text("Bugs", 14, nextY);
-        nextY += 4;
-
-        autoTable(doc, {
-            startY: nextY,
-            head: [["ID", "Title", "State", "Creator"]],
-            body: data.bugs.map((bug) => [
-                String(bug.id),
-                bug.title,
-                bug.state,
-                bug.creator ?? "",
-            ]),
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [0, 90, 158] },
-        });
-
-        nextY =
-            (doc as unknown as { lastAutoTable: { finalY: number } })
-                .lastAutoTable.finalY + 10;
-    }
-
-    if (suiteSection) {
-        const { suite, chart } = suiteSection;
-
-        nextY = ensurePdfSpace(doc, nextY, 20);
-
-        doc.setFontSize(13);
-        doc.text(`Suite: ${suite.suiteName}`, PDF_MARGIN, nextY);
-        nextY += 6;
-
-        const suitePassRate = suite.totalTestCases
-            ? Math.round(
-                (suite.outcomeCounts.Passed / suite.totalTestCases) * 1000
-            ) / 10
-            : 0;
-
-        const suiteExecutionRate = suite.totalTestCases
-            ? Math.round(
-                ((suite.totalTestCases -
-                    suite.outcomeCounts.NotRun -
-                    suite.outcomeCounts.NotApplicable) /
-                    suite.totalTestCases) *
-                    1000
-            ) / 10
-            : 0;
-
-        autoTable(doc, {
-            startY: nextY,
-            head: [
-                [
-                    "Total Test Cases",
-                    "Passed",
-                    "Failed",
-                    "Blocked",
-                    "Not Run",
-                    "Not Applicable",
-                    "Pass Rate",
-                    "Execution Rate",
-                ],
-            ],
-            body: [
-                [
-                    String(suite.totalTestCases),
-                    String(suite.outcomeCounts.Passed),
-                    String(suite.outcomeCounts.Failed),
-                    String(suite.outcomeCounts.Blocked),
-                    String(suite.outcomeCounts.NotRun),
-                    String(suite.outcomeCounts.NotApplicable),
-                    `${suitePassRate}%`,
-                    `${suiteExecutionRate}%`,
-                ],
-            ],
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [0, 90, 158] },
-        });
-
-        nextY =
-            (doc as unknown as { lastAutoTable: { finalY: number } })
-                .lastAutoTable.finalY + 10;
-
-        if (chart) {
-            nextY = addChartImagesRow(doc, [chart], nextY);
-        }
-
-        if (suite.bugs.length > 0) {
-            nextY = ensurePdfSpace(doc, nextY, 20);
-
-            doc.setFontSize(12);
-            doc.text("Bugs", PDF_MARGIN, nextY);
-            nextY += 4;
-
-            autoTable(doc, {
-                startY: nextY,
-                head: [["ID", "Title", "State", "Creator"]],
-                body: suite.bugs.map((bug) => [
-                    String(bug.id),
-                    bug.title,
-                    bug.state,
-                    bug.creator ?? "",
-                ]),
-                styles: { fontSize: 8 },
-                headStyles: { fillColor: [0, 90, 158] },
-            });
-        }
-    }
-
-    return doc;
-}
-
-export function exportPlanOverviewToPdf(
-    data: PlanOverviewResponse,
-    charts: ChartImage[] = [],
-    suiteSection?: PlanOverviewSuiteSection
-): void {
-    const doc = buildPlanOverviewPdfDocument(data, charts, suiteSection);
-    const filename = suiteSection
-        ? buildPlanOverviewFilename(data.planName, suiteSection.suite.suiteName)
-        : buildPlanOverviewFilename(data.planName);
-    doc.save(filename);
-}
-
-export function buildPlanOverviewPdfBase64(
-    data: PlanOverviewResponse,
-    charts: ChartImage[] = []
-): string {
-    const doc = buildPlanOverviewPdfDocument(data, charts);
-    return pdfDocToBase64(doc);
-}
-
-export function buildPlanOverviewSuitePdfBase64(
-    planName: string,
-    suite: PlanOverviewSuiteDetail,
-    chart?: ChartImage
-): string {
-    const doc = new jsPDF();
-
-    doc.setFontSize(14);
-    doc.text(`Plan Overview: ${planName} - ${suite.suiteName}`, PDF_MARGIN, 15);
-
-    autoTable(doc, {
-        startY: 22,
-        head: [
-            [
-                "Total Test Cases",
-                "Passed",
-                "Failed",
-                "Blocked",
-                "Not Run",
-                "Not Applicable",
-            ],
-        ],
-        body: [
-            [
-                String(suite.totalTestCases),
-                String(suite.outcomeCounts.Passed),
-                String(suite.outcomeCounts.Failed),
-                String(suite.outcomeCounts.Blocked),
-                String(suite.outcomeCounts.NotRun),
-                String(suite.outcomeCounts.NotApplicable),
-            ],
-        ],
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 90, 158] },
-    });
-
-    let nextY =
-        (doc as unknown as { lastAutoTable: { finalY: number } })
-            .lastAutoTable.finalY + 10;
-
-    if (chart) {
-        nextY = addChartImagesRow(doc, [chart], nextY);
-    }
-
-    if (suite.bugs.length > 0) {
-        nextY = ensurePdfSpace(doc, nextY, 20);
-
-        doc.setFontSize(12);
-        doc.text("Bugs", PDF_MARGIN, nextY);
-        nextY += 4;
-
-        autoTable(doc, {
-            startY: nextY,
-            head: [["ID", "Title", "State", "Creator"]],
-            body: suite.bugs.map((bug) => [
-                String(bug.id),
-                bug.title,
-                bug.state,
-                bug.creator ?? "",
-            ]),
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [0, 90, 158] },
-        });
-    }
-
-    return pdfDocToBase64(doc);
-}
-
-export function buildPlanProgressFilename(planTitle: string): string {
-    return `${sanitizeFilenamePart(planTitle)}_progress_report.pdf`;
-}
-
-export interface PlanProgressPdfLabels {
-    titlePrefix: string;
-    testCases: string;
-    testCasesRun: string;
-    passed: string;
-    failed: string;
-    blocked: string;
-    notApplicable: string;
-    passRate: string;
-    bugsTitle: string;
-    bugsEmpty: string;
-    bugColumns: {
-        id: string;
-        title: string;
-        state: string;
-        creator: string;
-        assignee: string;
-    };
-}
-
-function buildPlanProgressPdfDocument(
-    planTitle: string,
-    counts: TestPlanProgressCounts,
-    bugs: BugInfo[],
-    labels: PlanProgressPdfLabels,
-    charts: ChartImage[] = []
-): jsPDF {
-    const executed =
-        counts.total - counts.notExecuted - counts.notApplicable;
-
-    const doc = new jsPDF();
-
-    doc.setFontSize(14);
-    doc.text(`${labels.titlePrefix}: ${planTitle}`, PDF_MARGIN, 15);
-
-    autoTable(doc, {
-        startY: 22,
-        head: [
-            [
-                labels.testCases,
-                labels.testCasesRun,
-                labels.passed,
-                labels.failed,
-                labels.blocked,
-                labels.notApplicable,
-                labels.passRate,
-            ],
-        ],
-        body: [
-            [
-                String(counts.total),
-                `${executed} / ${counts.total}`,
-                String(counts.passed),
-                String(counts.failed),
-                String(counts.blocked),
-                String(counts.notApplicable),
-                `${passedPercent(counts)}%`,
-            ],
-        ],
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 90, 158] },
-    });
-
-    let nextY =
-        (doc as unknown as { lastAutoTable: { finalY: number } })
-            .lastAutoTable.finalY + 10;
-
-    nextY = addChartImagesRow(doc, charts, nextY);
-
-    nextY = ensurePdfSpace(doc, nextY, 20);
-
-    doc.setFontSize(12);
-    doc.text(labels.bugsTitle, PDF_MARGIN, nextY);
-    nextY += 4;
-
-    if (bugs.length > 0) {
-        autoTable(doc, {
-            startY: nextY,
-            head: [
-                [
-                    labels.bugColumns.id,
-                    labels.bugColumns.title,
-                    labels.bugColumns.state,
-                    labels.bugColumns.creator,
-                    labels.bugColumns.assignee,
-                ],
-            ],
-            body: bugs.map((bug) => [
-                String(bug.id),
-                bug.title,
-                bug.state,
-                bug.creator ?? "",
-                bug.assignee?.displayName ?? "",
-            ]),
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [0, 90, 158] },
-        });
-    } else {
-        doc.setFontSize(9);
-        doc.text(labels.bugsEmpty, PDF_MARGIN, nextY + 4);
-    }
-
-    return doc;
+// jspdf-autotable augments the doc instance with `lastAutoTable` at runtime
+// without a typed declaration, hence the cast - centralized here so every
+// "position the next block below the table I just drew" call reads the same.
+function getLastAutoTableY(doc: jsPDF, offset: number): number {
+    return (
+        (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+            .finalY + offset
+    );
 }
 
 // Severity is stored as e.g. "1 - Critical", so sorting by the leading rank
 // number naturally orders Critical, High, Medium, ... to match the chart.
-function severityRank(raw: string): number {
+// Exported so StatusReportCard.tsx uses the same ranking as every export.
+export function severityRank(raw: string): number {
     const match = /^(\d+)\s*-/.exec(raw);
     return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
@@ -952,12 +105,14 @@ export interface StatusReportCardEmailData {
 
 const EMAIL_CARD_WIDTH = 900;
 
-const EMAIL_STATUS_ORDER = ["Closed", "Resolved", "In Progress", "New", "Not Applicable"];
+const EMAIL_STATUS_ORDER = ["Closed", "Da verificare", "In verifica", "In Progress", "New", "Reopened", "Not Applicable"];
 const EMAIL_STATUS_LABEL_KEYS: Record<string, string> = {
     Closed: "closed",
-    Resolved: "resolved",
+    "Da verificare": "daVerificare",
+    "In verifica": "inVerifica",
     "In Progress": "inProgress",
     New: "new",
+    Reopened: "reopened",
     "Not Applicable": "notApplicable",
 };
 
@@ -976,11 +131,22 @@ function outcomeCountLabel(t: TranslateFn, outcome: Outcome, count: number): str
     return `${count} ${label}`;
 }
 
-function statusCountLabel(t: TranslateFn, name: string, count: number): string {
+function statusCountLabel(
+    t: TranslateFn,
+    name: string,
+    count: number,
+    closedOutOfScopeCount = 0
+): string {
     const label = t(
         `defectManagementPage.sprintReport.statusCard.statusLabels.${EMAIL_STATUS_LABEL_KEYS[name]}`
     );
-    return `${count} ${label}`;
+    const suffix =
+        name === "Closed" && closedOutOfScopeCount > 0
+            ? t("defectManagementPage.sprintReport.statusCard.closedOutOfScopeNote", {
+                  count: closedOutOfScopeCount,
+              })
+            : "";
+    return `${count} ${label}${suffix}`;
 }
 
 function formatEmailTimestamp(date: Date): { datePart: string; timePart: string } {
@@ -1000,14 +166,18 @@ function emailSeverityLabel(raw: string): string {
     return match ? match[2] : raw;
 }
 
-function splitEmailActionLeadIn(paragraph: string): {
+// Applied per-line (an Action box can hold several independently-labeled
+// lines, e.g. "Test Management:"/"DSI:"/"System Integrator:" all in the
+// same Azione 2 box - see buildDefaultActionText2 in SprintDefectReportTab.tsx),
+// mirroring StatusReportCard.tsx's splitActionLeadIn.
+function splitEmailActionLeadIn(line: string): {
     lead: string | null;
     rest: string;
 } {
-    const match = /^([^:\n]{1,80}:)\s*([\s\S]*)$/.exec(paragraph);
+    const match = /^([^:\n]{1,80}:)\s*([\s\S]*)$/.exec(line);
 
     if (!match) {
-        return { lead: null, rest: paragraph };
+        return { lead: null, rest: line };
     }
 
     return { lead: match[1], rest: match[2] };
@@ -1083,9 +253,11 @@ const LIGHT_OUTCOME_COLORS: Record<Outcome, string> = {
 };
 const LIGHT_STATUS_COLORS: Record<string, string> = {
     Closed: "#2e7d32",
-    Resolved: "#1565c0",
+    "Da verificare": "#1565c0",
+    "In verifica": "#0099a8",
     "In Progress": "#f0a500",
     New: "#e53935",
+    Reopened: "#ad1457",
     "Not Applicable": "#9e9e9e",
 };
 const LIGHT_SEVERITY_PALETTE = [
@@ -1111,11 +283,11 @@ function lightExecutedColor(pct: number): string {
     return LIGHT_KPI[2].accent;
 }
 
-function lightKpiTile(value: string, kpiIndex: number, label: string): string {
+function lightKpiTile(value: string, kpiIndex: number, label: string, widthPct = "16.66%"): string {
     const { bg, accent } = LIGHT_KPI[kpiIndex];
 
     return (
-        `<td width="16.66%" style="padding:4px;">` +
+        `<td width="${widthPct}" style="padding:4px;">` +
         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${bg}" style="background-color:${bg};border-radius:6px;border-top:3px solid ${accent};">` +
         // Fixed height (rather than content-sized) so a tile with a
         // one-line label - like the standalone 2nd-row "total bugs" tile -
@@ -1163,6 +335,8 @@ function lightSwatch(color: string): string {
 
 function lightSuiteRow(group: SuiteProgressGroup, t: TranslateFn): string {
     const { totalTestCases, outcomeCounts, label } = group;
+    // Counts NotApplicable as executed - see the comment on totalExecuted
+    // in StatusReportCard.tsx for why this differs from that KPI.
     const executed = totalTestCases - outcomeCounts.NotRun;
     const executedPct = totalTestCases
         ? Math.round((executed / totalTestCases) * 100)
@@ -1315,78 +489,32 @@ export function buildStatusReportCardEmailBodyHtml(
 
     const { datePart, timePart } = formatEmailTimestamp(new Date());
 
-    const totalTestCases = suiteGroups.reduce(
-        (sum, group) => sum + group.totalTestCases,
-        0
-    );
-    const totalPassed = suiteGroups.reduce(
-        (sum, group) => sum + group.outcomeCounts.Passed,
-        0
-    );
-    const totalNotApplicable = suiteGroups.reduce(
-        (sum, group) => sum + group.outcomeCounts.NotApplicable,
-        0
-    );
-    const totalDecided = totalTestCases - totalNotApplicable;
-    const passRate = totalDecided
-        ? Math.round((totalPassed / totalDecided) * 100)
-        : 0;
-    const notApplicableRate = totalTestCases
-        ? Math.round((totalNotApplicable / totalTestCases) * 100)
-        : 0;
+    const {
+        totalTestCases,
+        totalPassed,
+        totalNotApplicable,
+        totalExecuted,
+        executedPct,
+        totalNotRun,
+        passRate,
+        notApplicableRate,
+        bugsClosed,
+        bugsClosedPct,
+        stillOpen,
+        reopenedPct,
+        avgClosureDays,
+        bugsByDsi,
+        bugsByUs,
+    } = computeStatusCardKpis(suiteGroups, report);
 
-    const bugsClosed = report.byStatusAll.Closed ?? 0;
-    const bugsClosedPct = report.total
-        ? Math.round((bugsClosed / report.total) * 100)
-        : 0;
-    const stillOpen = report.total - bugsClosed;
-
-    const reopenedPct = report.total
-        ? Math.round((report.reopenedCount / report.total) * 1000) / 10
-        : 0;
-    // Always shown as a number - matches StatusReportCard.tsx's
-    // avgClosureDays (0 rather than blank when there's no closed bug yet to
-    // compute a real average from).
-    const avgClosureDays = Math.round(report.mttrDays ?? 0);
-
-    const statusEntries = EMAIL_STATUS_ORDER.map(
-        (name) =>
-            [
-                name,
-                name === "Not Applicable"
-                    ? report.outOfScopeCount
-                    : report.byStatus[name] ?? 0,
-            ] as const
-    ).filter(([, count]) => count > 0);
-
-    const severityTotal = Object.values(report.bySeverity).reduce(
-        (sum, count) => sum + count,
-        0
-    );
-    const severityEntries = EMAIL_SEVERITY_KEYS.map(
-        (key) => [key, report.bySeverity[key] ?? 0] as const
-    );
-
-    // Same idea as severityEntries above, but scoped to effective bugs that
-    // are still open - mirrors StatusReportCard.tsx's openSeverityEntries.
-    const openSeverityCounts = report.effectiveDefects.reduce<
-        Record<string, number>
-    >((acc, bug) => {
-        if (bug.state === "Closed") {
-            return acc;
-        }
-
-        const key = bug.severity ?? "Unspecified";
-        acc[key] = (acc[key] ?? 0) + 1;
-        return acc;
-    }, {});
-    const openSeverityTotal = Object.values(openSeverityCounts).reduce(
-        (sum, count) => sum + count,
-        0
-    );
-    const openSeverityEntries = EMAIL_SEVERITY_KEYS.map(
-        (key) => [key, openSeverityCounts[key] ?? 0] as const
-    );
+    const {
+        statusEntries,
+        closedOutOfScopeCount,
+        severityTotal,
+        severityEntries,
+        openSeverityTotal,
+        openSeverityEntries,
+    } = computeBugStatusData(report);
 
     const actionParagraphs = actionsText
         .split(/\n\s*\n/)
@@ -1472,74 +600,39 @@ export function buildStatusReportCardEmailBodyHtml(
           `</table></td></tr>`
         : "";
 
+    const kpiSectionTitle = (label: string) =>
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` +
+        `<tr><td style="padding:6px 4px 2px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;` +
+        `text-transform:uppercase;color:${LIGHT_INK_MUTED};border-bottom:1px solid ${LIGHT_RULE};` +
+        `font-family:${EMAIL_FONT_FAMILY};">${escapeHtml(label)}</td></tr></table>`;
+
     const kpiHtml =
-        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
-        lightKpiTile(
-            String(totalTestCases),
-            0,
-            t("defectManagementPage.sprintReport.statusCard.kpis.totalTestCases")
-        ) +
-        lightKpiTile(
-            `${passRate}%`,
-            1,
-            t("defectManagementPage.sprintReport.statusCard.kpis.passRate")
-        ) +
-        lightKpiTile(
-            `${bugsClosed}/${report.total}`,
-            2,
-            t("defectManagementPage.sprintReport.statusCard.kpis.bugsClosed", {
-                percent: bugsClosedPct,
-            })
-        ) +
-        lightKpiTile(
-            String(openSeverityEntries[0][1]),
-            3,
-            t("defectManagementPage.sprintReport.statusCard.kpis.criticalBugs")
-        ) +
-        lightKpiTile(
-            String(report.reopenedCount),
-            4,
-            t("defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs", {
-                percent: reopenedPct,
-            })
-        ) +
-        lightKpiTile(
-            t("defectManagementPage.stats.days", { value: avgClosureDays }),
-            5,
-            t("defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime")
-        ) +
+        kpiSectionTitle(`🧪 ${t("defectManagementPage.sprintReport.statusCard.kpis.testCasesSection")}`) +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:4px;"><tr>` +
+        lightKpiTile(String(totalTestCases), 0, t("defectManagementPage.sprintReport.statusCard.kpis.totalTestCases"), "16.66%") +
+        lightKpiTile(`${totalExecuted} (${executedPct}%)`, 1, t("defectManagementPage.sprintReport.statusCard.kpis.executedCount"), "16.66%") +
+        lightKpiTile(`${totalNotApplicable} (${notApplicableRate}%)`, 5, t("defectManagementPage.sprintReport.statusCard.kpis.notApplicable"), "16.66%") +
+        lightKpiTile(String(totalNotRun), 2, t("defectManagementPage.sprintReport.statusCard.kpis.notRun"), "16.66%") +
+        lightKpiTile(String(totalPassed), 1, t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"), "16.66%") +
+        lightKpiTile(`${passRate}%`, 4, t("defectManagementPage.sprintReport.statusCard.kpis.passRate"), "16.66%") +
         `</tr></table>` +
-        // A couple of <td width="16.66%"> in an otherwise-empty row have
-        // nothing to divide the row's width with, so most renderers just
-        // stretch them to fill the full table instead of honoring the
-        // percentage - hence 4 empty filler cells matching row 1's
-        // 6-column split, keeping these tiles the same size as the others
-        // instead of spanning full width.
-        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;"><tr>` +
-        lightKpiTile(
-            `${report.effectiveCount}/${report.total}`,
-            6,
-            t("defectManagementPage.sprintReport.statusCard.kpis.effectiveBugsDetected")
-        ) +
-        lightKpiTile(
-            String(report.withoutResolutionDateCount),
-            7,
-            t("defectManagementPage.sprintReport.statusCard.kpis.withoutResolutionDate")
-        ) +
-        (report.outOfScopeCount > 0
-            ? lightKpiTile(
-                `${report.outOfScopeCount}/${report.total}`,
-                8,
-                t("defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected")
-            )
+        kpiSectionTitle(`🐛 ${t("defectManagementPage.sprintReport.statusCard.kpis.bugsSection")}`) +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:4px;"><tr>` +
+        lightKpiTile(`${report.effectiveCount}/${report.total}`, 6, t("defectManagementPage.sprintReport.statusCard.kpis.effectiveBugsDetected"), "33%") +
+        lightKpiTile(String(report.outOfScopeCount), 8, t("defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected"), "33%") +
+        lightKpiTile(`${bugsClosed}/${report.total} (${bugsClosedPct}%)`, 2, t("defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio", { count: closedOutOfScopeCount }), "33%") +
+        `</tr></table>` +
+        (includeDsiSource
+            ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;"><tr>` +
+              lightKpiTile(String(bugsByUs), 4, t("defectManagementPage.sprintReport.statusCard.kpis.bugsByUs"), "50%") +
+              lightKpiTile(String(bugsByDsi), 0, t("defectManagementPage.sprintReport.statusCard.kpis.bugsByDsi"), "50%") +
+              `</tr></table>`
             : "") +
-        lightKpiTile(
-            `${notApplicableRate}%`,
-            9,
-            t("defectManagementPage.sprintReport.statusCard.kpis.notApplicableRate")
-        ) +
-        `<td width="16.66%"></td><td width="16.66%"></td>` +
-        (report.outOfScopeCount > 0 ? "" : `<td width="16.66%"></td>`) +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;"><tr>` +
+        lightKpiTile(String(openSeverityEntries[0][1]), 3, t("defectManagementPage.sprintReport.statusCard.kpis.criticalBugs"), "25%") +
+        lightKpiTile(`${report.reopenedCount} (${reopenedPct}%)`, 4, t("defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs"), "25%") +
+        lightKpiTile(t("defectManagementPage.stats.days", { value: avgClosureDays }), 9, t("defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"), "25%") +
+        lightKpiTile(String(report.withoutResolutionDateCount), 7, t("defectManagementPage.sprintReport.statusCard.kpis.withoutResolutionDate"), "25%") +
         `</tr></table>`;
 
     const dashboardHtml = dashboardUrl
@@ -1555,13 +648,22 @@ export function buildStatusReportCardEmailBodyHtml(
               .map((paragraph, index) => {
                   const palette =
                       LIGHT_ACTION_PALETTE[index % LIGHT_ACTION_PALETTE.length];
-                  const { lead, rest } = splitEmailActionLeadIn(paragraph);
+                  const linesHtml = paragraph
+                      .split("\n")
+                      .map((line) => {
+                          const { lead, rest } = splitEmailActionLeadIn(line);
+
+                          return (
+                              (lead ? `<strong>${escapeHtml(lead)}</strong> ` : "") +
+                              escapeHtml(rest)
+                          );
+                      })
+                      .join("<br>");
 
                   return (
                       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.bg}" style="background-color:${palette.bg};border-radius:6px;margin-top:8px;">` +
                       `<tr><td style="border-left:4px solid ${palette.border};padding:10px 12px;font-size:13px;line-height:1.4;color:${LIGHT_INK};font-family:${EMAIL_FONT_FAMILY};">` +
-                      (lead ? `<strong>${escapeHtml(lead)}</strong> ` : "") +
-                      `${escapeHtml(rest)}</td></tr></table>`
+                      `${linesHtml}</td></tr></table>`
                   );
               })
               .join("")
@@ -1577,7 +679,7 @@ export function buildStatusReportCardEmailBodyHtml(
         .map(
             ([name, count]) =>
                 lightSwatch(LIGHT_STATUS_COLORS[name]) +
-                `${count} ${escapeHtml(t(`defectManagementPage.sprintReport.statusCard.statusLabels.${EMAIL_STATUS_LABEL_KEYS[name]}`))}`
+                escapeHtml(statusCountLabel(t, name, count, closedOutOfScopeCount))
         )
         .join(`<span style="color:${LIGHT_RULE};"> | </span>`);
 
@@ -1665,6 +767,39 @@ export function buildStatusReportCardEmailBodyHtml(
         bugStatusHtml +
         originBreakdownHtml +
         `</td></tr>` +
+        `</table></td></tr></table>`
+    );
+}
+
+// Renders an optional free-text note the sender can add above or below the
+// status card (e.g. "Hi team, see below for this week's update", or a
+// closing signature) - kept as its own fragment, separate from the card
+// table itself, so it only ever appears in the emailed message and never
+// leaks into the PDF/PPTX/HTML exports of the card. Blank-line-separated
+// paragraphs, single newlines become <br/> - mirrors how actionsText is
+// split elsewhere in this file.
+export function buildEmailPrefaceHtml(prefaceText: string): string {
+    const paragraphs = prefaceText
+        .split(/\n\s*\n/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean);
+
+    if (paragraphs.length === 0) {
+        return "";
+    }
+
+    const paragraphsHtml = paragraphs
+        .map(
+            (paragraph) =>
+                `<p style="margin:0 0 10px 0;">${escapeHtml(paragraph).replace(/\n/g, "<br/>")}</p>`
+        )
+        .join("");
+
+    return (
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${LIGHT_PAGE_BG}" style="background-color:${LIGHT_PAGE_BG};padding:16px 0 0;">` +
+        `<tr><td align="center">` +
+        `<table role="presentation" width="${EMAIL_CARD_WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:${EMAIL_CARD_WIDTH}px;max-width:100%;">` +
+        `<tr><td style="font-size:13px;line-height:1.5;color:${LIGHT_INK};font-family:${EMAIL_FONT_FAMILY};">${paragraphsHtml}</td></tr>` +
         `</table></td></tr></table>`
     );
 }
@@ -1768,11 +903,14 @@ function pdfSeverityChipsRow(
     return rowBottom + 6;
 }
 
-interface StatusCardKpis {
+export interface StatusCardKpis {
     totalTestCases: number;
     totalPassed: number;
     totalNotApplicable: number;
     totalDecided: number;
+    totalExecuted: number;
+    executedPct: number;
+    totalNotRun: number;
     passRate: number;
     notApplicableRate: number;
     bugsClosed: number;
@@ -1780,12 +918,15 @@ interface StatusCardKpis {
     stillOpen: number;
     reopenedPct: number;
     avgClosureDays: number;
+    bugsByDsi: number;
+    bugsByUs: number;
     criticalCount: number;
 }
 
-// Shared by the PDF and PPTX status card exports so the two renderings never
-// drift apart on how a rate/percentage is derived from the raw report.
-function computeStatusCardKpis(
+// Shared by the on-screen card, PDF/PPTX exports, and email body so all four
+// renderings never drift apart on how a rate/percentage is derived from the
+// raw report.
+export function computeStatusCardKpis(
     suiteGroups: SuiteProgressGroup[],
     report: SprintDefectReport
 ): StatusCardKpis {
@@ -1801,13 +942,29 @@ function computeStatusCardKpis(
         ? Math.round((totalNotApplicable / totalTestCases) * 100)
         : 0;
 
+    const totalFailed = suiteGroups.reduce((sum, group) => sum + group.outcomeCounts.Failed, 0);
+    const totalBlocked = suiteGroups.reduce((sum, group) => sum + group.outcomeCounts.Blocked, 0);
+    // Excludes NotApplicable on purpose - see the matching comment on
+    // totalExecuted in StatusReportCard.tsx for why, and for the different
+    // (more inclusive) definition SuiteProgressBar uses.
+    const totalExecuted = totalPassed + totalFailed + totalBlocked;
+    const executedPct = totalTestCases ? Math.round((totalExecuted / totalTestCases) * 100) : 0;
+    const totalNotRun = totalTestCases - totalExecuted - totalNotApplicable;
+
     const bugsClosed = report.byStatusAll.Closed ?? 0;
     const bugsClosedPct = report.total ? Math.round((bugsClosed / report.total) * 100) : 0;
-    const stillOpen = report.total - bugsClosed;
+    // Effective (in-scope) bugs only, not report.total - byStatusAll.Closed -
+    // so this matches computeBugStatusData's openSeverityTotal exactly (the
+    // severity chips right below it on the card only ever break down
+    // effective bugs, never out-of-scope ones), rather than showing two
+    // different "still open" numbers on the same card.
+    const stillOpen = report.effectiveCount - (report.byStatus.Closed ?? 0);
     const reopenedPct = report.total
         ? Math.round((report.reopenedCount / report.total) * 1000) / 10
         : 0;
     const avgClosureDays = Math.round(report.mttrDays ?? 0);
+    const bugsByDsi = report.byOriginDetected["DSI"] ?? 0;
+    const bugsByUs = report.total - bugsByDsi;
 
     // Only non-closed bugs count here - a closed critical bug isn't
     // something the reader still needs to act on. Mirrors
@@ -1822,6 +979,9 @@ function computeStatusCardKpis(
         totalPassed,
         totalNotApplicable,
         totalDecided,
+        totalExecuted,
+        executedPct,
+        totalNotRun,
         passRate,
         notApplicableRate,
         bugsClosed,
@@ -1829,38 +989,55 @@ function computeStatusCardKpis(
         stillOpen,
         reopenedPct,
         avgClosureDays,
+        bugsByDsi,
+        bugsByUs,
         criticalCount,
     };
 }
 
-interface BugStatusData {
+export interface BugStatusData {
     statusEntries: (readonly [string, number])[];
     statusSegments: { color: string; pct: number }[];
+    // Closed bugs that are also out-of-scope - byStatusAll.Closed includes
+    // them but byStatus.Closed (effective-only) doesn't, so this is exactly
+    // that gap. Folded into the Closed legend entry as a "(of which N out
+    // of scope)" suffix rather than kept as its own "Not Applicable"
+    // segment, since that segment only ever showed this same subset in
+    // practice (out-of-scope bugs are closed once triaged).
+    closedOutOfScopeCount: number;
     severityTotal: number;
     severityEntries: (readonly [string, number])[];
     openSeverityTotal: number;
     openSeverityEntries: (readonly [string, number])[];
 }
 
-// Shared by the PDF and PPTX bug status sections - both render the same
-// status/severity breakdown, just with a different renderer underneath.
-function computeBugStatusData(report: SprintDefectReport): BugStatusData {
-    const statusEntries = EMAIL_STATUS_ORDER.map(
-        (name) =>
-            [
-                name,
-                name === "Not Applicable" ? report.outOfScopeCount : report.byStatus[name] ?? 0,
-            ] as const
-    ).filter(([, count]) => count > 0);
+// Shared by the PDF, PPTX, and email bug status sections, plus the on-screen
+// card - all render the same status/severity breakdown, just with a
+// different renderer underneath.
+export function computeBugStatusData(report: SprintDefectReport): BugStatusData {
+    const closedTotal = report.byStatusAll.Closed ?? 0;
+    const closedEffective = report.byStatus.Closed ?? 0;
+    const closedOutOfScopeCount = closedTotal - closedEffective;
+
+    const statusEntries = EMAIL_STATUS_ORDER.filter((name) => name !== "Not Applicable")
+        .map(
+            (name) =>
+                [name, name === "Closed" ? closedTotal : report.byStatus[name] ?? 0] as const
+        )
+        .filter(([, count]) => count > 0);
     const statusSegments = statusEntries.map(([name, count]) => ({
         color: LIGHT_STATUS_COLORS[name],
         pct: report.total ? (count / report.total) * 100 : 0,
     }));
 
     const severityTotal = Object.values(report.bySeverity).reduce((sum, count) => sum + count, 0);
-    const severityEntries = EMAIL_SEVERITY_KEYS.map(
-        (key) => [key, report.bySeverity[key] ?? 0] as const
-    );
+    const severityEntries: (readonly [string, number])[] = [
+        ...EMAIL_SEVERITY_KEYS.map((key) => [key, report.bySeverity[key] ?? 0] as const),
+        ...Object.entries(report.bySeverity)
+            .filter(([key, count]) => !EMAIL_SEVERITY_KEYS.includes(key) && count > 0)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, count]) => [key, count] as const),
+    ];
 
     const openSeverityCounts = report.effectiveDefects.reduce<Record<string, number>>(
         (acc, bug) => {
@@ -1878,13 +1055,18 @@ function computeBugStatusData(report: SprintDefectReport): BugStatusData {
         (sum, count) => sum + count,
         0
     );
-    const openSeverityEntries = EMAIL_SEVERITY_KEYS.map(
-        (key) => [key, openSeverityCounts[key] ?? 0] as const
-    );
+    const openSeverityEntries: (readonly [string, number])[] = [
+        ...EMAIL_SEVERITY_KEYS.map((key) => [key, openSeverityCounts[key] ?? 0] as const),
+        ...Object.entries(openSeverityCounts)
+            .filter(([key, count]) => !EMAIL_SEVERITY_KEYS.includes(key) && count > 0)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, count]) => [key, count] as const),
+    ];
 
     return {
         statusEntries,
         statusSegments,
+        closedOutOfScopeCount,
         severityTotal,
         severityEntries,
         openSeverityTotal,
@@ -1902,6 +1084,8 @@ interface SuiteProgressRowData {
 // Shared by the PDF and PPTX suite-progress rows - both render the same
 // executed/pass-rate figures, just with a different renderer underneath.
 function computeSuiteProgressRowData(group: SuiteProgressGroup): SuiteProgressRowData {
+    // Counts NotApplicable as executed - see the comment on totalExecuted
+    // in StatusReportCard.tsx for why this differs from that KPI.
     const executed = group.totalTestCases - group.outcomeCounts.NotRun;
     const executedPct = group.totalTestCases
         ? Math.round((executed / group.totalTestCases) * 100)
@@ -1954,9 +1138,10 @@ function pdfDrawAlertBanner(ctx: PdfDrawCtx, y: number, alertText: string): numb
     return boxY + boxHeight + 8;
 }
 
-function buildPdfRow2KpiDefs(
+function buildPdfBugRow1KpiDefs(
     kpis: StatusCardKpis,
     report: SprintDefectReport,
+    closedOutOfScopeCount: number,
     t: TranslateFn
 ): { kpi: (typeof LIGHT_KPI)[number]; label: string; value: string }[] {
     return [
@@ -1966,25 +1151,45 @@ function buildPdfRow2KpiDefs(
             value: `${report.effectiveCount}/${report.total}`,
         },
         {
+            kpi: LIGHT_KPI[8],
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected"),
+            value: String(report.outOfScopeCount),
+        },
+        {
+            kpi: LIGHT_KPI[2],
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio", {
+                count: closedOutOfScopeCount,
+            }),
+            value: `${kpis.bugsClosed}/${report.total} (${kpis.bugsClosedPct}%)`,
+        },
+    ];
+}
+
+function buildPdfBugRow2KpiDefs(
+    kpis: StatusCardKpis,
+    report: SprintDefectReport,
+    t: TranslateFn
+): { kpi: (typeof LIGHT_KPI)[number]; label: string; value: string }[] {
+    return [
+        {
+            kpi: LIGHT_KPI[3],
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.criticalBugs"),
+            value: String(kpis.criticalCount),
+        },
+        {
+            kpi: LIGHT_KPI[4],
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs"),
+            value: `${report.reopenedCount} (${kpis.reopenedPct}%)`,
+        },
+        {
+            kpi: LIGHT_KPI[9],
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"),
+            value: t("defectManagementPage.stats.days", { value: kpis.avgClosureDays }),
+        },
+        {
             kpi: LIGHT_KPI[7],
             label: t("defectManagementPage.sprintReport.statusCard.kpis.withoutResolutionDate"),
             value: String(report.withoutResolutionDateCount),
-        },
-        ...(report.outOfScopeCount > 0
-            ? [
-                {
-                    kpi: LIGHT_KPI[8],
-                    label: t(
-                        "defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected"
-                    ),
-                    value: `${report.outOfScopeCount}/${report.total}`,
-                },
-            ]
-            : []),
-        {
-            kpi: LIGHT_KPI[9],
-            label: t("defectManagementPage.sprintReport.statusCard.kpis.notApplicableRate"),
-            value: `${kpis.notApplicableRate}%`,
         },
     ];
 }
@@ -2151,6 +1356,7 @@ function pdfDrawBugStatusSection(
     const {
         statusEntries,
         statusSegments,
+        closedOutOfScopeCount,
         severityTotal,
         severityEntries,
         openSeverityTotal,
@@ -2225,7 +1431,9 @@ function pdfDrawBugStatusSection(
     doc.setFontSize(8);
     doc.setTextColor(LIGHT_INK_MUTED);
     doc.text(
-        statusEntries.map(([name, count]) => statusCountLabel(t, name, count)).join("   |   "),
+        statusEntries
+            .map(([name, count]) => statusCountLabel(t, name, count, closedOutOfScopeCount))
+            .join("   |   "),
         PDF_MARGIN,
         cursorY
     );
@@ -2344,8 +1552,22 @@ export function buildStatusReportCardPdfDocument(
     let y = pdfDrawAlertBanner(ctx, 30, alertText);
 
     const kpis = computeStatusCardKpis(suiteGroups, report);
+    const { closedOutOfScopeCount } = computeBugStatusData(report);
 
     y = ensurePdfSpace(doc, y, 24);
+
+    // Section label: test cases
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(LIGHT_INK_MUTED);
+    doc.text(
+        t("defectManagementPage.sprintReport.statusCard.kpis.testCasesSection").toUpperCase(),
+        PDF_MARGIN,
+        y + 3
+    );
+    y += 6;
+
+    const testKpiPalette = [LIGHT_KPI[0], LIGHT_KPI[1], LIGHT_KPI[5], LIGHT_KPI[2], LIGHT_KPI[1], LIGHT_KPI[4]];
 
     autoTable(doc, {
         startY: y,
@@ -2353,43 +1575,75 @@ export function buildStatusReportCardPdfDocument(
         head: [
             [
                 t("defectManagementPage.sprintReport.statusCard.kpis.totalTestCases"),
+                t("defectManagementPage.sprintReport.statusCard.kpis.executedCount"),
+                t("defectManagementPage.sprintReport.statusCard.kpis.notApplicable"),
+                t("defectManagementPage.sprintReport.statusCard.kpis.notRun"),
+                t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"),
                 t("defectManagementPage.sprintReport.statusCard.kpis.passRate"),
-                t("defectManagementPage.sprintReport.statusCard.kpis.bugsClosed", {
-                    percent: kpis.bugsClosedPct,
-                }),
-                t("defectManagementPage.sprintReport.statusCard.kpis.criticalBugs"),
-                t("defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs", {
-                    percent: kpis.reopenedPct,
-                }),
-                t("defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"),
             ],
         ],
         body: [
             [
                 String(kpis.totalTestCases),
+                `${kpis.totalExecuted} (${kpis.executedPct}%)`,
+                `${kpis.totalNotApplicable} (${kpis.notApplicableRate}%)`,
+                String(kpis.totalNotRun),
+                String(kpis.totalPassed),
                 `${kpis.passRate}%`,
-                `${kpis.bugsClosed}/${report.total}`,
-                String(kpis.criticalCount),
-                String(report.reopenedCount),
-                t("defectManagementPage.stats.days", { value: kpis.avgClosureDays }),
             ],
         ],
         tableWidth: innerWidth,
         styles: { fontSize: 7, halign: "center", cellPadding: 2, textColor: LIGHT_INK_MUTED },
         headStyles: { textColor: LIGHT_INK_MUTED, fontStyle: "normal" },
         bodyStyles: { fontSize: 12, fontStyle: "bold" },
-        // Explicit equal cellWidth (rather than autoTable's content-based
-        // default) so all 6 tiles are exactly innerWidth/6 wide - matching
-        // the standalone 7th tile below, which uses that same width.
         columnStyles: Object.fromEntries(
-            LIGHT_KPI.slice(0, 6).map((kpi, index) => [
+            testKpiPalette.map((kpi, index) => [
                 index,
                 { fillColor: kpi.bg, textColor: kpi.accent, cellWidth: innerWidth / 6 },
             ])
         ),
         didParseCell: (hookData) => {
             if (hookData.section === "head") {
-                hookData.cell.styles.fillColor = LIGHT_KPI[hookData.column.index].bg;
+                hookData.cell.styles.fillColor = testKpiPalette[hookData.column.index].bg;
+                hookData.cell.styles.textColor = LIGHT_INK_MUTED;
+            }
+        },
+    });
+
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+
+    // Section label: bugs
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(LIGHT_INK_MUTED);
+    doc.text(
+        t("defectManagementPage.sprintReport.statusCard.kpis.bugsSection").toUpperCase(),
+        PDF_MARGIN,
+        y + 3
+    );
+    y += 6;
+
+    const bugRow1Defs = buildPdfBugRow1KpiDefs(kpis, report, closedOutOfScopeCount, t);
+
+    autoTable(doc, {
+        startY: y,
+        theme: "plain",
+        tableWidth: innerWidth,
+        margin: { left: PDF_MARGIN },
+        head: [bugRow1Defs.map((d) => d.label)],
+        body: [bugRow1Defs.map((d) => d.value)],
+        styles: { fontSize: 7, halign: "center", cellPadding: 2, textColor: LIGHT_INK_MUTED },
+        headStyles: { textColor: LIGHT_INK_MUTED, fontStyle: "normal" },
+        bodyStyles: { fontSize: 12, fontStyle: "bold" },
+        columnStyles: Object.fromEntries(
+            bugRow1Defs.map((d, index) => [
+                index,
+                { fillColor: d.kpi.bg, textColor: d.kpi.accent, cellWidth: innerWidth / 4 },
+            ])
+        ),
+        didParseCell: (hookData) => {
+            if (hookData.section === "head") {
+                hookData.cell.styles.fillColor = bugRow1Defs[hookData.column.index].kpi.bg;
                 hookData.cell.styles.textColor = LIGHT_INK_MUTED;
             }
         },
@@ -2397,27 +1651,27 @@ export function buildStatusReportCardPdfDocument(
 
     y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 2;
 
-    const row2Defs = buildPdfRow2KpiDefs(kpis, report, t);
+    const bugRow2Defs = buildPdfBugRow2KpiDefs(kpis, report, t);
 
     autoTable(doc, {
         startY: y,
         theme: "plain",
-        tableWidth: (innerWidth / 6) * row2Defs.length,
+        tableWidth: innerWidth,
         margin: { left: PDF_MARGIN },
-        head: [row2Defs.map((d) => d.label)],
-        body: [row2Defs.map((d) => d.value)],
+        head: [bugRow2Defs.map((d) => d.label)],
+        body: [bugRow2Defs.map((d) => d.value)],
         styles: { fontSize: 7, halign: "center", cellPadding: 2, textColor: LIGHT_INK_MUTED },
         headStyles: { textColor: LIGHT_INK_MUTED, fontStyle: "normal" },
         bodyStyles: { fontSize: 12, fontStyle: "bold" },
         columnStyles: Object.fromEntries(
-            row2Defs.map((d, index) => [
+            bugRow2Defs.map((d, index) => [
                 index,
-                { fillColor: d.kpi.bg, textColor: d.kpi.accent, cellWidth: innerWidth / 6 },
+                { fillColor: d.kpi.bg, textColor: d.kpi.accent, cellWidth: innerWidth / 4 },
             ])
         ),
         didParseCell: (hookData) => {
             if (hookData.section === "head") {
-                hookData.cell.styles.fillColor = row2Defs[hookData.column.index].kpi.bg;
+                hookData.cell.styles.fillColor = bugRow2Defs[hookData.column.index].kpi.bg;
                 hookData.cell.styles.textColor = LIGHT_INK_MUTED;
             }
         },
@@ -2440,6 +1694,137 @@ export function exportStatusReportCardToPdf(
     t: TranslateFn
 ): void {
     const doc = buildStatusReportCardPdfDocument(data, t);
+    doc.save(filename);
+}
+
+interface KpiLegendEntry {
+    labelKey: string;
+    helpKey: string;
+}
+
+// Same key sets/order as the "Casi di test"/"Stato bug" tile grids in
+// StatusReportCard.tsx (KpiTile usages) and the kpis/kpisHelp translation
+// objects, so this legend never lists a tile the live card doesn't have (or
+// vice versa).
+const KPI_LEGEND_TEST_CASES: KpiLegendEntry[] = [
+    { labelKey: "totalTestCases", helpKey: "totalTestCases" },
+    { labelKey: "executedCount", helpKey: "executedCount" },
+    { labelKey: "notApplicable", helpKey: "notApplicable" },
+    { labelKey: "notRun", helpKey: "notRun" },
+    { labelKey: "totalPassed", helpKey: "totalPassed" },
+    { labelKey: "passRate", helpKey: "passRate" },
+];
+
+const KPI_LEGEND_BUGS: KpiLegendEntry[] = [
+    { labelKey: "effectiveBugsDetected", helpKey: "effectiveBugsDetected" },
+    { labelKey: "outOfScopeBugsDetected", helpKey: "outOfScopeBugsDetected" },
+    { labelKey: "bugsByUs", helpKey: "bugsByUs" },
+    { labelKey: "bugsByDsi", helpKey: "bugsByDsi" },
+    { labelKey: "bugsClosedRatio", helpKey: "bugsClosedRatio" },
+    { labelKey: "criticalBugs", helpKey: "criticalBugs" },
+    { labelKey: "reopenedBugs", helpKey: "reopenedBugs" },
+    { labelKey: "avgClosureTime", helpKey: "avgClosureTime" },
+    { labelKey: "withoutResolutionDate", helpKey: "withoutResolutionDate" },
+];
+
+function pdfDrawKpiLegendSection(
+    doc: jsPDF,
+    innerWidth: number,
+    startY: number,
+    sectionTitle: string,
+    entries: KpiLegendEntry[],
+    t: TranslateFn
+): number {
+    let y = ensurePdfSpace(doc, startY, 20);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(LIGHT_HEADER_BG);
+    doc.text(sectionTitle, PDF_MARGIN, y);
+    y += 4;
+
+    autoTable(doc, {
+        startY: y,
+        theme: "grid",
+        head: [
+            [
+                t("defectManagementPage.sprintReport.statusCard.kpiLegend.columnIndicator"),
+                t("defectManagementPage.sprintReport.statusCard.kpiLegend.columnExplanation"),
+            ],
+        ],
+        body: entries.map((entry) => [
+            // Some kpis.* labels carry a "\n(...)" line-wrap hint for the
+            // narrow on-screen tile (e.g. bugsClosedCount) - not meaningful
+            // in a table cell, so it's flattened to a single line here. Some
+            // also carry a "({{count}} ...)" clause meant to be filled in
+            // with a live report figure (e.g. bugsClosedRatio's out-of-scope
+            // count) - this legend isn't tied to any report, so that clause
+            // is dropped rather than left showing the raw placeholder.
+            t(`defectManagementPage.sprintReport.statusCard.kpis.${entry.labelKey}`)
+                .replace(/\n/g, " ")
+                .replace(/\s*\([^)]*\{\{count\}\}[^)]*\)/g, ""),
+            t(`defectManagementPage.sprintReport.statusCard.kpisHelp.${entry.helpKey}`),
+        ]),
+        tableWidth: innerWidth,
+        margin: { left: PDF_MARGIN },
+        styles: { fontSize: 9, cellPadding: 3, textColor: LIGHT_INK, valign: "top" },
+        headStyles: { fillColor: LIGHT_HEADER_BG, textColor: "#ffffff", fontStyle: "bold" },
+        columnStyles: {
+            0: { cellWidth: innerWidth * 0.32, fontStyle: "bold" },
+            1: { cellWidth: innerWidth * 0.68 },
+        },
+    });
+
+    return getLastAutoTableY(doc, 8);
+}
+
+// A standalone "how do I read this card" one-pager - independent of any
+// specific sprint's report data, so it can be generated once and shared
+// alongside report sends without needing to regenerate it every sprint.
+export function buildKpiLegendPdfDocument(t: TranslateFn): jsPDF {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const innerWidth = pageWidth - PDF_MARGIN * 2;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(LIGHT_INK);
+    doc.text(t("defectManagementPage.sprintReport.statusCard.kpiLegend.title"), PDF_MARGIN, 16);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(LIGHT_INK_MUTED);
+    const subtitleLines = doc.splitTextToSize(
+        t("defectManagementPage.sprintReport.statusCard.kpiLegend.subtitle"),
+        innerWidth
+    );
+    doc.text(subtitleLines, PDF_MARGIN, 23);
+
+    let y = 23 + subtitleLines.length * 5 + 6;
+
+    y = pdfDrawKpiLegendSection(
+        doc,
+        innerWidth,
+        y,
+        t("defectManagementPage.sprintReport.statusCard.kpis.testCasesSection"),
+        KPI_LEGEND_TEST_CASES,
+        t
+    );
+
+    pdfDrawKpiLegendSection(
+        doc,
+        innerWidth,
+        y,
+        t("defectManagementPage.sprintReport.statusCard.kpis.bugsSection"),
+        KPI_LEGEND_BUGS,
+        t
+    );
+
+    return doc;
+}
+
+export function exportKpiLegendToPdf(filename: string, t: TranslateFn): void {
+    const doc = buildKpiLegendPdfDocument(t);
     doc.save(filename);
 }
 
@@ -2712,7 +2097,7 @@ function computePptxNaturalHeights(params: {
         : 0;
     const naturalAlertBlock = hasAlert ? naturalAlertLineCount * 0.2 + 0.14 + 0.18 : 0;
 
-    const naturalKpiBlock = 0.62 + 0.08 + 0.62 + 0.15;
+    const naturalKpiBlock = 0.62 + 0.08 + 0.62 + 0.08 + 0.62 + 0.15;
 
     const naturalDashboardBlock = hasDashboard ? 0.32 + 0.2 : 0;
 
@@ -2761,7 +2146,7 @@ function computePptxNaturalHeights(params: {
 
 function buildPptxKpiDefs(
     kpis: StatusCardKpis,
-    report: SprintDefectReport,
+    _report: SprintDefectReport,
     t: TranslateFn
 ): { value: string; label: string }[] {
     return [
@@ -2770,28 +2155,24 @@ function buildPptxKpiDefs(
             label: t("defectManagementPage.sprintReport.statusCard.kpis.totalTestCases"),
         },
         {
+            value: `${kpis.totalExecuted} (${kpis.executedPct}%)`,
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.executedCount"),
+        },
+        {
+            value: `${kpis.totalNotApplicable} (${kpis.notApplicableRate}%)`,
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.notApplicable"),
+        },
+        {
+            value: String(kpis.totalNotRun),
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.notRun"),
+        },
+        {
+            value: String(kpis.totalPassed),
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"),
+        },
+        {
             value: `${kpis.passRate}%`,
             label: t("defectManagementPage.sprintReport.statusCard.kpis.passRate"),
-        },
-        {
-            value: `${kpis.bugsClosed}/${report.total}`,
-            label: t("defectManagementPage.sprintReport.statusCard.kpis.bugsClosed", {
-                percent: kpis.bugsClosedPct,
-            }),
-        },
-        {
-            value: String(kpis.criticalCount),
-            label: t("defectManagementPage.sprintReport.statusCard.kpis.criticalBugs"),
-        },
-        {
-            value: String(report.reopenedCount),
-            label: t("defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs", {
-                percent: kpis.reopenedPct,
-            }),
-        },
-        {
-            value: t("defectManagementPage.stats.days", { value: kpis.avgClosureDays }),
-            label: t("defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"),
         },
     ];
 }
@@ -2799,6 +2180,7 @@ function buildPptxKpiDefs(
 function buildPptxRow2KpiDefs(
     kpis: StatusCardKpis,
     report: SprintDefectReport,
+    closedOutOfScopeCount: number,
     t: TranslateFn
 ): { value: string; label: string }[] {
     return [
@@ -2807,22 +2189,39 @@ function buildPptxRow2KpiDefs(
             label: t("defectManagementPage.sprintReport.statusCard.kpis.effectiveBugsDetected"),
         },
         {
+            value: String(report.outOfScopeCount),
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected"),
+        },
+        {
+            value: `${kpis.bugsClosed}/${report.total} (${kpis.bugsClosedPct}%)`,
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio", {
+                count: closedOutOfScopeCount,
+            }),
+        },
+    ];
+}
+
+function buildPptxRow3KpiDefs(
+    kpis: StatusCardKpis,
+    report: SprintDefectReport,
+    t: TranslateFn
+): { value: string; label: string }[] {
+    return [
+        {
+            value: String(kpis.criticalCount),
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.criticalBugs"),
+        },
+        {
+            value: `${report.reopenedCount} (${kpis.reopenedPct}%)`,
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs"),
+        },
+        {
+            value: t("defectManagementPage.stats.days", { value: kpis.avgClosureDays }),
+            label: t("defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"),
+        },
+        {
             value: String(report.withoutResolutionDateCount),
             label: t("defectManagementPage.sprintReport.statusCard.kpis.withoutResolutionDate"),
-        },
-        ...(report.outOfScopeCount > 0
-            ? [
-                {
-                    value: `${report.outOfScopeCount}/${report.total}`,
-                    label: t(
-                        "defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected"
-                    ),
-                },
-            ]
-            : []),
-        {
-            value: `${kpis.notApplicableRate}%`,
-            label: t("defectManagementPage.sprintReport.statusCard.kpis.notApplicableRate"),
         },
     ];
 }
@@ -2886,49 +2285,50 @@ function pptxDrawKpiTiles(
     ctx: PptxDrawCtx,
     cursorY: number,
     kpiDefs: { value: string; label: string }[],
-    row2KpiDefs: { value: string; label: string }[]
+    row2KpiDefs: { value: string; label: string }[],
+    row3KpiDefs: { value: string; label: string }[]
 ): void {
     const { slide, M, innerW, s } = ctx;
     const kpiHeight = s(0.62);
     const kpiGap = 0.06;
-    const kpiColumns = 6;
-    const kpiTileWidth = (innerW - kpiGap * (kpiColumns - 1)) / kpiColumns;
 
-    const drawTile = (
-        kpi: { value: string; label: string },
-        paletteIndex: number,
-        positionIndex: number,
+    const drawRow = (
+        defs: { value: string; label: string }[],
+        paletteOffset: number,
         y: number
     ) => {
-        const kpiPalette = PPTX_KPI[paletteIndex];
-        const tileX = M + positionIndex * (kpiTileWidth + kpiGap);
+        const columns = defs.length;
+        const tileWidth = (innerW - kpiGap * (columns - 1)) / columns;
+        defs.forEach((kpi, index) => {
+            const kpiPalette = PPTX_KPI[(paletteOffset + index) % PPTX_KPI.length];
+            const tileX = M + index * (tileWidth + kpiGap);
 
-        slide.addText(
-            [
-                { text: kpi.value, options: { fontSize: s(15), bold: true, breakLine: true } },
-                { text: kpi.label, options: { fontSize: s(7) } },
-            ],
-            {
-                x: tileX,
-                y,
-                w: kpiTileWidth,
-                h: kpiHeight,
-                align: "center",
-                valign: "middle",
-                color: pptxHex(kpiPalette.accent),
-                fontFace: "Arial",
-                fill: { color: pptxHex(kpiPalette.bg) },
-                line: { color: pptxHex(kpiPalette.accent), width: 0.75 },
-                shape: "roundRect",
-                rectRadius: 0.06,
-            }
-        );
+            slide.addText(
+                [
+                    { text: kpi.value, options: { fontSize: s(15), bold: true, breakLine: true } },
+                    { text: kpi.label, options: { fontSize: s(7) } },
+                ],
+                {
+                    x: tileX,
+                    y,
+                    w: tileWidth,
+                    h: kpiHeight,
+                    align: "center",
+                    valign: "middle",
+                    color: pptxHex(kpiPalette.accent),
+                    fontFace: "Arial",
+                    fill: { color: pptxHex(kpiPalette.bg) },
+                    line: { color: pptxHex(kpiPalette.accent), width: 0.75 },
+                    shape: "roundRect",
+                    rectRadius: 0.06,
+                }
+            );
+        });
     };
 
-    kpiDefs.forEach((kpi, index) => drawTile(kpi, index, index, cursorY));
-    row2KpiDefs.forEach((kpi, index) =>
-        drawTile(kpi, 6 + index, index, cursorY + kpiHeight + s(0.08))
-    );
+    drawRow(kpiDefs, 0, cursorY);
+    drawRow(row2KpiDefs, 0, cursorY + kpiHeight + s(0.08));
+    drawRow(row3KpiDefs, 4, cursorY + (kpiHeight + s(0.08)) * 2);
 }
 
 function pptxDrawDashboardButton(
@@ -3157,6 +2557,7 @@ function pptxDrawBugStatusSection(
     const {
         statusEntries,
         statusSegments,
+        closedOutOfScopeCount,
         severityTotal,
         severityEntries,
         openSeverityTotal,
@@ -3230,7 +2631,9 @@ function pptxDrawBugStatusSection(
     localY += s(0.1);
 
     slide.addText(
-        statusEntries.map(([name, count]) => statusCountLabel(t, name, count)).join("   |   "),
+        statusEntries
+            .map(([name, count]) => statusCountLabel(t, name, count, closedOutOfScopeCount))
+            .join("   |   "),
         {
             x: M,
             y: localY,
@@ -3432,10 +2835,12 @@ export async function exportStatusReportCardToPptx(
     cursorY = pptxDrawAlertBanner(ctx, cursorY, alertText, heights.naturalAlertBlock);
 
     const kpis = computeStatusCardKpis(suiteGroups, report);
+    const { closedOutOfScopeCount } = computeBugStatusData(report);
     const kpiDefs = buildPptxKpiDefs(kpis, report, t);
-    const row2KpiDefs = buildPptxRow2KpiDefs(kpis, report, t);
+    const row2KpiDefs = buildPptxRow2KpiDefs(kpis, report, closedOutOfScopeCount, t);
+    const row3KpiDefs = buildPptxRow3KpiDefs(kpis, report, t);
 
-    pptxDrawKpiTiles(ctx, cursorY, kpiDefs, row2KpiDefs);
+    pptxDrawKpiTiles(ctx, cursorY, kpiDefs, row2KpiDefs, row3KpiDefs);
     cursorY += s(heights.naturalKpiBlock);
 
     cursorY = pptxDrawDashboardButton(ctx, cursorY, dashboardUrl, heights.naturalDashboardBlock);
@@ -3475,36 +2880,3 @@ export async function copyStatusReportCardEmailHtmlToClipboard(
     ]);
 }
 
-export function exportPlanProgressToPdf(
-    planTitle: string,
-    counts: TestPlanProgressCounts,
-    bugs: BugInfo[],
-    labels: PlanProgressPdfLabels,
-    charts: ChartImage[] = []
-): void {
-    const doc = buildPlanProgressPdfDocument(
-        planTitle,
-        counts,
-        bugs,
-        labels,
-        charts
-    );
-    doc.save(buildPlanProgressFilename(planTitle));
-}
-
-export function buildPlanProgressPdfBase64(
-    planTitle: string,
-    counts: TestPlanProgressCounts,
-    bugs: BugInfo[],
-    labels: PlanProgressPdfLabels,
-    charts: ChartImage[] = []
-): string {
-    const doc = buildPlanProgressPdfDocument(
-        planTitle,
-        counts,
-        bugs,
-        labels,
-        charts
-    );
-    return pdfDocToBase64(doc);
-}

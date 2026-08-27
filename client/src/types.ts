@@ -71,6 +71,15 @@ export interface SuiteStat {
     openBugs: number;
 }
 
+export interface ProjectSummary {
+    id: string;
+    name: string;
+}
+
+// Same shape as the Iteration classification tree - used for the Area Path
+// selector on the dynamic Sprint Report page.
+export type AreaPathNode = IterationNode;
+
 export interface TestPlanSummary {
     id: number;
     name: string;
@@ -249,6 +258,16 @@ export interface SprintDefectReport {
     withoutResolutionDateCount: number;
 }
 
+export interface VerificaActivitySummary {
+    verifiedToday: number;
+    closedToday: number;
+    closedTodayOutOfScopeCount: number;
+    reopenedToday: number;
+    stillPendingVerification: number;
+    dsiPendingCount: number;
+    siPendingCount: number;
+}
+
 export interface DefectSummary extends BugInfo {
     severity?: string;
     ageDays?: number;
@@ -297,6 +316,7 @@ export interface DefectStats {
     outOfScopeRate: number;
     outOfScopeBySuite: Record<string, number>;
     sprintDefectReport: SprintDefectReport;
+    verificaActivitySummary: VerificaActivitySummary;
     firstTimeFixRate: number | null;
     densityByComponent: Record<string, number | null>;
     backlogTrend: BacklogTrendPoint[];
@@ -339,6 +359,7 @@ export interface PlanOverviewSuiteDetail {
 export interface PlanOverviewResponse {
     planId: number;
     planName: string;
+    reportUrl?: string; // see PlanOverviewResponse in the server's src/types.ts
     totalTestCases: number;
     totalBugs: number;
     testsBySuite: PlanOverviewSuiteCount[];

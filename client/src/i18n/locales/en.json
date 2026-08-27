@@ -5,27 +5,12 @@
     "nav": {
         "primary": "Primary",
         "home": "Go to home",
-        "suites": "Browse by Suite",
-        "dashboard": "Full Dashboard",
-        "runs": "Last 10 Runs",
-        "plans": "Test Plans",
-        "planOverview": "Plan Overview",
-        "planProgress": "Progress Report",
-        "automation": "Automation",
-        "automationDashboard": "Automation Dashboard",
-        "execution": "Test Execution",
-        "defects": "Defect Management",
-        "sprintReport": "Sprint Report",
-        "plurifondSprintReport": "Plurifond Sprint Report",
-        "commonErrors": "Common Errors",
-        "myWorkItems": "My Work Items",
-        "removeTestCases": "Remove Test Cases",
-        "releaseReadiness": "Release Readiness",
+        "dynamicSprintReport": "Sprint Report",
         "refresh": "Refresh Now",
         "refreshing": "Refreshing...",
         "refreshFailed": "Refresh failed: {{message}}",
-        "welcome": "Welcome, {{name}}",
-        "signOut": "Sign Out",
+        "refreshUpToDate": "Already up to date (try again in {{minutes}}m)",
+        "help": "Help",
         "testGraphLogin": "Login",
         "testGraphLogout": "Logout",
         "testGraphSigningIn": "Signing in...",
@@ -33,12 +18,38 @@
         "testGraphLoginFailed": "Login failed: {{message}}",
         "testGraphLogoutFailed": "Logout failed: {{message}}",
         "collapseSidebar": "Collapse sidebar",
-        "expandSidebar": "Expand sidebar"
+        "expandSidebar": "Expand sidebar",
+        "changePat": "Change PAT"
     },
-    "signInPage": {
-        "title": "QA Dashboard",
-        "subtitle": "Sign in with your Microsoft account to continue.",
-        "signIn": "Sign in with Microsoft"
+    "azdoPatSteps": {
+        "step1": "In Azure DevOps, open your profile (top right) and go to User Settings > Personal Access Tokens.",
+        "step2": "Click \"New Token\", give it a name, and set scopes to Work Items (Read) and Test Plans (Read).",
+        "step3": "Click \"Create\" and copy the token right away - Azure DevOps only shows it once.",
+        "step4": "In the dashboard, click \"Change PAT\" (or use the first-run screen) and paste your organization name plus PAT.",
+        "step5": "The values stay only in this browser's local storage and are sent only to your local dashboard process."
+    },
+    "onboardingGuide": {
+        "title": "Getting started",
+        "intro": "A quick look at emailing a report and connecting the dashboard to Azure DevOps from this browser.",
+        "emailSection": {
+            "title": "Emailing a report",
+            "statusReport": "Full status report: on the Sprint Report page, click \"Login\" in the top bar to sign in with your Microsoft account, then fill in the recipients under \"Email Status Card\" and click \"Send Email\". Only shown if enabled."
+        },
+        "azdoSection": {
+            "title": "Connecting to Azure DevOps",
+            "intro": "The local package loads data only after you save your Azure DevOps organization and PAT in this browser:"
+        },
+        "navSectionTitle": "What's in the menu",
+        "navSections": {
+            "dynamic-sprint-report": "Build a report scoped to an area path, sprint, and test plan."
+        },
+        "gotIt": "Got it"
+    },
+    "azdoConnectionError": {
+        "title": "Can't reach Azure DevOps",
+        "message": "The dashboard could not load data from Azure DevOps. The saved organization or PAT is usually missing, expired, or invalid.",
+        "retry": "Retry",
+        "changePat": "Change PAT"
     },
     "outcome": {
         "Passed": "Passed",
@@ -47,321 +58,24 @@
         "NotApplicable": "Not Applicable",
         "Paused": "Paused",
         "InProgress": "In Progress",
-        "NotRun": "Not Run",
-        "ariaLabel": "Outcome: {{outcome}}"
-    },
-    "suitesPage": {
-        "empty": "No suites found."
-    },
-    "dashboardPage": {
-        "title": "QA Dashboard",
-        "lastRefresh": "Last Refresh: {{date}} (cache duration: 5 minutes)",
-        "priority": "Priority {{value}}",
-        "emptyFiltered": "No test cases match the current filters.",
-        "emailSending": "Sending email report...",
-        "emailSent": "Email report sent.",
-        "emailFailed": "Failed to send email report: {{message}}",
-        "stats": {
-            "total": "Total Test Cases",
-            "withOpenBugs": "With Open Bugs",
-            "withoutOpenBugs": "Without Open Bugs",
-            "activeBugs": "Active Bugs",
-            "closedBugs": "Closed Bugs",
-            "passed": "Passed",
-            "failed": "Failed",
-            "blocked": "Blocked",
-            "notApplicable": "Not Applicable",
-            "notRun": "Not Run",
-            "passRate": "Pass Rate",
-            "passRateExclNA": "Pass Rate (excl. N/A)"
-        }
-    },
-    "runsPage": {
-        "title": "QA Dashboard - Last 10 Runs",
-        "empty": "No test runs found."
-    },
-    "plansPage": {
-        "title": "Test Plans",
-        "empty": "No test plans found."
-    },
-    "planDetailPage": {
-        "title": "Test Plan {{id}}",
-        "backToPlans": "Back to Test Plans",
-        "openInAzureDevOps": "Open in Azure DevOps",
-        "suitesTitle": "Test Suites",
-        "empty": "No test suites found.",
-        "suiteEmpty": "No test cases in this suite."
+        "NotRun": "Not Run"
     },
     "planOverviewPage": {
-        "title": "Plan Overview",
-        "exportPdf": "Export as PDF",
         "exporting": "Exporting...",
         "sendEmail": "Send report by email",
         "emailSending": "Sending email report...",
         "emailSent": "Email report sent.",
-        "emailFailed": "Failed to send email report: {{message}}",
-        "email": {
-            "metricColumn": "Metric",
-            "valueColumn": "Value"
-        },
-        "selectPlanPrompt": "Select a test plan to view its overview.",
-        "planFilter": {
-            "label": "Test Plan",
-            "placeholder": "Select a plan..."
-        },
-        "suiteFilter": {
-            "label": "Suite"
-        },
-        "selectedSuiteSection": {
-            "title": "Suite Overview: {{suite}}",
-            "outcomeTitle": "Test Outcome Breakdown",
-            "bugsTitle": "Bugs by State",
-            "noBugs": "No bugs linked to this suite's test cases."
-        },
-        "stats": {
-            "totalTests": "Total Test Cases",
-            "totalBugs": "Total Bugs",
-            "passRate": "Pass Rate",
-            "passRateExclNA": "Pass Rate (excl. N/A)",
-            "executionRate": "Execution Rate"
-        },
-        "charts": {
-            "outcomeBreakdown": "Test Outcome Breakdown",
-            "testsBySuite": "Tests by Suite",
-            "bugsByState": "Bugs by State",
-            "bugsBySuite": "Bugs by Test Suite",
-            "otherSuites": "Other"
-        },
-        "bugsSection": {
-            "title": "Bugs",
-            "empty": "No bugs linked to this plan's test cases."
-        }
-    },
-    "planProgressPage": {
-        "title": "Progress Report",
-        "selectPlanPrompt": "Select a test plan to view its progress report.",
-        "empty": "No requirement-based suites found for this plan.",
-        "planFilter": {
-            "label": "Test Plan",
-            "placeholder": "Select a plan..."
-        },
-        "suiteFilter": {
-            "label": "Test Suites",
-            "placeholder": "All suites",
-            "allSuites": "All suites",
-            "selectedCount": "{{count}} selected"
-        },
-        "summary": {
-            "testPoints": "Test Cases",
-            "testPointsRun": "Test Cases Run",
-            "passRate": "Pass Rate",
-            "passRateExclNA": "Pass Rate (excl. N/A)",
-            "runChart": "Run %",
-            "passRateChart": "Pass Rate",
-            "executedLabel": "Run"
-        },
-        "bugsSection": {
-            "title": "Bugs",
-            "empty": "No open bugs linked to this plan's test cases."
-        }
-    },
-    "automationDashboardPage": {
-        "title": "Automation Dashboard",
-        "minutes": "{{value}} min",
-        "planFilter": {
-            "label": "Test Plan",
-            "allPlans": "All Plans"
-        },
-        "emptyForPlan": "No automated tests found for this plan.",
-        "kpis": {
-            "automatedTests": "Automated Tests",
-            "manualTests": "Manual Tests",
-            "automationCoveragePct": "Automation Coverage %",
-            "flakyTests": "Flaky Tests",
-            "automationSuccessRate": "Automation Success Rate"
-        },
-        "ciCd": {
-            "pipelineSuccessRate": "Pipeline Success Rate",
-            "pipelineFailureRate": "Pipeline Failure Rate",
-            "avgPipelineDuration": "Average Pipeline Duration",
-            "testExecutionTime": "Test Execution Time"
-        },
-        "charts": {
-            "coverageByModule": "Automation Coverage by Module",
-            "flakyTestRanking": "Flaky Test Ranking",
-            "pipelineSuccessTrend": "Pipeline Success Trend"
-        }
-    },
-    "testExecutionPage": {
-        "title": "Test Execution",
-        "sections": {
-            "metrics": "Execution Metrics",
-            "trends": "Trends",
-            "coverage": "Coverage",
-            "visuals": "Visuals"
-        },
-        "metrics": {
-            "total": "Total Test Cases",
-            "executed": "Executed Tests",
-            "passed": "Passed",
-            "failed": "Failed",
-            "blocked": "Blocked",
-            "notApplicable": "Not Applicable",
-            "notRun": "Not Run"
-        },
-        "trends": {
-            "passRate": "Pass Rate Trend",
-            "dailyExecution": "Daily Execution Progress",
-            "failedTests": "Failed Tests Trend"
-        },
-        "coverage": {
-            "tableLabel": "Coverage by suite",
-            "tabs": {
-                "requirements": "Requirements",
-                "userStory": "User Story",
-                "feature": "Feature"
-            },
-            "columns": {
-                "name": "Name",
-                "total": "Total",
-                "executed": "Executed",
-                "coverage": "Coverage %",
-                "passRate": "Pass Rate",
-                "passRateExclNA": "Pass Rate (excl. N/A*)",
-                "passRateNADelta": "N/A Impact (Δ)"
-            },
-            "footnote": "* N/A test cases are tagged \"OutOfScope\" in Azure DevOps. They still count as executed and toward Coverage %, but are excluded from \"Pass Rate (excl. N/A)\"."
-        },
-        "risk": {
-            "title": "Risk Coverage",
-            "tableLabel": "Coverage by priority",
-            "highRisk": "High Risk",
-            "priorityLabel": "Priority {{value}}",
-            "columns": {
-                "priority": "Priority",
-                "total": "Total",
-                "passRate": "Pass Rate",
-                "failed": "Failed"
-            }
-        },
-        "visuals": {
-            "executionFunnel": "Execution Funnel",
-            "burnUp": "Test Progress Burn-up",
-            "passFailTrend": "Pass/Fail Trend",
-            "totalLine": "Total Test Cases",
-            "executedLine": "Executed (cumulative)",
-            "funnel": {
-                "total": "Total",
-                "executed": "Executed",
-                "passed": "Passed"
-            }
-        }
+        "emailFailed": "Failed to send email report: {{message}}"
     },
     "defectManagementPage": {
-        "title": "Defect Management",
-        "tabs": {
-            "sprintReport": "Sprint Report",
-            "overview": "Overview",
-            "quality": "Quality & Process Health",
-            "resource": "Resource & Focus"
-        },
         "stats": {
-            "totalOpen": "Open Bugs",
-            "totalClosed": "Closed Bugs",
-            "mttr": "Mean Time to Resolution",
-            "reopenedBugs": "Reopened Bugs",
-            "reopenRate": "Reopen Rate",
-            "duplicateRate": "Duplicate Bug Rate",
-            "bugsPerStory": "Bugs per Story",
-            "days": "{{value}} day(s)",
-            "notAvailable": "N/A",
-            "notConfigured": "Not configured",
-            "withoutLinkedTestCase": "Defects Without Linked Test Cases",
-            "withoutSuite": "Defects Without a Suite",
-            "leakageRate": "Defect Leakage Rate",
-            "rejectionRate": "Defect Rejection Rate",
-            "firstTimeFixRate": "First-Time Fix Rate",
-            "outOfScopeRate": "Out-of-Scope Rate",
-            "regressionRate": "Regression Rate",
-            "backlogDirection": "Backlog Trend",
-            "backlogDirection_growing": "Growing",
-            "backlogDirection_stable": "Stable",
-            "backlogDirection_shrinking": "Shrinking"
-        },
-        "charts": {
-            "trend": "Bug Trend Over Time",
-            "opened": "Opened",
-            "closed": "Closed",
-            "openTotal": "Open Total",
-            "bySeverity": "Bugs by Severity",
-            "byPriority": "Bugs by Priority",
-            "byComponent": "Defects by Component/Module",
-            "byTeam": "Defects by Team",
-            "byTestSuite": "Bugs by Test Suite",
-            "aging": "Defect Aging",
-            "reopenDistribution": "Reopen Count Distribution (Times Reopened)",
-            "rejectionReasons": "Rejection Reasons",
-            "noRejections": "No rejected defects in the current process data.",
-            "density": "Defect Density (Bugs per Story Point)",
-            "noDensity": "No components with story points to compute density against.",
-            "workload": "Triage Workload (Bugs by Assignee)",
-            "noWorkload": "No bugs currently assigned to anyone.",
-            "backlogTrend": "Backlog Growth Rate (Arrival vs. Resolution)",
-            "backlogDelta": "Opened - Closed",
-            "realVsOutOfScope": "Real Defects vs. Out-of-Scope (Closed Only)",
-            "realVsOutOfScopeAll": "Real Defects vs. Out-of-Scope (All Bugs)",
-            "realDefects": "Real Defects",
-            "outOfScope": "Out of Scope",
-            "noClosedDefects": "No closed defects with a determined closure reason yet.",
-            "noDefectsAllBugs": "No bugs in the current data.",
-            "outOfScopeBySuite": "Out-of-Scope Bugs by Test Suite",
-            "noOutOfScope": "No bugs tagged Out of Scope in the current data."
-        },
-        "sections": {
-            "withoutLinkedTestCase": "Defects Without Linked Test Cases",
-            "excludeClosed": "Exclude closed defects",
-            "noGaps": "No defects without a linked test case.",
-            "withoutSuite": "Defects Without a Suite",
-            "noSuiteGaps": "No defects missing a suite.",
-            "highAttention": "High Attention (SLA Breaches)",
-            "noBreaches": "No defects currently breach their SLA age threshold.",
-            "openInAdo": "Open in Azure DevOps →"
+            "days": "{{value}} day(s)"
         },
         "sprintReport": {
-            "title": "Sprint Defect Report",
-            "stats": {
-                "total": "Bugs Detected",
-                "effective": "Effective Defects",
-                "outOfScope": "Out of Scope",
-                "outOfScopeNote": "Out of Scope: bugs raised against functionality or test cases that are not part of the current sprint."
-            },
             "origin": {
-                "dsi": "DSI",
                 "testFactory": "Test Factory",
                 "testAgenti": "Test Agenti",
                 "business": "Business"
-            },
-            "status": {
-                "closed": "Closed",
-                "resolved": "Resolved",
-                "inProgress": "In Progress",
-                "new": "New"
-            },
-            "charts": {
-                "byOrigin": "Effective Defects by Origin",
-                "byStatus": "Effective Defects by Status",
-                "bySeverity": "Effective Defects by Severity",
-                "byOpenSeverity": "Open Defects by Severity",
-                "noEffectiveDefects": "No effective defects in the current data."
-            },
-            "list": {
-                "title": "Bugs: {{filter}}",
-                "clear": "Clear filter",
-                "empty": "No bugs match this filter."
-            },
-            "pdf": {
-                "filename": "sprint_defect_report",
-                "countColumn": "Count"
             },
             "statusCard": {
                 "title": "Sprint Status Card",
@@ -371,8 +85,15 @@
                 "uatDeadlineLabel": "UAT deadline (optional)",
                 "alertTemplate_one": "UAT window closes: {{date}} - {{count}} working day remains. The System Integrator is required to provide a resolution-date plan for open bugs (details below).",
                 "alertTemplate_other": "UAT window closes: {{date}} - {{count}} working days remain. The System Integrator is required to provide a resolution-date plan for open bugs (details below).",
-                "actionsLabel": "Actions required (optional)",
-                "actionsPlaceholder": "One action per paragraph, separated by a blank line",
+                "actionsLabel1": "Action 1 (optional)",
+                "actionsLabel2": "Action 2 (optional)",
+                "actionsPlaceholder": "Action text",
+                "actionsPresetPlaceholder": "Insert template...",
+                "actionsPresetAutoSuggested": "Suggested text (auto-generated from this report)",
+                "actionsPreset1SiDeadline": "System Integrator: update/close bugs by deadline",
+                "actionsPreset1SiMissingDates": "System Integrator: missing resolution dates ({{count}} bugs)",
+                "actionsPreset2TestManagementOutOfScope": "Test Management: complex agent out of scope (Sprint 3)",
+                "actionsPreset2TestFunzionaliNotExecutable": "Functional tests: non-executable test cases (unreleased features)",
                 "actionsTitle": "Actions Required",
                 "exportButton": "Export Status Card",
                 "exportPptxButton": "Export as PPTX",
@@ -386,11 +107,10 @@
                 "emailAddressPlaceholder": "email1@example.com, email2@example.com",
                 "emailFromNameLabel": "Sender name (optional)",
                 "emailFromNamePlaceholder": "Shown as the sender name",
-                "emailToLabel": "To",
-                "emailCcLabel": "Cc",
-                "emailAddressPlaceholder": "email1@example.com, email2@example.com",
-                "emailFromNameLabel": "Sender name (optional)",
-                "emailFromNamePlaceholder": "Shown as the sender name",
+                "emailPrefaceLabel": "Message before report",
+                "emailPrefacePlaceholder": "Write a message to include above the status card, e.g. a greeting or summary...",
+                "emailClosingLabel": "Message after report",
+                "emailClosingPlaceholder": "Write a message to include below the status card, e.g. closing remarks or a signature...",
                 "openDashboard": "Open monitoring dashboard",
                 "casesCount": "{{count}} cases",
                 "executed": "executed",
@@ -401,30 +121,70 @@
                 "suiteGroupsWarning": "\"{{group}}\": no test cases matched ({{hint}})",
                 "noPlanSelected": "No suites matched yet - check the plan/suite names configured for this card.",
                 "bugStatusTitle": "Bug Status",
-                "bugStatusSubtitle": "(reported by {{sources}})",
-                "bugsDetected": "{{count}} bugs detected",
+                "bugStatusSubtitle": "(reported by {{sources}} · effective bugs only)",
+                "closedOutOfScopeNote": " ({{count}} out of scope included)",
+                "bugsDetected": "{{count}} total bugs detected",
                 "bugStatusSummary": "{{effective}} effective, {{outOfScope}} out of scope",
-                "stillOpen": "{{count}} still open",
+                "stillOpen": "of which {{count}} still open",
                 "statusLabels": {
                     "closed": "Closed",
-                    "resolved": "To verify (DSI retest)",
+                    "daVerificare": "To verify (DSI retest)",
+                    "inVerifica": "In verification",
                     "inProgress": "In progress",
-                    "new": "New (to be picked up)",
+                    "new": "To be picked up",
+                    "reopened": "Reopened",
                     "notApplicable": "Not applicable (out of scope)"
                 },
                 "severityCaption": "Severity distribution of the {{count}} effective bugs",
                 "openSeverityCaption": "Severity distribution of the {{count}} bugs still open",
                 "kpis": {
-                    "totalTestCases": "Total Test Cases\n\n (Test Factory, Business, Test Agenti)",
-                    "passRate": "Pass Rate",
-                    "bugsClosed": "Bugs Closed ({{percent}}%)",
+                    "testCasesSection": "Test Case Status",
+                    "bugsSection": "Bug Status",
+                    "totalTestCases": "Total Test Cases",
+                    "notRun": "Test Cases To Execute",
+                    "executedCount": "Test Cases Executed",
+                    "totalPassed": "Test Cases Passed",
+                    "passRate": "Pass Rate (Ok / Total)",
+                    "notApplicable": "Not Applicable",
+                    "bugsClosedRatio": "Bugs Closed / Total\n(all detected)",
                     "criticalBugs": "Critical Bugs (open)",
-                    "reopenedBugs": "Reopened Bugs ({{percent}}%)",
+                    "reopenedBugs": "Reopened Bugs",
                     "avgClosureTime": "Average Bug Closure Time",
-                    "effectiveBugsDetected": "Effective Bugs Detected",
+                    "effectiveBugsDetected": "Effective /\nTotal Bugs",
                     "outOfScopeBugsDetected": "Out of Scope Bugs",
-                    "withoutResolutionDate": "Bugs Without Resolution Date",
-                    "notApplicableRate": "N/A Test Cases"
+                    "withoutResolutionDate": "Bugs Without\nResolution Date",
+                    "bugsByUs": "Bugs opened by Test Factory",
+                    "bugsByDsi": "Bugs opened by DSI"
+                },
+                "kpisHelp": {
+                    "totalTestCases": "All test cases in the selected plan(s), regardless of their status.",
+                    "executedCount": "Cases with outcome Passed, Failed, or Blocked. Any other outcome (Not Applicable, Not Run, Paused, In Progress) isn't counted as executed here - unlike each suite's own \"% Executed\" badge further down, which counts Not Applicable as executed too.",
+                    "notApplicable": "Cases marked Not Applicable (N/A), i.e. not relevant for this sprint.",
+                    "notRun": "Cases not yet executed: Total minus Executed minus N/A. This also folds in any Paused or In Progress cases, since only Passed/Failed/Blocked count as \"executed\" above.",
+                    "totalPassed": "Total number of test cases with outcome Passed.",
+                    "passRate": "Percentage of Passed cases over the total usable cases (Total minus N/A). N/A cases are excluded.",
+                    "effectiveBugsDetected": "Valid bugs found, excluding out-of-scope ones (duplicates, not relevant, etc.) - shown as effective bugs out of the total detected.",
+                    "outOfScopeBugsDetected": "Bugs found but excluded from the main count because they're out of scope (duplicates, not reproducible, not relevant).",
+                    "bugsByUs": "Bugs found by our test team: every detected bug (including out-of-scope ones) whose source isn't DSI.",
+                    "bugsByDsi": "Bugs reported directly by DSI: every detected bug (including out-of-scope ones) linked to the DSI source.",
+                    "bugsClosedRatio": "Percentage of Closed bugs over the total bugs found (Closed divided by Total), including any out-of-scope bugs that were closed.",
+                    "criticalBugs": "Critical-severity bugs that are still open, counted only among in-scope (effective) bugs - unlike the other bug counts on this card, out-of-scope bugs are excluded here.",
+                    "reopenedBugs": "Bugs that have been reopened at least once after being closed, based on their full history - regardless of current status, and counted across every detected bug including out-of-scope ones.",
+                    "avgClosureTime": "Average number of days between a bug being opened and closed, across every detected bug (including out-of-scope ones) that has an actual closed date. Bugs still open aren't counted yet.",
+                    "withoutResolutionDate": "Bugs still active (not Closed, Da verificare, or In verifica) that don't have an estimated resolution date set yet. A separate figure from the closure-time average above, which is based on each bug's actual closed date."
+                },
+                "sectionHelp": {
+                    "suiteProgress": "Each suite's own \"% Executed\" counts Not Applicable as executed too (only Not Run is excluded) - broader than the \"Test Cases Executed\" KPI above, which excludes Not Applicable entirely. Pass Rate = Passed ÷ (Total minus Not Applicable).",
+                    "bugStatus": "Every bug detected for this sprint/area, including out-of-scope ones, grouped by current Azure DevOps status. \"Still open\" counts only in-scope (effective) bugs not yet Closed - narrower than the totals above it.",
+                    "originBreakdown": "\"Detected\" counts every bug attributed to this source, including out-of-scope ones. \"Accepted\" counts only the in-scope (effective) bugs from that same source. A bug's source is Test Factory by default, unless its linked suite identifies it as Test Agenti, Business, or DSI (DSI bugs are counted in the KPI tile above, not shown as their own panel here)."
+                },
+                "kpiLegend": {
+                    "title": "Sprint Status Card Guide",
+                    "subtitle": "Simple explanation of every indicator shown on the card, so you can see at a glance how each number is calculated.",
+                    "columnIndicator": "Indicator",
+                    "columnExplanation": "How it's calculated",
+                    "downloadButton": "Download Guide (PDF)",
+                    "filename": "sprint_status_card_guide"
                 },
                 "originBreakdown": {
                     "title": "Bugs by Suite",
@@ -437,52 +197,33 @@
             }
         }
     },
-    "sprintReportPage": {
-        "title": "Sprint Report"
+    "dynamicSprintReportPage": {
+        "title": "Sprint Report",
+        "selectProjectPrompt": "Select a project in the scope bar above to get started.",
+        "selectAreaPathPrompt": "Select an area path in the sidebar to get started.",
+        "selectSprintPrompt": "Select a sprint in the sidebar to load the report.",
+        "defaultHeaderTitle": "Sprint Status Report",
+        "defaultHeaderSubtitle": "Test execution status"
     },
-    "plurifondSprintReportPage": {
-        "title": "Plurifond Sprint Report"
+    "reportSidebar": {
+        "title": "Report Scope",
+        "loadingPlans": "Loading test plans...",
+        "noPlans": "No test plans found for this sprint.",
+        "noSprints": "No sprints found for this area path.",
+        "newPlanBadge": "New"
     },
-    "commonErrorsPage": {
-        "title": "Common Errors",
-        "empty": "No failed test results with error messages found.",
-        "kpis": {
-            "totalFailedResults": "Total Failed Results",
-            "uniqueSignatures": "Unique Error Signatures",
-            "topErrorCount": "Top Error Occurrences"
-        },
-        "charts": {
-            "topErrors": "Top Errors by Frequency"
-        },
-        "table": {
-            "affectedTestCases": "Affected Test Cases ({{count}})"
-        }
-    },
-    "myWorkItemsPage": {
-        "title": "My Work Items",
-        "empty": "No work items found for this view.",
-        "emptyAssigned": "Nothing assigned to you right now - enjoy the calm!",
-        "emptyMentioned": "No one's mentioned you lately.",
-        "emptyFollowing": "You're not following anything yet.",
-        "emptyCreated": "You haven't created any work items yet.",
-        "filters": {
-            "assignedToMe": "Assigned to me",
-            "createdByMe": "Created by me",
-            "mentioned": "Mentioned",
-            "following": "Following",
-            "bugsOnly": "Bugs only"
-        }
+    "scopeBar": {
+        "projectLabel": "Project",
+        "projectPlaceholder": "Select a project...",
+        "areaPathLabel": "Area Path",
+        "sprintLabel": "Sprint",
+        "allSprints": "All Sprints",
+        "changeScope": "Change scope",
+        "done": "Done"
     },
     "filterBar": {
         "areaPath": "Area Path",
-        "allAreas": "All Areas",
-        "suite": "Suite",
-        "allSuites": "All Suites",
-        "selectedSuites": "{{count}} selected",
-        "priority": "Priority",
-        "allPriorities": "All Priorities",
-        "search": "Search",
-        "searchPlaceholder": "Search test case title..."
+        "allAreas": "All Areas"
     },
     "defectFilterBar": {
         "iteration": "Sprint/Iteration",
@@ -495,73 +236,6 @@
         "allSuites": "All Test Suites",
         "selectedSuites": "{{count}} selected"
     },
-    "iterationFilter": {
-        "label": "Sprint/Iteration (Azure)",
-        "all": "All Iterations"
-    },
-    "suiteCard": {
-        "total": "Total: {{count}}",
-        "summary": "Passed {{passed}} · Failed {{failed}} · Blocked {{blocked}} · Not Applicable {{notApplicable}} · Not Run {{notRun}}",
-        "openBugs": "Open bugs: {{count}}",
-        "passRate": "Pass rate: {{rate}}%"
-    },
-    "runCard": {
-        "state": "State: {{state}}",
-        "completed": "Completed: {{date}}",
-        "completedNA": "N/A",
-        "total": "Total: {{count}}",
-        "summary": "Passed {{passed}} · Failed {{failed}} · Blocked {{blocked}} · Not Applicable {{notApplicable}} · Not Run {{notRun}}",
-        "passRate": "Pass rate: {{rate}}%"
-    },
-    "planCard": {
-        "state": "State: {{state}}",
-        "area": "Area: {{areaPath}}",
-        "iteration": "Iteration: {{iteration}}",
-        "owner": "Owner: {{owner}}"
-    },
-    "testCaseItem": {
-        "area": "Area: {{areaPath}}",
-        "bugsLinked": "Bugs linked: {{count}} ({{active}} active, {{closed}} closed)",
-        "latestRun": "Latest run"
-    },
-    "bugsTable": {
-        "columns": {
-            "priority": "Priority",
-            "id": "ID",
-            "title": "Title",
-            "state": "State",
-            "creator": "Creator",
-            "assignee": "Assignee"
-        }
-    },
-    "workItemsTable": {
-        "columns": {
-            "priority": "Priority",
-            "id": "ID",
-            "title": "Title",
-            "type": "Type",
-            "state": "State",
-            "assignee": "Assignee",
-            "createdDate": "Opened",
-            "createdTime": "Opened (time)",
-            "closedDate": "Closed",
-            "closedTime": "Closed (time)",
-            "tags": "Tags"
-        },
-        "noTags": "No tags",
-        "filter": {
-            "label": "Filter",
-            "search": "Search...",
-            "selectAll": "(Select all)",
-            "blank": "(Blanks)"
-        }
-    },
-    "pagination": {
-        "previous": "Previous page",
-        "next": "Next page",
-        "pageOf": "Page {{page}} of {{pageCount}}",
-        "itemsPerPage": "Items per page"
-    },
     "errorState": {
         "title": "Something went wrong",
         "retry": "Retry",
@@ -571,7 +245,6 @@
         "label": "Loading"
     },
     "themeSwitcher": {
-        "label": "Theme",
         "light": "Light",
         "dark": "Dark"
     },
@@ -580,109 +253,13 @@
         "english": "English",
         "italian": "Italiano"
     },
-    "exportMenu": {
-        "label": "Export",
-        "pdf": "Export as PDF",
-        "csv": "Export as CSV",
-        "excel": "Export as Excel",
-        "email": "Send report by email"
-    },
-    "removeTestCasesPage": {
-        "title": "Remove Test Cases",
-        "planFilter": {
-            "label": "Test Plan",
-            "placeholder": "Select a test plan"
-        },
-        "selectPlanFirst": "Select a test plan to browse and remove its test cases.",
-        "selectSuite": "Select all test cases in {{suiteName}}",
-        "selectedCount": "{{count}} selected",
-        "clearSelection": "Clear selection",
-        "deleteSelected": "Delete selected",
-        "confirm": {
-            "title": "Delete {{count}} test cases?",
-            "message": "This permanently removes the following test case work items from Azure DevOps (moved to the Recycle Bin) and from every suite they belong to:",
-            "cancel": "Cancel",
-            "confirm": "Delete {{count}} test cases"
-        },
-        "result": {
-            "successTitle": "{{count}} test case(s) deleted.",
-            "failedSummary": "{{count}} test case(s) could not be deleted.",
-            "errorTitle": "Delete failed"
-        }
-    },
-    "releaseReadinessPage": {
-        "title": "Release Readiness",
-        "sprintLabel": "{{name}} ({{start}} – {{end}})",
-        "sprintEnded": "sprint ended",
-        "rag": {
-            "green": "Green",
-            "amber": "Amber",
-            "red": "Red"
-        },
-        "gate": {
-            "title": "Release Gate",
-            "passingCount": "{{passing}}/{{total}} tracked criteria passing",
-            "criteriaTitle": "Exit Criteria (Test Funzionali e di Non Regressione)",
-            "actualTarget": "{{actual}} (target: {{target}})",
-            "notTrackedNote": "Not yet tracked (target: {{target}})",
-            "status": {
-                "pass": "PASS",
-                "block": "BLOCK",
-                "warn": "WARN",
-                "notTracked": "N/A"
-            },
-            "criteria": {
-                "testsExecuted": {
-                    "label": "Test Cases Executed",
-                    "description": "Percentage of planned manual test cases that were actually executed."
-                },
-                "testsPassed": {
-                    "label": "Tests Passed *",
-                    "description": "Percentage of executed manual test cases with a passing outcome.",
-                    "note": "* Excludes test cases with a Not Applicable outcome — these were out of scope for the current sprint and were added in error."
-                },
-                "requirementsCoverage": {
-                    "label": "Functional Requirements Coverage",
-                    "description": "Percentage of functional requirements covered by at least one test case."
-                },
-                "testCaseRelevance": {
-                    "label": "Test Case Relevance",
-                    "description": "Percentage of manual test cases marked Not Applicable, i.e. out of scope for the current release."
-                },
-                "criticalDefectsOpen": {
-                    "label": "Critical Defects Open",
-                    "description": "Critical severity defects still open at the end of the test cycle."
-                },
-                "highDefectsOpen": {
-                    "label": "High Defects Open",
-                    "description": "High severity defects still open at the end of the test cycle."
-                },
-                "mediumDefectsOpen": {
-                    "label": "Medium Defects Open",
-                    "description": "Medium severity defects still open at the end of the test cycle (tracked only, does not block release)."
-                },
-                "lowDefectsOpen": {
-                    "label": "Low Defects Open",
-                    "description": "Low severity defects still open at the end of the test cycle (tracked only, does not block release)."
-                }
-            }
-        },
-        "stats": {
-            "title": "Sprint Metrics",
-            "completionRate": "Sprint Test Completion Rate",
-            "executedOfPlanned": "Executed / Planned",
-            "carryOver": "Carry-Over Test Cases",
-            "notYetExecuted": "Not Yet Executed",
-            "notApplicable": "Not Applicable",
-            "passRateDelta": "Pass Rate vs. Previous Sprint",
-            "blockingDefects": "Blocking Defects (Critical/High)"
-        },
-        "passRateDelta": {
-            "noPriorSprint": "No prior sprint yet"
-        },
-        "blockingDefects": {
-            "title": "Blocking Defects at Release",
-            "empty": "No open Critical or High severity bugs."
-        }
+    "patSetup": {
+        "title": "Connect your Azure DevOps PAT",
+        "description": "Stored only in this browser's local storage and sent only to your local dashboard process.",
+        "orgLabel": "Azure DevOps organization",
+        "orgPlaceholder": "your-organization-name",
+        "patLabel": "Personal Access Token",
+        "patPlaceholder": "Paste your PAT",
+        "connect": "Connect"
     }
 }

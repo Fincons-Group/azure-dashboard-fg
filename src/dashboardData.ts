@@ -3,42 +3,29 @@ import {
     getSuites,
     getTestCases,
     getTestPoints,
-    getTestRuns,
-    getTestRunStatistics,
     getWorkItem,
     getWorkItems,
     extractWorkItemIds,
     buildWorkItemUrl,
     buildTestRunUrl,
-    deleteTestCase,
-    deleteTestCasesFromSuite,
 } from "./azdo.js";
 import type {
     TestCaseRow,
     Outcome,
-    SuiteStat,
-    RunCard,
-    DashboardStats,
-    TrendPoint,
     TestPlanSummary,
-    TestSuiteSummary,
-    TestCaseSummary,
-    DeleteTestCaseItem,
-    DeleteTestCasesResult,
 } from "./types.js";
 
-let dashboardCache: TestCaseRow[] | null = null;
-let cacheTimestamp = 0;
+// Keyed by resolved project rather than a single global entry, so scoping
+// to a different project doesn't evict/clobber the default project's cache.
+const dashboardCache = new Map<
+    string,
+    { data: TestCaseRow[]; timestamp: number }
+>();
 
 const CACHE_DURATION_MS = 5 * 60 * 1000;
 
-// Sprint 1 test execution kicked off on this date; runs before it are
-// leftover data from prior activity and excluded from the execution trend.
-
-const SPRINT_1_START_DATE = "2026-07-07";
-
-export function getCacheTimestamp(): number {
-    return cacheTimestamp;
+function resolveProjectKey(project?: string): string {
+    return project ?? process.env.AZDO_PROJECT!;
 }
 
 // A test point's `results.outcome` can carry a stale/interim verdict (e.g.
@@ -117,10 +104,12 @@ export async function buildTestCaseRow(
     suiteId: number,
     outcomesByTestCase: Record<number, string[]>,
     lastRunByTestCase: Record<number, number>,
-    planIteration?: string
+    planIteration?: string,
+    project?: string
 ): Promise<TestCaseRow> {
     const workItem = await getWorkItem(
-        tc.workItem.id
+        tc.workItem.id,
+        project
     );
 
     const linkedIds = extractWorkItemIds(
@@ -128,7 +117,9 @@ export async function buildTestCaseRow(
     );
 
     const linkedItems = await getWorkItems(
-        linkedIds
+        linkedIds,
+        undefined,
+        project
     );
 
     const bugs = linkedItems.filter(
@@ -174,7 +165,7 @@ export async function buildTestCaseRow(
             id: b.id,
             title: b.fields["System.Title"],
             state: b.fields["System.State"],
-            url: buildWorkItemUrl(b.id),
+            url: buildWorkItemUrl(b.id, project),
             creator: b.fields["System.CreatedBy"]?.displayName,
             assignee: b.fields["System.AssignedTo"]
                 ? {
@@ -187,7 +178,7 @@ export async function buildTestCaseRow(
         })),
         lastRunId,
         lastRunUrl: lastRunId
-            ? buildTestRunUrl(lastRunId)
+            ? buildTestRunUrl(lastRunId, project)
             : undefined,
     };
 }
@@ -244,25 +235,27 @@ function indexSuiteTestPoints(testPoints: any[]): SuiteTestPointIndex {
     return { outcomesByTestCase, lastRunByTestCase };
 }
 
-export async function buildDashboard(): Promise<
+export async function buildDashboard(project?: string): Promise<
     TestCaseRow[]
 > {
-    const plans = await getTestPlans();
+    const plans = await getTestPlans(project);
 
     const allTestCases: TestCaseRow[] = [];
 
     for (const plan of plans) {
-        const suites = await getSuites(plan.id);
+        const suites = await getSuites(plan.id, project);
 
         for (const suite of suites) {
             const testCases = await getTestCases(
                 plan.id,
-                suite.id
+                suite.id,
+                project
             );
 
             const testPoints = await getTestPoints(
                 plan.id,
-                suite.id
+                suite.id,
+                project
             );
 
             const { outcomesByTestCase, lastRunByTestCase } =
@@ -277,7 +270,8 @@ export async function buildDashboard(): Promise<
                         suite.id,
                         outcomesByTestCase,
                         lastRunByTestCase,
-                        plan.iteration
+                        plan.iteration,
+                        project
                     )
                 )
             );
@@ -289,265 +283,84 @@ export async function buildDashboard(): Promise<
     return allTestCases;
 }
 
-export async function getDashboardData(): Promise<
+export async function getDashboardData(project?: string): Promise<
     TestCaseRow[]
 > {
+    const projectKey = resolveProjectKey(project);
     const now = Date.now();
+    const cached = dashboardCache.get(projectKey);
 
-    if (
-        dashboardCache &&
-        now - cacheTimestamp <
-        CACHE_DURATION_MS
-    ) {
-        console.log("CACHE HIT");
-        return dashboardCache;
+    if (cached && now - cached.timestamp < CACHE_DURATION_MS) {
+        return cached.data;
     }
 
-    console.log("CACHE MISS");
+    const data = await buildDashboard(project);
 
-    dashboardCache = await buildDashboard();
-    cacheTimestamp = now;
+    dashboardCache.set(projectKey, { data, timestamp: now });
 
-    return dashboardCache;
+    return data;
 }
 
 export function clearDashboardCache(): void {
-    dashboardCache = null;
-    cacheTimestamp = 0;
+    dashboardCache.clear();
 }
 
-export function computeDashboardStats(
-    allTestCases: TestCaseRow[]
-): DashboardStats {
-    const grouped: Record<
-        string,
-        TestCaseRow[]
-    > = {};
-
-    for (const tc of allTestCases) {
-        const key = String(tc.priority);
-
-        if (!grouped[key]) {
-            grouped[key] = [];
-        }
-
-        grouped[key].push(tc);
+// Plan descriptions are used as a place to hand-paste that sprint's report
+// link (e.g. plan 6177's description holds the link to its saved report),
+// authored through Azure DevOps' rich-text editor - which renders a pasted
+// link as Markdown ("[label](https://...)") rather than HTML. Markdown is
+// checked first since a bare-URL match on that same text would otherwise
+// swallow the link's closing ")" as part of the URL; HTML/plain-text is
+// still checked after for descriptions written by hand.
+export function extractReportUrlFromDescription(
+    description?: string
+): string | undefined {
+    if (!description) {
+        return undefined;
     }
 
-    Object.keys(grouped).forEach(
-        (priority) => {
-            grouped[priority].sort((a, b) => {
-                if (
-                    a.hasOpenBugs &&
-                    !b.hasOpenBugs
-                ) {
-                    return -1;
-                }
-
-                if (
-                    !a.hasOpenBugs &&
-                    b.hasOpenBugs
-                ) {
-                    return 1;
-                }
-
-                return a.testCaseTitle.localeCompare(
-                    b.testCaseTitle
-                );
-            });
-        }
-    );
-
-    const areaPaths = [
-        ...new Set(
-            allTestCases
-                .map((tc) => tc.areaPath)
-                .filter(Boolean)
-        ),
-    ].sort((a, b) => a.localeCompare(b));
-
-    const suites = [
-        ...new Set(
-            allTestCases.map(
-                (tc) => tc.suiteName
-            )
-        ),
-    ].sort((a, b) => a.localeCompare(b));
-
-    const priorities = [
-        ...new Set(
-            allTestCases.map(
-                (tc) => tc.priority
-            )
-        ),
-    ].sort((a, b) => a - b);
-
-    const totalTestCases = allTestCases.length;
-
-    const withOpenBugs = allTestCases.filter(
-        (tc) => tc.hasOpenBugs
-    ).length;
-
-    const withoutOpenBugs =
-        totalTestCases - withOpenBugs;
-
-    const passedCount = allTestCases.filter(
-        (tc) => tc.outcome === "Passed"
-    ).length;
-
-    const failedCount = allTestCases.filter(
-        (tc) => tc.outcome === "Failed"
-    ).length;
-
-    const blockedCount = allTestCases.filter(
-        (tc) => tc.outcome === "Blocked"
-    ).length;
-
-    const notApplicableCount = allTestCases.filter(
-        (tc) => tc.outcome === "NotApplicable"
-    ).length;
-
-    const notRunCount = allTestCases.filter(
-        (tc) => tc.outcome === "NotRun"
-    ).length;
-
-    const executedCount =
-        passedCount + failedCount + blockedCount;
-
-    const passRate = totalTestCases
-        ? Math.round(
-            (passedCount / totalTestCases) * 1000
-        ) / 10
-        : 0;
-
-    return {
-        areaPaths,
-        suites,
-        priorities,
-        totalTestCases,
-        withOpenBugs,
-        withoutOpenBugs,
-        passedCount,
-        failedCount,
-        blockedCount,
-        notApplicableCount,
-        notRunCount,
-        executedCount,
-        passRate,
-        groupedByPriority: grouped,
-    };
-}
-
-export function computeSuiteStats(
-    allTestCases: TestCaseRow[]
-): Record<string, SuiteStat> {
-    const suiteStats: Record<
-        string,
-        SuiteStat
-    > = {};
-
-    for (const tc of allTestCases) {
-        if (!suiteStats[tc.suiteName]) {
-            suiteStats[tc.suiteName] = {
-                total: 0,
-                passed: 0,
-                failed: 0,
-                blocked: 0,
-                notApplicable: 0,
-                notRun: 0,
-                openBugs: 0,
-            };
-        }
-
-        const stat = suiteStats[tc.suiteName];
-
-        stat.total++;
-
-        if (tc.outcome === "Passed") {
-            stat.passed++;
-        } else if (tc.outcome === "Failed") {
-            stat.failed++;
-        } else if (tc.outcome === "Blocked") {
-            stat.blocked++;
-        } else if (tc.outcome === "NotApplicable") {
-            stat.notApplicable++;
-        } else {
-            stat.notRun++;
-        }
-
-        if (tc.hasOpenBugs) {
-            stat.openBugs++;
-        }
+    const markdownMatch = /]\((https?:\/\/[^)\s]+)\)/i.exec(description);
+    if (markdownMatch) {
+        return markdownMatch[1];
     }
 
-    return suiteStats;
-}
-
-function summarizeRunStats(
-    stats: any[]
-): {
-    counts: Record<Outcome, number>;
-    total: number;
-    passRate: number;
-} {
-    const counts: Record<Outcome, number> = {
-        Passed: 0,
-        Failed: 0,
-        Blocked: 0,
-        NotApplicable: 0,
-        Paused: 0,
-        InProgress: 0,
-        NotRun: 0,
-    };
-
-    for (const s of stats) {
-        const outcome = (
-            s.outcome ?? ""
-        ).toLowerCase();
-
-        if (outcome === "passed") {
-            counts.Passed += s.count;
-        } else if (outcome === "failed") {
-            counts.Failed += s.count;
-        } else if (outcome === "blocked") {
-            counts.Blocked += s.count;
-        } else if (outcome === "notapplicable") {
-            counts.NotApplicable += s.count;
-        } else {
-            counts.NotRun += s.count;
-        }
+    const hrefMatch = /href=["'](https?:\/\/[^"']+)["']/i.exec(description);
+    if (hrefMatch) {
+        return hrefMatch[1];
     }
 
-    const total =
-        counts.Passed +
-        counts.Failed +
-        counts.Blocked +
-        counts.NotApplicable +
-        counts.NotRun;
-
-    const passRate = total
-        ? Math.round(
-            (counts.Passed / total) * 1000
-        ) / 10
-        : 0;
-
-    return { counts, total, passRate };
+    const bareMatch = /https?:\/\/[^\s"'<>]+/i.exec(description);
+    return bareMatch ? stripTrailingPunctuation(bareMatch[0]) : undefined;
 }
 
-export async function computeTestPlans(): Promise<
+// Written as a plain loop rather than a trailing-punctuation regex
+// (`/[)\].,;:]+$/`) - that pattern flags as super-linear on static analysis,
+// and a bounded loop is just as clear for "trim a few trailing chars".
+function stripTrailingPunctuation(url: string): string {
+    const trailing = new Set([")", "]", ".", ",", ";", ":"]);
+    let end = url.length;
+
+    while (end > 0 && trailing.has(url[end - 1])) {
+        end--;
+    }
+
+    return url.slice(0, end);
+}
+
+export async function computeTestPlans(project?: string): Promise<
     TestPlanSummary[]
 > {
-    const plans = await getTestPlans();
+    const plans = await getTestPlans(project);
 
     const org = process.env.AZDO_ORG;
-    const project = encodeURIComponent(
-        process.env.AZDO_PROJECT!
+    const encodedProject = encodeURIComponent(
+        project ?? process.env.AZDO_PROJECT!
     );
 
     return plans.map((plan: any): TestPlanSummary => ({
         id: plan.id,
         name: plan.name,
-        url: `https://dev.azure.com/${org}/${project}/_testPlans/define?planId=${plan.id}&suiteId=${plan.rootSuite?.id ?? plan.id}`,
+        url: `https://dev.azure.com/${org}/${encodedProject}/_testPlans/define?planId=${plan.id}&suiteId=${plan.rootSuite?.id ?? plan.id}`,
         areaPath: plan.areaPath,
         iteration: plan.iteration,
         state: plan.state,
@@ -555,326 +368,3 @@ export async function computeTestPlans(): Promise<
     }));
 }
 
-export async function computePlanSuites(
-    planId: number
-): Promise<TestSuiteSummary[]> {
-    const suites = await getSuites(planId);
-
-    const testCasesBySuiteId = new Map<
-        number,
-        TestCaseSummary[]
-    >(
-        await Promise.all(
-            suites.map(
-                async (
-                    suite: any
-                ): Promise<
-                    [number, TestCaseSummary[]]
-                > => {
-                    const testCases =
-                        await getTestCases(
-                            planId,
-                            suite.id
-                        );
-
-                    return [
-                        suite.id,
-                        testCases.map((tc: any) => ({
-                            id: tc.workItem.id,
-                            title: tc.workItem.name,
-                            suiteId: suite.id,
-                        })),
-                    ];
-                }
-            )
-        )
-    );
-
-    const nodesById = new Map<
-        number,
-        TestSuiteSummary
-    >(
-        suites.map((suite: any) => [
-            suite.id,
-            {
-                id: suite.id,
-                name: suite.name,
-                testCases:
-                    testCasesBySuiteId.get(suite.id) ??
-                    [],
-                children: [],
-            },
-        ])
-    );
-
-    const roots: TestSuiteSummary[] = [];
-
-    for (const suite of suites) {
-        const node = nodesById.get(suite.id)!;
-        const parentId = suite.parentSuite?.id;
-        const parentNode = parentId
-            ? nodesById.get(parentId)
-            : undefined;
-
-        if (parentNode) {
-            parentNode.children.push(node);
-        } else {
-            roots.push(node);
-        }
-    }
-
-    if (
-        roots.length === 1 &&
-        roots[0].children.length > 0
-    ) {
-        return roots[0].children;
-    }
-
-    return roots;
-}
-
-export async function computeRunCards(): Promise<
-    RunCard[]
-> {
-    const runs = await getTestRuns();
-
-    const last10 = [...runs]
-        .sort((a: any, b: any) => {
-            const aDate = new Date(
-                a.completedDate ??
-                a.startedDate
-            ).getTime();
-
-            const bDate = new Date(
-                b.completedDate ??
-                b.startedDate
-            ).getTime();
-
-            return bDate - aDate;
-        })
-        .slice(0, 10);
-
-    const cards = await Promise.all(
-        last10.map(
-            async (run: any): Promise<RunCard | null> => {
-                const stats =
-                    await getTestRunStatistics(
-                        run.id
-                    );
-
-                // A null result means Azure DevOps no longer has this run
-                // (it lingers in the runs list after deletion) - drop it
-                // rather than showing a phantom zeroed-out card.
-                if (stats === null) {
-                    return null;
-                }
-
-                const { counts, total, passRate } =
-                    summarizeRunStats(stats);
-
-                return {
-                    id: run.id,
-                    name: run.name,
-                    state: run.state,
-                    startedDate:
-                        run.startedDate,
-                    completedDate:
-                        run.completedDate,
-                    url: run.webAccessUrl,
-                    counts,
-                    total,
-                    passRate,
-                };
-            }
-        )
-    );
-
-    return cards.filter(
-        (card): card is RunCard => card !== null
-    );
-}
-
-export async function computeExecutionTrend(): Promise<
-    TrendPoint[]
-> {
-    const runs = await getTestRuns();
-
-    const runStatsWithNulls = await Promise.all(
-        runs.map(async (run: any) => {
-            const stats = await getTestRunStatistics(
-                run.id
-            );
-
-            // See computeRunCards: a null result means the run no longer
-            // exists in Azure DevOps despite still appearing in the runs
-            // list, so it's excluded from the trend entirely.
-            if (stats === null) {
-                return null;
-            }
-
-            return {
-                run,
-                ...summarizeRunStats(stats),
-            };
-        })
-    );
-
-    const runStats = runStatsWithNulls.filter(
-        (entry): entry is NonNullable<typeof entry> =>
-            entry !== null
-    );
-
-    const byDate = new Map<
-        string,
-        {
-            passed: number;
-            failed: number;
-            blocked: number;
-            notApplicable: number;
-            notRun: number;
-        }
-    >();
-
-    for (const { run, counts } of runStats) {
-        const rawDate =
-            run.completedDate ?? run.startedDate;
-
-        if (!rawDate) {
-            continue;
-        }
-
-        const date = new Date(rawDate)
-            .toISOString()
-            .slice(0, 10);
-
-        if (date < SPRINT_1_START_DATE) {
-            continue;
-        }
-
-        const bucket = byDate.get(date) ?? {
-            passed: 0,
-            failed: 0,
-            blocked: 0,
-            notApplicable: 0,
-            notRun: 0,
-        };
-
-        bucket.passed += counts.Passed;
-        bucket.failed += counts.Failed;
-        bucket.blocked += counts.Blocked;
-        bucket.notApplicable += counts.NotApplicable;
-        bucket.notRun += counts.NotRun;
-
-        byDate.set(date, bucket);
-    }
-
-    let cumulativeExecuted = 0;
-
-    return [...byDate.keys()]
-        .sort((a, b) => a.localeCompare(b))
-        .map((date): TrendPoint => {
-            const bucket = byDate.get(date)!;
-
-            const total =
-                bucket.passed +
-                bucket.failed +
-                bucket.blocked +
-                bucket.notApplicable +
-                bucket.notRun;
-
-            cumulativeExecuted +=
-                bucket.passed +
-                bucket.failed +
-                bucket.blocked;
-
-            const passRate = total
-                ? Math.round(
-                    (bucket.passed / total) * 1000
-                ) / 10
-                : 0;
-
-            return {
-                date,
-                total,
-                passed: bucket.passed,
-                failed: bucket.failed,
-                blocked: bucket.blocked,
-                notApplicable: bucket.notApplicable,
-                notRun: bucket.notRun,
-                passRate,
-                cumulativeExecuted,
-            };
-        });
-}
-
-export async function deleteTestCases(
-    items: DeleteTestCaseItem[]
-): Promise<DeleteTestCasesResult> {
-    // Unlinking from the suite is what actually makes the test case
-    // disappear from the suite tree the UI renders (see the comment on
-    // deleteTestCasesFromSuite) - items sharing a (planId, suiteId) are
-    // batched into a single unlink request.
-    const groups = new Map<
-        string,
-        { planId: number; suiteId: number; testCaseIds: number[] }
-    >();
-
-    for (const item of items) {
-        const key = `${item.planId}:${item.suiteId}`;
-        const group = groups.get(key);
-
-        if (group) {
-            group.testCaseIds.push(item.testCaseId);
-        } else {
-            groups.set(key, {
-                planId: item.planId,
-                suiteId: item.suiteId,
-                testCaseIds: [item.testCaseId],
-            });
-        }
-    }
-
-    const groupList = [...groups.values()];
-
-    const unlinkResults = await Promise.allSettled(
-        groupList.map((group) =>
-            deleteTestCasesFromSuite(
-                group.planId,
-                group.suiteId,
-                group.testCaseIds
-            )
-        )
-    );
-
-    const deleted: number[] = [];
-    const failed: { id: number; message: string }[] = [];
-
-    unlinkResults.forEach((result, index) => {
-        const group = groupList[index];
-
-        if (result.status === "fulfilled") {
-            deleted.push(...group.testCaseIds);
-        } else {
-            const message =
-                result.reason?.message ?? "Unknown error";
-
-            for (const testCaseId of group.testCaseIds) {
-                failed.push({ id: testCaseId, message });
-            }
-        }
-    });
-
-    // Best-effort permanent delete of the underlying work item now that it's
-    // unlinked from the suite. A failure here doesn't change the outcome
-    // reported to the caller - the test case already no longer appears in
-    // the suite, which is what the UI promised.
-    await Promise.allSettled(
-        deleted.map((id) => deleteTestCase(id))
-    );
-
-    if (deleted.length > 0) {
-        clearDashboardCache();
-    }
-
-    return { deleted, failed };
-}

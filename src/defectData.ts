@@ -9,6 +9,7 @@ import {
     buildWorkItemUrl,
 } from "./azdo.js";
 import { getDashboardData } from "./dashboardData.js";
+import { parseAllowedSenders, isAllowedSender } from "./teamsNotifier.js";
 import type {
     DefectRecord,
     DefectStats,
@@ -21,16 +22,39 @@ import type {
     DefectFilterOptions,
     ClosureReason,
     SprintDefectReport,
+    VerificaActivitySummary,
 } from "./types.js";
 
-let defectCache: { data: DefectRecord[]; timestamp: number } | null = null;
+// Keyed by resolved project (see resolveProjectKey) rather than a single
+// global entry, so selecting a different project on the dynamic Sprint
+// Report page doesn't evict/clobber the default project's cache.
+const defectCache = new Map<
+    string,
+    { data: DefectRecord[]; timestamp: number }
+>();
 
 const CACHE_DURATION_MS = 5 * 60 * 1000;
+
+function resolveProjectKey(project?: string): string {
+    return project ?? process.env.AZDO_PROJECT!;
+}
 
 // This project's Bug workflow has a dedicated "Riaperto" (reopened) state
 // rather than a generic Resolved/Closed -> Active/New transition, so a
 // reopening is any transition into that state, regardless of prior state.
 const REOPENED_TO_STATES = ["Riaperto"];
+
+// State a developer sets once they believe a bug is fixed and it's ready for
+// QA to re-test. Drives the Teams "sent to verifica" notification (see
+// startVerificaNotificationScheduler in scheduler.ts).
+export const VERIFICA_STATE = "Da verificare";
+
+// VERIFICA_STATE plus "In verifica" (QA actively re-testing) - the combined
+// "pending/undergoing verification" window. Drives the per-assignee Teams
+// notification (see startAssigneeVerificaNotificationScheduler in
+// scheduler.ts), which cares about either sub-state, not just the moment a
+// bug first lands in the queue.
+export const VERIFICA_PENDING_STATES = [VERIFICA_STATE, "In verifica"];
 
 // Seeded with the canonical VSTS/Agile rejection reasons. Whether these
 // actually appear depends on the project's process template - some
@@ -107,8 +131,8 @@ const SLA_THRESHOLD_DAYS: Record<string, number> = {
     default: 30,
 };
 
-export function getDefectCacheTimestamp(): number {
-    return defectCache?.timestamp ?? 0;
+export function getDefectCacheTimestamp(project?: string): number {
+    return defectCache.get(resolveProjectKey(project))?.timestamp ?? 0;
 }
 
 function countReopenings(revisions: any[]): number {
@@ -135,12 +159,58 @@ function countReopenings(revisions: any[]): number {
     return count;
 }
 
+// Finds when the bug most recently transitioned INTO targetState (mirrors
+// countReopenings' walk over revisions), so callers know whether a bug
+// currently in that state just arrived there or has been sitting for a
+// while - without a second per-bug revisions fetch.
+// targetStates is a set to enter, not a single value - e.g. VERIFICA_PENDING_STATES,
+// so moving between its members (Da verificare <-> In verifica) doesn't count
+// as a fresh entry, only arriving from outside the set does.
+function findLastTransitionInto(
+    revisions: any[],
+    targetStates: string[]
+): { changedDate: string } | undefined {
+    let result: { changedDate: string } | undefined;
+
+    for (let i = 1; i < revisions.length; i++) {
+        const prevState = revisions[i - 1].fields?.["System.State"];
+        const currState = revisions[i].fields?.["System.State"];
+
+        if (targetStates.includes(currState) && !targetStates.includes(prevState)) {
+            result = { changedDate: revisions[i].fields?.["System.ChangedDate"] };
+        }
+    }
+
+    return result;
+}
+
+// Mirror of findLastTransitionInto - last time the bug LEFT targetStates
+// (arrived somewhere outside the set, having been inside it), rather than
+// entered it. Used for verificaExitTransition ("verified today").
+function findLastTransitionOutOf(
+    revisions: any[],
+    targetStates: string[]
+): { changedDate: string } | undefined {
+    let result: { changedDate: string } | undefined;
+
+    for (let i = 1; i < revisions.length; i++) {
+        const prevState = revisions[i - 1].fields?.["System.State"];
+        const currState = revisions[i].fields?.["System.State"];
+
+        if (!targetStates.includes(currState) && targetStates.includes(prevState)) {
+            result = { changedDate: revisions[i].fields?.["System.ChangedDate"] };
+        }
+    }
+
+    return result;
+}
+
 function parseTags(tagsField?: string): string[] {
     return tagsField
         ? tagsField
-              .split(";")
-              .map((tag) => tag.trim())
-              .filter(Boolean)
+            .split(";")
+            .map((tag) => tag.trim())
+            .filter(Boolean)
         : [];
 }
 
@@ -190,9 +260,10 @@ function computeClosureReason(
 // confirmed linked here won't silently fall back to "no test case" just
 // because the reverse crawl in buildDashboard() didn't happen to surface it.
 async function getLinkedTestCaseIds(
-    bugId: number
+    bugId: number,
+    project?: string
 ): Promise<number[]> {
-    const workItem = await getWorkItem(bugId);
+    const workItem = await getWorkItem(bugId, project);
 
     // Only "Tested By" relations (in either direction) represent a genuine
     // "this bug was found via this test case" link. A bug can also pick up
@@ -212,7 +283,7 @@ async function getLinkedTestCaseIds(
         testedByRelations
     );
 
-    const linkedItems = await getWorkItems(linkedIds);
+    const linkedItems = await getWorkItems(linkedIds, undefined, project);
 
     return linkedItems
         .filter(
@@ -243,12 +314,12 @@ interface TestCaseLookups {
 // bug's own confirmed test case links (see getLinkedTestCaseIds) instead of
 // requiring the bug to also turn up in the dashboard's own test-case-to-bug
 // crawl.
-async function getTestCaseLookups(): Promise<TestCaseLookups> {
+async function getTestCaseLookups(project?: string): Promise<TestCaseLookups> {
     const iterationByTestCase = new Map<number, string>();
     const titleByTestCase = new Map<number, string>();
     const suiteByTitle = new Map<string, string>();
 
-    const testCases = await getDashboardData();
+    const testCases = await getDashboardData(project);
 
     for (const tc of testCases) {
         if (tc.iteration && !iterationByTestCase.has(tc.testCaseId)) {
@@ -287,12 +358,13 @@ function isSpecificIterationPath(path: unknown): path is string {
 
 async function buildDefectRecord(
     bug: any,
-    lookups: TestCaseLookups
+    lookups: TestCaseLookups,
+    project?: string
 ): Promise<DefectRecord> {
     const [revisions, linkedTestCaseIds] =
         await Promise.all([
-            getWorkItemRevisions(bug.id),
-            getLinkedTestCaseIds(bug.id),
+            getWorkItemRevisions(bug.id, project),
+            getLinkedTestCaseIds(bug.id, project),
         ]);
 
     // Custom.Suite is the sole source for a bug's suite - no more borrowing
@@ -376,8 +448,12 @@ async function buildDefectRecord(
         estimatedResolutionDate:
             bug.fields["Custom.EstimatedResolutionDate"],
         reopenedCount: countReopenings(revisions),
+        verificaTransition: findLastTransitionInto(revisions, [VERIFICA_STATE]),
+        verificaPendingTransition: findLastTransitionInto(revisions, VERIFICA_PENDING_STATES),
+        verificaExitTransition: findLastTransitionOutOf(revisions, VERIFICA_PENDING_STATES),
+        lastReopenedTransition: findLastTransitionInto(revisions, REOPENED_TO_STATES),
         hasLinkedTestCase: linkedTestCaseIds.length > 0,
-        url: buildWorkItemUrl(bug.id),
+        url: buildWorkItemUrl(bug.id, project),
         creator: bug.fields["System.CreatedBy"]?.displayName,
         assignedTo: bug.fields["System.AssignedTo"]
             ? {
@@ -388,37 +464,39 @@ async function buildDefectRecord(
     };
 }
 
-export async function buildDefectRecords(): Promise<DefectRecord[]> {
+export async function buildDefectRecords(project?: string): Promise<DefectRecord[]> {
     const [bugs, lookups] = await Promise.all([
-        getAllBugFields(),
-        getTestCaseLookups(),
+        getAllBugFields(project),
+        getTestCaseLookups(project),
     ]);
 
     return Promise.all(
         bugs.map((bug) =>
-            buildDefectRecord(bug, lookups)
+            buildDefectRecord(bug, lookups, project)
         )
     );
 }
 
-export async function getDefectData(): Promise<DefectRecord[]> {
+export async function getDefectData(project?: string): Promise<DefectRecord[]> {
+    const projectKey = resolveProjectKey(project);
     const now = Date.now();
+    const cached = defectCache.get(projectKey);
 
-    if (defectCache && now - defectCache.timestamp < CACHE_DURATION_MS) {
-        return defectCache.data;
+    if (cached && now - cached.timestamp < CACHE_DURATION_MS) {
+        return cached.data;
     }
 
-    const data = await buildDefectRecords();
+    const data = await buildDefectRecords(project);
 
-    defectCache = { data, timestamp: now };
+    defectCache.set(projectKey, { data, timestamp: now });
 
     return data;
 }
 
 export function clearDefectCache(): void {
-    defectCache = null;
-    storyPointsCache = null;
-    suiteNamesCache = null;
+    defectCache.clear();
+    storyPointsCache.clear();
+    suiteNamesCache.clear();
 }
 
 function groupCount(
@@ -726,23 +804,36 @@ function computeOutOfScopeBySuite(
     );
 }
 
-// "Resolved" gets its own bucket (fixed by dev, pending QA/DSI retest) since
-// it's a meaningfully different state of work than "New" or actively being
-// worked on; anything else non-terminal (Active, Committed, ...) still
-// collapses into "In Progress".
+// "Da verificare" covers both the standard VSTS "Resolved" state and the
+// project's own same-meaning custom state (dev believes it's fixed, QA hasn't
+// started retesting yet). "In verifica" is its own bucket - QA is actively
+// retesting. Keeping them separate lets the status bar show how many bugs are
+// waiting vs. being actively verified. "Riaperto" gets its own bucket rather
+// than collapsing into "In Progress" - a bug that bounced back after QA
+// sign-off is a meaningfully different signal than one still being worked for
+// the first time (see REOPENED_TO_STATES above). Anything else non-terminal
+// (Active, Committed, ...) still collapses into "In Progress".
 function statusBucket(
     state: string
-): "New" | "Resolved" | "Closed" | "In Progress" {
+): "New" | "Da verificare" | "In verifica" | "Closed" | "In Progress" | "Reopened" {
     if (state === "New") {
         return "New";
     }
 
-    if (state === "Resolved") {
-        return "Resolved";
+    if (state === "Resolved" || state === "Da verificare") {
+        return "Da verificare";
+    }
+
+    if (state === "In verifica") {
+        return "In verifica";
     }
 
     if (state === "Closed") {
         return "Closed";
+    }
+
+    if (state === "Riaperto") {
+        return "Reopened";
     }
 
     return "In Progress";
@@ -878,9 +969,102 @@ export function computeSprintDefectReport(
         })),
         reopenedCount: records.filter((r) => r.reopenedCount > 0).length,
         mttrDays: computeMttrDays(records),
-        withoutResolutionDateCount: records.filter(
-            (r) => !r.estimatedResolutionDate
-        ).length,
+        // Closed and Da verificare/In verifica bugs are already fixed (just
+        // pending or past QA sign-off), so a missing estimate isn't actionable
+        // the way it is for a bug still New/In Lavorazione - reuses
+        // statusBucket() so this stays in sync with that bucketing.
+        withoutResolutionDateCount: records.filter((r) => {
+            const bucket = statusBucket(r.state);
+            return bucket !== "Closed" && bucket !== "Da verificare" && bucket !== "In verifica" && !r.estimatedResolutionDate;
+        }).length,
+    };
+}
+
+function isToday(dateString: string, timeZone: string): boolean {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    });
+
+    return fmt.format(new Date(dateString)) === fmt.format(new Date());
+}
+
+// Drives the Sprint Defect Report's auto-generated Azione 2 text (see
+// SprintDefectReportTab.tsx). Reads TEAMS_VERIFICA_ASSIGNEE_ALLOWLIST /
+// TEAMS_VERIFICA_TIMEZONE directly (same env vars the per-assignee Teams
+// notifier uses - see scheduler.ts), matching this file's existing
+// process.env.AZDO_PROJECT precedent rather than threading them through
+// every caller.
+// Anyone assigned a bug with this email domain who isn't already on the
+// allowlist is treated as DSI (see computeVerificaActivitySummary) - not
+// configurable via env since, unlike the allowlist itself, this is a fixed
+// organizational fact (gruppoitas.it is ITAS's own domain) rather than a
+// per-deployment choice.
+const DSI_EMAIL_DOMAIN = "gruppoitas.it";
+
+function computeVerificaActivitySummary(
+    records: DefectRecord[]
+): VerificaActivitySummary {
+    const allowedAssignees = parseAllowedSenders(
+        process.env.TEAMS_VERIFICA_ASSIGNEE_ALLOWLIST ?? ""
+    );
+    const timezone = process.env.TEAMS_VERIFICA_TIMEZONE ?? "Europe/Rome";
+
+    const scoped = records.filter((r) =>
+        isAllowedSender(r.assignedTo?.uniqueName, allowedAssignees)
+    );
+
+    const verifiedToday = scoped.filter(
+        (r) => r.verificaExitTransition && isToday(r.verificaExitTransition.changedDate, timezone)
+    ).length;
+
+    const closedToday = scoped.filter(
+        (r) => r.state === "Closed" && r.closedDate && isToday(r.closedDate, timezone)
+    ).length;
+
+    const closedTodayOutOfScopeCount = scoped.filter(
+        (r) =>
+            r.state === "Closed" &&
+            r.closedDate &&
+            isToday(r.closedDate, timezone) &&
+            r.tags.includes(OUT_OF_SCOPE_TAG)
+    ).length;
+
+    const reopenedToday = scoped.filter(
+        (r) => r.lastReopenedTransition && isToday(r.lastReopenedTransition.changedDate, timezone)
+    ).length;
+
+    const stillPendingVerification = scoped.filter((r) =>
+        VERIFICA_PENDING_STATES.includes(r.state)
+    ).length;
+
+    // Priority order: Test Factory (allowlist) beats DSI beats SI, even if
+    // an email were to match more than one bucket - see the field comment
+    // on VerificaActivitySummary.
+    const dsiPendingCount = records.filter(
+        (r) =>
+            !isAllowedSender(r.assignedTo?.uniqueName, allowedAssignees) &&
+            isAllowedSender(r.assignedTo?.uniqueName, [DSI_EMAIL_DOMAIN]) &&
+            VERIFICA_PENDING_STATES.includes(r.state)
+    ).length;
+
+    const siPendingCount = records.filter(
+        (r) =>
+            !isAllowedSender(r.assignedTo?.uniqueName, allowedAssignees) &&
+            !isAllowedSender(r.assignedTo?.uniqueName, [DSI_EMAIL_DOMAIN]) &&
+            VERIFICA_PENDING_STATES.includes(r.state)
+    ).length;
+
+    return {
+        verifiedToday,
+        closedToday,
+        closedTodayOutOfScopeCount,
+        reopenedToday,
+        stillPendingVerification,
+        dsiPendingCount,
+        siPendingCount,
     };
 }
 
@@ -1121,49 +1305,50 @@ function computeAvailableFilters(
     };
 }
 
-let storyPointsCache: {
-    data: Record<string, number>;
-    timestamp: number;
-} | null = null;
+const storyPointsCache = new Map<
+    string,
+    { data: Record<string, number>; timestamp: number }
+>();
 
-export async function getStoryPointsByArea(): Promise<
+export async function getStoryPointsByArea(project?: string): Promise<
     Record<string, number>
 > {
+    const projectKey = resolveProjectKey(project);
     const now = Date.now();
+    const cached = storyPointsCache.get(projectKey);
 
-    if (
-        storyPointsCache &&
-        now - storyPointsCache.timestamp < CACHE_DURATION_MS
-    ) {
-        return storyPointsCache.data;
+    if (cached && now - cached.timestamp < CACHE_DURATION_MS) {
+        return cached.data;
     }
 
-    const stories = await getStoriesWithFields();
+    const stories = await getStoriesWithFields(project);
     const data = computeStoryPointsByArea(stories);
 
-    storyPointsCache = { data, timestamp: now };
+    storyPointsCache.set(projectKey, { data, timestamp: now });
 
     return data;
 }
 
-let suiteNamesCache: { data: string[]; timestamp: number } | null =
-    null;
+const suiteNamesCache = new Map<
+    string,
+    { data: string[]; timestamp: number }
+>();
 
 // Full set of test suite names for the project, independent of whether any
 // bug is currently linked to them - needed so suites with zero bugs still
 // render as a zero bar instead of disappearing from the chart.
-export async function getAllSuiteNames(): Promise<string[]> {
+export async function getAllSuiteNames(project?: string): Promise<string[]> {
+    const projectKey = resolveProjectKey(project);
     const now = Date.now();
 
-    if (
-        suiteNamesCache &&
-        now - suiteNamesCache.timestamp < CACHE_DURATION_MS
-    ) {
-        return suiteNamesCache.data;
+    const cached = suiteNamesCache.get(projectKey);
+
+    if (cached && now - cached.timestamp < CACHE_DURATION_MS) {
+        return cached.data;
     }
 
     const suites = new Set<string>();
-    const testCases = await getDashboardData();
+    const testCases = await getDashboardData(project);
 
     for (const tc of testCases) {
         const normalized = normalizeSuiteName(tc.suiteName);
@@ -1175,7 +1360,7 @@ export async function getAllSuiteNames(): Promise<string[]> {
 
     const data = [...suites].sort((a, b) => a.localeCompare(b));
 
-    suiteNamesCache = { data, timestamp: now };
+    suiteNamesCache.set(projectKey, { data, timestamp: now });
 
     return data;
 }
@@ -1315,6 +1500,7 @@ export function computeDefectStats(
         outOfScopeRate: computeOutOfScopeRate(records),
         outOfScopeBySuite: computeOutOfScopeBySuite(records),
         sprintDefectReport: computeSprintDefectReport(records, allSuiteNames),
+        verificaActivitySummary: computeVerificaActivitySummary(records),
         firstTimeFixRate: computeFirstTimeFixRate(records),
         densityByComponent: computeDensityByComponent(
             records,

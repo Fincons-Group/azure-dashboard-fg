@@ -14,3 +14,19 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* Every Fluent UI portal (Dialog, Dropdown listbox, Combobox, Menu, Tooltip...)
+   gets re-wrapped in its own ".fui-FluentProvider" theming div appended to
+   document.body, and that wrapper is what actually carries the stacking
+   z-index (1000000, identical for all of them) - overriding z-index on the
+   DialogSurface/backdrop themselves has no effect, since the real contest is
+   between these *wrapper* divs, and Fluent breaks ties there by DOM order
+   (last mounted wins). That let a Dropdown left open via `defaultOpen`
+   render above a Dialog that appeared afterward, e.g. the first-load Getting
+   Started guide over an unset scope's Project dropdown. Give the wrapper
+   around a Dialog a higher z-index than Fluent's shared default so Dialogs
+   always stack above other floating UI regardless of mount order. */
+.fui-FluentProvider:has(> .fui-DialogSurface__backdrop),
+.fui-FluentProvider:has(> .fui-DialogSurface) {
+  z-index: 2000000;
+}

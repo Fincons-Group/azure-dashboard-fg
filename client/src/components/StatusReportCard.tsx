@@ -1,8 +1,10 @@
 import { forwardRef, useMemo } from "react";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { makeStyles } from "@fluentui/react-components";
+import { Tooltip, makeStyles } from "@fluentui/react-components";
+import { InfoRegular } from "@fluentui/react-icons";
 import { SuiteProgressBar } from "./SuiteProgressBar";
+import { computeBugStatusData, computeStatusCardKpis } from "../utils/export";
 import type { Outcome, SprintDefectReport } from "../types";
 
 function formatUpdatedTimestamp(date: Date): {
@@ -39,11 +41,6 @@ function severityLabel(raw: string): string {
     return match ? match[2] : raw;
 }
 
-// The three severities this card always shows a chip for, even when a
-// severity has zero bugs - keeps the row's shape stable sprint to sprint
-// instead of chips appearing/disappearing as counts hit zero.
-const SEVERITY_KEYS = ["1 - Critical", "2 - High", "3 - Medium"];
-
 const SEVERITY_PALETTE = [
     { bg: "#442726", border: "#d13438", text: "#ff9b93" },
     { bg: "#3d3319", border: "#eda100", text: "#f4c669" },
@@ -51,22 +48,26 @@ const SEVERITY_PALETTE = [
 ];
 const SEVERITY_FALLBACK = { bg: "#2d2d2d", border: "#605e5c", text: "#c8c6c4" };
 
-// Order/colors match the reference status card: most-done to least-done,
-// left to right (green -> blue -> amber -> salmon), with the out-of-scope
-// "Not Applicable" bucket trailing at the end.
-const STATUS_ORDER = ["Closed", "Resolved", "In Progress", "New", "Not Applicable"];
+// Colors match the reference status card (green -> blue -> amber -> salmon),
+// with "Reopened" (a bug that regressed past QA sign-off, not just unstarted
+// work) and the out-of-scope "Not Applicable" bucket trailing at the end -
+// see EMAIL_STATUS_ORDER in export.ts for the shared ordering this follows.
 const STATUS_COLORS: Record<string, string> = {
     Closed: "#3fb950",
-    Resolved: "#0078d4",
+    "Da verificare": "#0078d4",
+    "In verifica": "#00b7c3",
     "In Progress": "#eda100",
     New: "#e8746c",
+    Reopened: "#d13438",
     "Not Applicable": "#8a8886",
 };
 const STATUS_LABEL_KEYS: Record<string, string> = {
     Closed: "closed",
-    Resolved: "resolved",
+    "Da verificare": "daVerificare",
+    "In verifica": "inVerifica",
     "In Progress": "inProgress",
     New: "new",
+    Reopened: "reopened",
     "Not Applicable": "notApplicable",
 };
 
@@ -82,18 +83,22 @@ const ACTION_PALETTE = [
     { bg: "#1f3550", border: "#3aa0f3" },
 ];
 
-// A paragraph like "In arrivo su Azure DevOps: la maschera..." gets its
-// "Label:" lead-in bolded, matching the reference card - only when the
-// colon shows up early/on the first line, so it doesn't misfire on
-// sentences that just happen to contain a colon further in.
-function splitActionLeadIn(paragraph: string): {
+// A line like "DSI: ci sono 10 bug..." gets its "Label:" lead-in bolded,
+// matching the reference card - only when the colon shows up early, so it
+// doesn't misfire on a sentence that just happens to contain a colon
+// further in. Applied per-line (see splitActionLeadInLines below) rather
+// than once per paragraph, since an Action box can hold several
+// independently-labeled lines (e.g. "Test Management:"/"DSI:"/"System
+// Integrator:" all in the same Azione 2 box - see
+// buildDefaultActionText2 in SprintDefectReportTab.tsx).
+function splitActionLeadIn(line: string): {
     lead: string | null;
     rest: string;
 } {
-    const match = /^([^:\n]{1,80}:)\s*([\s\S]*)$/.exec(paragraph);
+    const match = /^([^:\n]{1,80}:)\s*([\s\S]*)$/.exec(line);
 
     if (!match) {
-        return { lead: null, rest: paragraph };
+        return { lead: null, rest: line };
     }
 
     return { lead: match[1], rest: match[2] };
@@ -101,7 +106,12 @@ function splitActionLeadIn(paragraph: string): {
 
 const useStyles = makeStyles({
     card: {
-        maxWidth: "900px",
+        // Fixed (not maxWidth) so every card renders the same size
+        // regardless of content - a report with fewer suites/shorter
+        // actions text would otherwise shrink narrower than one with more,
+        // making exported cards visibly inconsistent send to send.
+        width: "900px",
+        flexShrink: 0,
         display: "flex",
         flexDirection: "column",
         borderRadius: "8px",
@@ -155,9 +165,38 @@ const useStyles = makeStyles({
         fontSize: "13px",
         lineHeight: 1.4,
     },
-    kpiGrid: {
+    kpiSections: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+    },
+    kpiSection: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px",
+    },
+    kpiSectionTitle: {
+        fontSize: "11px",
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: "#a0a0a0",
+        paddingBottom: "4px",
+        borderBottom: "1px solid #3b3a39",
+    },
+    kpiGrid5: {
+        display: "grid",
+        gridTemplateColumns: "repeat(5, 1fr)",
+        gap: "8px",
+    },
+    kpiGrid6: {
         display: "grid",
         gridTemplateColumns: "repeat(6, 1fr)",
+        gap: "8px",
+    },
+    kpiGrid4: {
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
         gap: "8px",
     },
     kpiTile: {
@@ -190,6 +229,18 @@ const useStyles = makeStyles({
         // as an actual line break instead of collapsing to a space.
         whiteSpace: "pre-line",
     },
+    kpiLabelRow: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "3px",
+    },
+    kpiHelpIcon: {
+        display: "flex",
+        flexShrink: 0,
+        color: "#8a8886",
+        cursor: "help",
+    },
     dashboardButton: {
         display: "inline-flex",
         alignSelf: "flex-start",
@@ -209,6 +260,11 @@ const useStyles = makeStyles({
         fontSize: "14px",
         fontWeight: 600,
         color: "#f3f2f1",
+    },
+    sectionTitleRow: {
+        display: "flex",
+        alignItems: "center",
+        gap: "5px",
     },
     section: {
         display: "flex",
@@ -389,10 +445,123 @@ export interface StatusReportCardProps {
     // still being validated, so existing report sends stay unaffected
     // unless someone opts in for a given card.
     showOriginBreakdown?: boolean;
-    // On by default (bugs are tracked in DSI org-wide) - Plurifond has no
-    // DSI-sourced bugs yet, so its report sets this to false to keep the
-    // subtitle from claiming a source that doesn't apply.
+    // On by default (bugs are tracked in DSI org-wide) - a report with no
+    // DSI-sourced bugs sets this to false to keep the subtitle from
+    // claiming a source that doesn't apply.
     includeDsiSource?: boolean;
+}
+
+// Renders one row of severity chips (used for both the "all effective bugs"
+// and "still open" breakdowns below, which are identical except for which
+// entries/total they're fed).
+function SeverityChipsRow({
+    entries,
+    total,
+}: {
+    entries: readonly (readonly [string, number])[];
+    total: number;
+}) {
+    const styles = useStyles();
+
+    return (
+        <div className={styles.severityRow}>
+            {entries.map(([raw, count]) => {
+                const rank = severityRank(raw);
+                const palette = SEVERITY_PALETTE[rank - 1] ?? SEVERITY_FALLBACK;
+                const percent = total ? Math.round((count / total) * 100) : 0;
+
+                return (
+                    <div
+                        key={raw}
+                        className={styles.severityChip}
+                        style={{
+                            backgroundColor: palette.bg,
+                            borderColor: palette.border,
+                        }}
+                    >
+                        <span
+                            className={styles.severityCount}
+                            style={{ color: palette.text }}
+                        >
+                            {count}
+                        </span>
+                        <span
+                            className={styles.severityPercent}
+                            style={{ color: palette.text }}
+                        >
+                            {percent}%
+                        </span>
+                        <span
+                            className={styles.severityLabelText}
+                            style={{ color: palette.text }}
+                        >
+                            {severityLabel(raw)}
+                        </span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+// One KPI tile: a value, a label, and an (i) icon whose hover/focus tooltip
+// explains in plain language how the value is calculated - the reader
+// shouldn't have to guess why a number excludes N/A or only counts open
+// bugs. helpKey is a translation key under statusCard.kpisHelp.
+function KpiTile({
+    value,
+    color,
+    labelKey,
+    helpKey,
+    labelCount,
+}: {
+    value: ReactNode;
+    color: string;
+    labelKey: string;
+    helpKey: string;
+    labelCount?: number;
+}) {
+    const { t } = useTranslation();
+    const styles = useStyles();
+
+    return (
+        <div className={styles.kpiTile}>
+            <span className={styles.kpiValue} style={{ color }}>
+                {value}
+            </span>
+            <span className={styles.kpiLabelRow}>
+                <span className={styles.kpiLabel}>
+                    {labelCount === undefined
+                        ? t(labelKey)
+                        : t(labelKey, { count: labelCount })}
+                </span>
+                <Tooltip content={t(helpKey)} relationship="description" withArrow>
+                    <span className={styles.kpiHelpIcon} tabIndex={0}>
+                        <InfoRegular fontSize={12} />
+                    </span>
+                </Tooltip>
+            </span>
+        </div>
+    );
+}
+
+// Same (i) icon/tooltip as KpiTile's helpKey, for a section title rather
+// than a single KPI value - covers the parts of the card (Suite Progress,
+// Bug Status, Bugs by Suite) that aren't broken into individual tiles, so
+// they don't stay unexplained just because they render as one block
+// instead of a grid. helpKey is a translation key under
+// statusCard.sectionHelp.
+function SectionHelp({ helpKey }: { helpKey: string }) {
+    const { t } = useTranslation();
+    const styles = useStyles();
+
+    return (
+        <Tooltip content={t(helpKey)} relationship="description" withArrow>
+            <span className={styles.kpiHelpIcon} tabIndex={0}>
+                <InfoRegular fontSize={12} />
+            </span>
+        </Tooltip>
+    );
 }
 
 export const StatusReportCard = forwardRef<
@@ -424,100 +593,35 @@ export const StatusReportCard = forwardRef<
         []
     );
 
-    const totalTestCases = suiteGroups.reduce(
-        (sum, group) => sum + group.totalTestCases,
-        0
-    );
+    // Shared with export.ts's PDF/PPTX/email renderings so the live card
+    // never drifts from what gets exported for the same report.
+    const {
+        totalTestCases,
+        totalPassed,
+        totalNotApplicable,
+        totalExecuted,
+        executedPct,
+        totalNotRun,
+        passRate,
+        notApplicableRate,
+        bugsClosed,
+        bugsClosedPct,
+        stillOpen,
+        reopenedPct,
+        avgClosureDays,
+        bugsByDsi,
+        bugsByUs,
+        criticalCount,
+    } = computeStatusCardKpis(suiteGroups, report);
 
-    // Pass rate = Passed / everything except NotApplicable - matches the
-    // per-suite pass rate shown in SuiteProgressBar. NotApplicable is
-    // excluded because those cases were never meant to run; every other
-    // outcome (including NotRun/Blocked/InProgress) still counts against
-    // the rate since it isn't a pass yet.
-    const totalPassed = suiteGroups.reduce(
-        (sum, group) => sum + group.outcomeCounts.Passed,
-        0
-    );
-    const totalNotApplicable = suiteGroups.reduce(
-        (sum, group) => sum + group.outcomeCounts.NotApplicable,
-        0
-    );
-    const totalDecided = totalTestCases - totalNotApplicable;
-    const passRate = totalDecided
-        ? Math.round((totalPassed / totalDecided) * 100)
-        : 0;
-    const notApplicableRate = totalTestCases
-        ? Math.round((totalNotApplicable / totalTestCases) * 100)
-        : 0;
-
-    // Bug status covers ALL detected bugs (including out-of-scope ones -
-    // they still need to be tracked to closure), so this and "still open"
-    // are measured against report.total via byStatusAll, not effectiveCount.
-    const bugsClosed = report.byStatusAll.Closed ?? 0;
-    const bugsClosedPct = report.total
-        ? Math.round((bugsClosed / report.total) * 100)
-        : 0;
-    const stillOpen = report.total - bugsClosed;
-
-    const reopenedPct = report.total
-        ? Math.round((report.reopenedCount / report.total) * 1000) / 10
-        : 0;
-    // Always shown as a number, even when there's no closed bug yet to
-    // compute a real average from - a blank/"N/A" tile reads as broken on
-    // the exported card, 0 reads as "nothing to report yet".
-    const avgClosureDays = Math.round(report.mttrDays ?? 0);
-
-    // Only non-closed bugs count here - a closed critical bug isn't
-    // something the reader still needs to act on.
-    const criticalCount = report.effectiveDefects.filter(
-        (bug) => bug.state !== "Closed" && severityRank(bug.severity ?? "") === 1
-    ).length;
-
-    // Closed/Resolved/In Progress/New are scoped to effective (in-scope)
-    // bugs via byStatus - out-of-scope bugs are pulled into their own "Not
-    // Applicable" bucket instead, so the two together still sum to
-    // report.total like byStatusAll used to.
-    const statusEntries = STATUS_ORDER.map((name) => [
-        name,
-        name === "Not Applicable"
-            ? report.outOfScopeCount
-            : report.byStatus[name] ?? 0,
-    ] as const).filter(([, count]) => count > 0);
-
-    // Severity distribution stays scoped to effective (in-scope) bugs only,
-    // matching the caption under the chips. Always shows all three known
-    // severities (defaulting missing ones to 0) rather than only the
-    // severities present in the data, so e.g. "Critical" doesn't just
-    // disappear from the row when there happen to be zero critical bugs.
-    const severityTotal = Object.values(report.bySeverity).reduce(
-        (sum, count) => sum + count,
-        0
-    );
-    const severityEntries = SEVERITY_KEYS.map(
-        (key) => [key, report.bySeverity[key] ?? 0] as const
-    );
-
-    // Same idea as severityEntries above, but scoped to effective bugs that
-    // are still open - lets the card show whether the remaining open work
-    // skews critical/high even after most bugs have been closed out.
-    const openSeverityCounts = report.effectiveDefects.reduce<
-        Record<string, number>
-    >((acc, bug) => {
-        if (bug.state === "Closed") {
-            return acc;
-        }
-
-        const key = bug.severity ?? "Unspecified";
-        acc[key] = (acc[key] ?? 0) + 1;
-        return acc;
-    }, {});
-    const openSeverityTotal = Object.values(openSeverityCounts).reduce(
-        (sum, count) => sum + count,
-        0
-    );
-    const openSeverityEntries = SEVERITY_KEYS.map(
-        (key) => [key, openSeverityCounts[key] ?? 0] as const
-    );
+    const {
+        statusEntries,
+        closedOutOfScopeCount,
+        severityTotal,
+        severityEntries,
+        openSeverityTotal,
+        openSeverityEntries,
+    } = computeBugStatusData(report);
 
     const actionParagraphs = actionsText
         .split(/\n\s*\n/)
@@ -585,112 +689,120 @@ export const StatusReportCard = forwardRef<
                 </div>
             )}
 
-            <div className={styles.kpiGrid}>
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#3aa0f3" }}>
-                        {totalTestCases}
+            <div className={styles.kpiSections}>
+                {/* Stato casi di test */}
+                <div className={styles.kpiSection}>
+                    <span className={styles.kpiSectionTitle}>
+                        🧪 {t("defectManagementPage.sprintReport.statusCard.kpis.testCasesSection")}
                     </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.totalTestCases"
-                        )}
-                    </span>
-                </div>
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#6bcf6b" }}>
-                        {passRate}%
-                    </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.passRate"
-                        )}
-                    </span>
-                </div>
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#f2b134" }}>
-                        {bugsClosed}/{report.total}
-                    </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.bugsClosed",
-                            { percent: bugsClosedPct }
-                        )}
-                    </span>
-                </div>
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#ff6b6b" }}>
-                        {criticalCount}
-                    </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.criticalBugs"
-                        )}
-                    </span>
-                </div>
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#3aa0f3" }}>
-                        {report.reopenedCount}
-                    </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs",
-                            { percent: reopenedPct }
-                        )}
-                    </span>
-                </div>
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#6bcf6b" }}>
-                        {t("defectManagementPage.stats.days", {
-                            value: avgClosureDays,
-                        })}
-                    </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"
-                        )}
-                    </span>
-                </div>
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#b180d7" }}>
-                        {report.effectiveCount}/{report.total}
-                    </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.effectiveBugsDetected"
-                        )}
-                    </span>
-                </div>
-                {report.outOfScopeCount > 0 && (
-                    <div className={styles.kpiTile}>
-                        <span className={styles.kpiValue} style={{ color: "#9e9e9e" }}>
-                            {report.outOfScopeCount}/{report.total}
-                        </span>
-                        <span className={styles.kpiLabel}>
-                            {t(
-                                "defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected"
-                            )}
-                        </span>
+                    <div className={styles.kpiGrid6}>
+                        <KpiTile
+                            value={totalTestCases}
+                            color="#3aa0f3"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.totalTestCases"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.totalTestCases"
+                        />
+                        <KpiTile
+                            value={`${totalExecuted} (${executedPct}%)`}
+                            color="#6bcf6b"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.executedCount"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.executedCount"
+                        />
+                        <KpiTile
+                            value={`${totalNotApplicable} (${notApplicableRate}%)`}
+                            color="#8a8886"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.notApplicable"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.notApplicable"
+                        />
+                        <KpiTile
+                            value={totalNotRun}
+                            color="#f2b134"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.notRun"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.notRun"
+                        />
+                        <KpiTile
+                            value={totalPassed}
+                            color="#3fb950"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.totalPassed"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.totalPassed"
+                        />
+                        <KpiTile
+                            value={`${passRate}%`}
+                            color="#6bcf6b"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.passRate"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.passRate"
+                        />
                     </div>
-                )}
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#8a8886" }}>
-                        {report.withoutResolutionDateCount}
-                    </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.withoutResolutionDate"
-                        )}
-                    </span>
                 </div>
-                <div className={styles.kpiTile}>
-                    <span className={styles.kpiValue} style={{ color: "#8a8886" }}>
-                        {notApplicableRate}%
+
+                {/* Stato bug */}
+                <div className={styles.kpiSection}>
+                    <span className={styles.kpiSectionTitle}>
+                        🐛 {t("defectManagementPage.sprintReport.statusCard.kpis.bugsSection")}
                     </span>
-                    <span className={styles.kpiLabel}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.kpis.notApplicableRate"
+                    <div className={styles.kpiGrid4}>
+                        <KpiTile
+                            value={`${report.effectiveCount}/${report.total}`}
+                            color="#b180d7"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.effectiveBugsDetected"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.effectiveBugsDetected"
+                        />
+                        <KpiTile
+                            value={report.outOfScopeCount}
+                            color="#9e9e9e"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.outOfScopeBugsDetected"
+                        />
+                        {includeDsiSource && (
+                            <>
+                                <KpiTile
+                                    value={bugsByUs}
+                                    color="#6bcf6b"
+                                    labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByUs"
+                                    helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByUs"
+                                />
+                                <KpiTile
+                                    value={bugsByDsi}
+                                    color="#3aa0f3"
+                                    labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByDsi"
+                                    helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByDsi"
+                                />
+                            </>
                         )}
-                    </span>
+                        <KpiTile
+                            value={`${bugsClosed}/${report.total} (${bugsClosedPct}%)`}
+                            color="#f2b134"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsClosedRatio"
+                            labelCount={closedOutOfScopeCount}
+                        />
+                        <KpiTile
+                            value={criticalCount}
+                            color="#ff6b6b"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.criticalBugs"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.criticalBugs"
+                        />
+                        <KpiTile
+                            value={`${report.reopenedCount} (${reopenedPct}%)`}
+                            color="#3aa0f3"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.reopenedBugs"
+                        />
+                        <KpiTile
+                            value={t("defectManagementPage.stats.days", {
+                                value: avgClosureDays,
+                            })}
+                            color="#6bcf6b"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgClosureTime"
+                        />
+                        <KpiTile
+                            value={report.withoutResolutionDateCount}
+                            color="#8a8886"
+                            labelKey="defectManagementPage.sprintReport.statusCard.kpis.withoutResolutionDate"
+                            helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.withoutResolutionDate"
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -719,7 +831,7 @@ export const StatusReportCard = forwardRef<
                     {actionParagraphs.map((paragraph, index) => {
                         const palette =
                             ACTION_PALETTE[index % ACTION_PALETTE.length];
-                        const { lead, rest } = splitActionLeadIn(paragraph);
+                        const lines = paragraph.split("\n");
 
                         return (
                             <div
@@ -730,8 +842,17 @@ export const StatusReportCard = forwardRef<
                                     borderLeftColor: palette.border,
                                 }}
                             >
-                                {lead && <strong>{lead} </strong>}
-                                {rest}
+                                {lines.map((line, lineIndex) => {
+                                    const { lead, rest } = splitActionLeadIn(line);
+
+                                    return (
+                                        <span key={lineIndex}>
+                                            {lead && <strong>{lead} </strong>}
+                                            {rest}
+                                            {lineIndex < lines.length - 1 && "\n"}
+                                        </span>
+                                    );
+                                })}
                             </div>
                         );
                     })}
@@ -739,11 +860,14 @@ export const StatusReportCard = forwardRef<
             )}
 
             <div className={styles.section}>
-                <span className={styles.sectionTitle}>
-                    📈{" "}
-                    {t(
-                        "defectManagementPage.sprintReport.statusCard.suiteProgressTitle"
-                    )}
+                <span className={styles.sectionTitleRow}>
+                    <span className={styles.sectionTitle}>
+                        📈{" "}
+                        {t(
+                            "defectManagementPage.sprintReport.statusCard.suiteProgressTitle"
+                        )}
+                    </span>
+                    <SectionHelp helpKey="defectManagementPage.sprintReport.statusCard.sectionHelp.suiteProgress" />
                 </span>
 
                 {suiteGroups.length > 0 ? (
@@ -766,11 +890,14 @@ export const StatusReportCard = forwardRef<
 
             <div className={styles.section}>
                 <div className={styles.sectionHeader}>
-                    <span className={styles.sectionTitle}>
-                        🐛{" "}
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.bugStatusTitle"
-                        )}
+                    <span className={styles.sectionTitleRow}>
+                        <span className={styles.sectionTitle}>
+                            🐛{" "}
+                            {t(
+                                "defectManagementPage.sprintReport.statusCard.bugStatusTitle"
+                            )}
+                        </span>
+                        <SectionHelp helpKey="defectManagementPage.sprintReport.statusCard.sectionHelp.bugStatus" />
                     </span>
                     <span className={styles.sectionSubtitle}>
                         {t(
@@ -833,50 +960,17 @@ export const StatusReportCard = forwardRef<
                             {t(
                                 `defectManagementPage.sprintReport.statusCard.statusLabels.${STATUS_LABEL_KEYS[name]}`
                             )}
+                            {name === "Closed" &&
+                                closedOutOfScopeCount > 0 &&
+                                t(
+                                    "defectManagementPage.sprintReport.statusCard.closedOutOfScopeNote",
+                                    { count: closedOutOfScopeCount },
+                                )}
                         </span>
                     ))}
                 </span>
 
-                <div className={styles.severityRow}>
-                    {severityEntries.map(([raw, count]) => {
-                        const rank = severityRank(raw);
-                        const palette =
-                            SEVERITY_PALETTE[rank - 1] ?? SEVERITY_FALLBACK;
-                        const percent = severityTotal
-                            ? Math.round((count / severityTotal) * 100)
-                            : 0;
-
-                        return (
-                            <div
-                                key={raw}
-                                className={styles.severityChip}
-                                style={{
-                                    backgroundColor: palette.bg,
-                                    borderColor: palette.border,
-                                }}
-                            >
-                                <span
-                                    className={styles.severityCount}
-                                    style={{ color: palette.text }}
-                                >
-                                    {count}
-                                </span>
-                                <span
-                                    className={styles.severityPercent}
-                                    style={{ color: palette.text }}
-                                >
-                                    {percent}%
-                                </span>
-                                <span
-                                    className={styles.severityLabelText}
-                                    style={{ color: palette.text }}
-                                >
-                                    {severityLabel(raw)}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </div>
+                <SeverityChipsRow entries={severityEntries} total={severityTotal} />
 
                 <span className={styles.severityCaption}>
                     {t(
@@ -885,46 +979,7 @@ export const StatusReportCard = forwardRef<
                     )}
                 </span>
 
-                <div className={styles.severityRow}>
-                    {openSeverityEntries.map(([raw, count]) => {
-                        const rank = severityRank(raw);
-                        const palette =
-                            SEVERITY_PALETTE[rank - 1] ?? SEVERITY_FALLBACK;
-                        const percent = openSeverityTotal
-                            ? Math.round((count / openSeverityTotal) * 100)
-                            : 0;
-
-                        return (
-                            <div
-                                key={raw}
-                                className={styles.severityChip}
-                                style={{
-                                    backgroundColor: palette.bg,
-                                    borderColor: palette.border,
-                                }}
-                            >
-                                <span
-                                    className={styles.severityCount}
-                                    style={{ color: palette.text }}
-                                >
-                                    {count}
-                                </span>
-                                <span
-                                    className={styles.severityPercent}
-                                    style={{ color: palette.text }}
-                                >
-                                    {percent}%
-                                </span>
-                                <span
-                                    className={styles.severityLabelText}
-                                    style={{ color: palette.text }}
-                                >
-                                    {severityLabel(raw)}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </div>
+                <SeverityChipsRow entries={openSeverityEntries} total={openSeverityTotal} />
 
                 <span className={styles.severityCaption}>
                     {t(
@@ -937,10 +992,13 @@ export const StatusReportCard = forwardRef<
             {showOriginBreakdown &&
                 originPanels.some((panel) => panel.suiteEntries.length > 0) && (
                 <div className={styles.section}>
-                    <span className={styles.sectionTitle}>
-                        {t(
-                            "defectManagementPage.sprintReport.statusCard.originBreakdown.title"
-                        )}
+                    <span className={styles.sectionTitleRow}>
+                        <span className={styles.sectionTitle}>
+                            {t(
+                                "defectManagementPage.sprintReport.statusCard.originBreakdown.title"
+                            )}
+                        </span>
+                        <SectionHelp helpKey="defectManagementPage.sprintReport.statusCard.sectionHelp.originBreakdown" />
                     </span>
 
                     {originPanels
