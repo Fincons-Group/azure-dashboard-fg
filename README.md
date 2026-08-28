@@ -136,6 +136,53 @@ npm run dev:all
 - **Errore 502 o pagina bloccata**: esegui `npm run kill:dev` e poi rilancia `npm run dev:all`.
 - **Pagina "My Work Items" vuota** (schede "assegnati a me"/"creati da me"): imposta `VITE_MY_EMAIL` in `client/.env`.
 
+## Pubblicazione su GitHub Pages
+
+Il frontend puo essere pubblicato come sito statico su GitHub Pages,
+collegato a un backend ospitato separatamente (es. un web service gratuito
+su [Render](https://render.com)) invece che locale. E un confine di fiducia
+diverso rispetto all'uso locale: il PAT viaggia via internet fino a quel
+backend (che lo inoltra subito ad Azure DevOps senza mai salvarlo), invece
+di restare su `localhost`.
+
+### 1. Distribuisci il backend
+
+Distribuisci la root di questo repo (non `client/`) come Node web service -
+es. su Render: **New + → Web Service**, collega questo repo, lascia Root
+Directory vuoto, Build Command `npm install`, Start Command `npm run start`.
+
+Imposta queste variabili d'ambiente sull'host:
+
+- `HOST=0.0.0.0` (obbligatoria - il default `127.0.0.1` e solo loopback e
+  non sarebbe raggiungibile dall'esterno del container)
+- `CORS_ORIGIN=https://<org>.github.io/<repo>` (l'URL di Pages, senza slash
+  finale)
+
+Non impostare deliberatamente `AZDO_PAT`/`AZDO_ORG`/`AZDO_PROJECT`: lasciati
+vuoti, il backend si fida solo del PAT/org inviato dal browser ad ogni
+richiesta (header `x-ado-pat`/`x-ado-org`, dal local storage dell'utente),
+mai di un segreto salvato sull'host.
+
+### 2. Configura ed esegui il workflow di GitHub Pages
+
+In **Settings → Pages** di questo repo, imposta Source su **GitHub
+Actions**.
+
+In **Settings → Secrets and variables → Actions → Variables**, aggiungi:
+
+- `VITE_API_BASE_URL` = l'URL del backend del passo 1 (es.
+  `https://your-service.onrender.com`)
+
+Poi fai push su `main`, oppure avvia manualmente il workflow **Deploy to
+GitHub Pages** dalla tab Actions. Compila il client impostando
+automaticamente `VITE_PUBLIC_BASE_PATH` sul percorso Pages di questo repo, e
+pubblica `dist/` tramite `actions/deploy-pages`.
+
+> Nota: GitHub Pages per un repository **privato** richiede GitHub
+> Pro/Team/Enterprise, e puo essere limitato ai soli membri dell'org invece
+> che pubblico - verifica il piano/le policy della tua org prima di
+> affidartici.
+
 ## Onboarding Italiano (Windows)
 
 - Guida completa italiana: `docs/guida-windows-da-zero-it.md`

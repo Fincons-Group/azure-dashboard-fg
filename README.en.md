@@ -105,6 +105,52 @@ The first time you load the app, a **Project** dropdown opens at the top of the 
 - **A "502" or "Bad Gateway" error, or the page looks stuck**: a server from a previous `npm run dev:all` run may still be holding the ports. Press `Ctrl + C` in the terminal, then run `npm run kill:dev` to clean up any leftover processes, and try `npm run dev:all` again.
 - **"My Work Items" page is empty on the "Assigned to me"/"Created by me" tabs**: set `VITE_MY_EMAIL` in `client/.env` to your Azure DevOps email.
 
+## Deploying to GitHub Pages
+
+The frontend can be published as a static site on GitHub Pages, calling a
+separately hosted backend (e.g. a free [Render](https://render.com) web
+service) instead of a local one. This is a different trust boundary than
+running locally: the PAT now travels over the internet to that backend
+(which forwards it straight to Azure DevOps and never stores it), instead of
+staying on `localhost`.
+
+### 1. Deploy the backend
+
+Deploy this repo's root (not `client/`) as a Node web service - e.g. on
+Render: **New + → Web Service**, connect this repo, leave Root Directory
+blank, Build Command `npm install`, Start Command `npm run start`.
+
+Set these environment variables on the host:
+
+- `HOST=0.0.0.0` (required - the default of `127.0.0.1` is loopback-only and
+  won't be reachable from outside the container)
+- `CORS_ORIGIN=https://<org>.github.io/<repo>` (your Pages URL, no trailing
+  slash)
+
+Deliberately do **not** set `AZDO_PAT`/`AZDO_ORG`/`AZDO_PROJECT` there - left
+unset, the backend only trusts the PAT/org the browser sends per request
+(`x-ado-pat`/`x-ado-org` headers, from the user's own local storage), never a
+secret stored on the host.
+
+### 2. Configure and run the GitHub Pages workflow
+
+In this repo's **Settings → Pages**, set Source to **GitHub Actions**.
+
+In **Settings → Secrets and variables → Actions → Variables**, add:
+
+- `VITE_API_BASE_URL` = the backend URL from step 1 (e.g.
+  `https://your-service.onrender.com`)
+
+Then push to `main`, or run the **Deploy to GitHub Pages** workflow manually
+from the Actions tab. It builds the client with `VITE_PUBLIC_BASE_PATH` set
+to this repo's Pages path automatically, and publishes `dist/` via
+`actions/deploy-pages`.
+
+> Note: GitHub Pages for a **private** repository requires GitHub
+> Pro/Team/Enterprise, and can be restricted to organization members only
+> instead of fully public - check your org's plan/policy before relying on
+> this.
+
 ## Italian onboarding (Windows)
 
 - Manual guide (Italian): `docs/guida-windows-da-zero-it.md`
