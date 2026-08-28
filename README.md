@@ -21,9 +21,9 @@ First run asks for your Azure DevOps organization and Personal Access Token
 ### Architecture note
 
 The React app does **not** call Azure DevOps directly today. It already goes
-through the existing Express API first (`/home/runner/work/azure-dashboard/azure-dashboard/client/src/api/client.ts`
-→ `/home/runner/work/azure-dashboard/azure-dashboard/src/server.ts`
-→ `/home/runner/work/azure-dashboard/azure-dashboard/src/azdo.ts`), so the
+through the existing Express API first (`client/src/api/client.ts`
+→ `src/server.ts`
+→ `src/azdo.ts`), so the
 local package reuses that backend and forwards PAT/org per request.
 
 Versione inglese: [README.en.md](README.en.md)
@@ -56,7 +56,7 @@ Se hai ricevuto un `.zip`, estrailo dove preferisci.
 Se usi Git:
 
 ```
-git clone <repository-url>
+git clone https://github.com/Fincons-Group/azure-dashboard-fg.git
 ```
 
 ## 3. Apri un terminale nella cartella progetto
