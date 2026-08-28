@@ -56,12 +56,14 @@ export function PatSetup({
                 <Field label={t("patSetup.patLabel")}>
                     <Input
                         type="password"
+                        autoComplete="off"
                         placeholder={t("patSetup.patPlaceholder")}
                         value={pat}
                         onChange={(_, data) => setPat(data.value)}
                     />
                 </Field>
             </div>
+            <Text size={200}>{t("patSetup.sharedMachineWarning")}</Text>
             <Button
                 appearance="primary"
                 disabled={!canSave}

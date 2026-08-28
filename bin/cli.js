@@ -19,7 +19,7 @@ const serve = sirv(DIST_DIR, { single: true });
 
 http.createServer((req, res) => {
     serve(req, res);
-}).listen(PORT, () => {
+}).listen(PORT, "127.0.0.1", () => {
     const url = `http://localhost:${PORT}`;
     console.log(`\nAzure Dashboard running at ${url}\n`);
     void open(url);

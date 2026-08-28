@@ -214,7 +214,10 @@ app.post("/api/refresh", (_, res) => {
 
 const port = Number(process.env.PORT) || 3000;
 
-app.listen(port, () => {
+// Bound to loopback only: this server forwards whatever Azure DevOps PAT it
+// receives (see runWithAzdoConfig above) straight through to Azure DevOps, so
+// listening on 0.0.0.0 would let anyone else on the same network reach it.
+app.listen(port, "127.0.0.1", () => {
     console.log(
         `Running on http://localhost:${port}`
     );
