@@ -28,7 +28,7 @@ If you received this project as a `.zip` file, extract it anywhere on your compu
 If you're using Git, clone the repository instead:
 
 ```
-git clone <repository-url>
+git clone https://github.com/Fincons-Group/azure-dashboard-fg.git
 ```
 
 ## 3. Open a terminal in the project folder
