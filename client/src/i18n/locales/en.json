@@ -260,6 +260,7 @@
         "orgPlaceholder": "your-organization-name",
         "patLabel": "Personal Access Token",
         "patPlaceholder": "Paste your PAT",
+        "sharedMachineWarning": "Don't paste your PAT on a shared or public computer - use \"Change PAT\" to clear it before you leave.",
         "connect": "Connect"
     }
 }
