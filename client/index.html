@@ -10,13 +10,18 @@
       UI (Griffel) injects <style> tags at runtime - blocking it breaks the
       whole UI, and there's no server here to hand out a nonce.
       connect-src covers: same-origin API calls, the packaged CLI's local
-      proxy (localhost:4174) and dev-mode backend (localhost:3001), and the
+      proxy (localhost:4174) and dev-mode backend (localhost:3001), the
       Entra ID / Graph endpoints used by the optional SWA auth mode and the
-      "Send by email" Graph mail flow.
+      "Send by email" Graph mail flow, and the VITE_API_BASE_URL token below
+      - the hosted backend origin (e.g. Render) that a cross-origin build
+      (GitHub Pages) is configured to call. Vite interpolates that token
+      from the same env var client/src/api/client.ts reads at build time,
+      and it resolves to nothing for same-origin builds where that env var
+      is unset.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' http://localhost:4174 http://localhost:3001 https://login.microsoftonline.com https://graph.microsoft.com; frame-src https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; form-action 'self';"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' http://localhost:4174 http://localhost:3001 https://login.microsoftonline.com https://graph.microsoft.com %VITE_API_BASE_URL%; frame-src https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; form-action 'self';"
     />
     <title>QA Dashboard</title>
   </head>
