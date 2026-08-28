@@ -29,7 +29,7 @@
     "kill:dev": "node scripts/kill-dev.js"
   },
   "dependencies": {
-    "@azure/msal-browser": "^5.17.3",
+    "@azure/msal-browser": "^5.19.0",
     "@azure/msal-node": "^5.6.0",
     "axios": "^1.18.0",
     "cors": "^2.8.6",
