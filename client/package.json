@@ -13,7 +13,7 @@
     "@azure/msal-browser": "^5.14.0",
     "@azure/msal-react": "^5.4.5",
     "@fluentui/react-components": "^9.74.1",
-    "@fluentui/react-icons": "^2.0.330",
+    "@fluentui/react-icons": "^2.0.338",
     "@tanstack/react-query": "^5.101.0",
     "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
