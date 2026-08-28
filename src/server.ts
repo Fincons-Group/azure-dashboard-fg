@@ -214,10 +214,16 @@ app.post("/api/refresh", (_, res) => {
 
 const port = Number(process.env.PORT) || 3000;
 
-// Bound to loopback only: this server forwards whatever Azure DevOps PAT it
-// receives (see runWithAzdoConfig above) straight through to Azure DevOps, so
-// listening on 0.0.0.0 would let anyone else on the same network reach it.
-app.listen(port, "127.0.0.1", () => {
+// Defaults to loopback only: this server forwards whatever Azure DevOps PAT
+// it receives (see runWithAzdoConfig above) straight through to Azure DevOps,
+// so listening on 0.0.0.0 would let anyone else on the same network reach it
+// when this is run as the local packaged CLI. A hosted deployment (e.g.
+// Render) needs to be reachable from outside its own container, so it must
+// set HOST=0.0.0.0 explicitly - there the actual access boundary is CORS_ORIGIN
+// above, not the bind address.
+const host = process.env.HOST || "127.0.0.1";
+
+app.listen(port, host, () => {
     console.log(
         `Running on http://localhost:${port}`
     );
