@@ -147,6 +147,8 @@
           "passRate": "Pass Rate (Ok / Totali)",
           "notApplicable": "Non applicabili",
           "bugsClosedRatio": "Bug chiusi (di cui {{count}} out of scope)",
+          "bugsToClose": "Bug da chiudere",
+          "bugsToCloseRatio": "Bug da chiudere (di cui {{count}} out of scope)",
           "criticalBugs": "Bug critici (non chiusi)",
           "reopenedBugs": "Bug riaperti",
           "avgClosureTime": "Tempo medio chiusura\nbug (gg)",
@@ -168,6 +170,7 @@
           "bugsByUs": "Bug rilevati dal nostro team di test: ogni bug rilevato (compresi quelli fuori perimetro) la cui origine non è DSI.",
           "bugsByDsi": "Bug segnalati direttamente da DSI: ogni bug rilevato (compresi quelli fuori perimetro) collegato all'origine DSI.",
           "bugsClosedRatio": "Percentuale di bug Chiusi sul totale dei bug rilevati (Chiusi diviso Totale), inclusi eventuali bug fuori perimetro chiusi.",
+          "bugsToClose": "Bug non ancora chiusi sul totale dei bug rilevati (Totale meno Chiusi), inclusi eventuali bug fuori perimetro non ancora chiusi.",
           "criticalBugs": "Bug di severity Critica ancora aperti, conteggiati solo tra i bug effettivi (in perimetro) - a differenza degli altri conteggi bug di questa scheda, qui i bug fuori perimetro sono esclusi.",
           "reopenedBugs": "Bug che sono stati riaperti almeno una volta dopo essere stati chiusi, in base alla loro storia completa - indipendentemente dallo stato attuale, e conteggiati su ogni bug rilevato inclusi quelli fuori perimetro.",
           "avgClosureTime": "Numero medio di giorni tra l'apertura e la chiusura di un bug, calcolato su ogni bug rilevato (compresi quelli fuori perimetro) che ha una data di chiusura effettiva. I bug ancora aperti non vengono conteggiati.",
@@ -260,7 +263,6 @@
     "orgPlaceholder": "nome-della-tua-organizzazione",
     "patLabel": "Personal Access Token",
     "patPlaceholder": "Incolla il tuo PAT",
-    "sharedMachineWarning": "Non incollare il tuo PAT su un computer condiviso o pubblico - usa \"Cambia PAT\" per cancellarlo prima di andare via.",
     "connect": "Connetti"
   }
 }

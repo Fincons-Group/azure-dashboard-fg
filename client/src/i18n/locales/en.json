@@ -1,266 +1,268 @@
 {
-    "common": {
-        "title": "QA Dashboard"
+  "common": {
+    "title": "QA Dashboard"
+  },
+  "nav": {
+    "primary": "Primary",
+    "home": "Go to home",
+    "dynamicSprintReport": "Sprint Report",
+    "refresh": "Refresh Now",
+    "refreshing": "Refreshing...",
+    "refreshFailed": "Refresh failed: {{message}}",
+    "refreshUpToDate": "Already up to date (try again in {{minutes}}m)",
+    "help": "Help",
+    "testGraphLogin": "Login",
+    "testGraphLogout": "Logout",
+    "testGraphSigningIn": "Signing in...",
+    "testGraphSigningOut": "Signing out...",
+    "testGraphLoginFailed": "Login failed: {{message}}",
+    "testGraphLogoutFailed": "Logout failed: {{message}}",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "changePat": "Change PAT"
+  },
+  "azdoPatSteps": {
+    "step1": "In Azure DevOps, open your profile (top right) and go to User Settings > Personal Access Tokens.",
+    "step2": "Click \"New Token\", give it a name, and set scopes to Work Items (Read) and Test Plans (Read).",
+    "step3": "Click \"Create\" and copy the token right away - Azure DevOps only shows it once.",
+    "step4": "In the dashboard, click \"Change PAT\" (or use the first-run screen) and paste your organization name plus PAT.",
+    "step5": "The values stay only in this browser's local storage and are sent only to your local dashboard process."
+  },
+  "onboardingGuide": {
+    "title": "Getting started",
+    "intro": "A quick look at emailing a report and connecting the dashboard to Azure DevOps from this browser.",
+    "emailSection": {
+      "title": "Emailing a report",
+      "statusReport": "Full status report: on the Sprint Report page, click \"Login\" in the top bar to sign in with your Microsoft account, then fill in the recipients under \"Email Status Card\" and click \"Send Email\". Only shown if enabled."
     },
-    "nav": {
-        "primary": "Primary",
-        "home": "Go to home",
-        "dynamicSprintReport": "Sprint Report",
-        "refresh": "Refresh Now",
-        "refreshing": "Refreshing...",
-        "refreshFailed": "Refresh failed: {{message}}",
-        "refreshUpToDate": "Already up to date (try again in {{minutes}}m)",
-        "help": "Help",
-        "testGraphLogin": "Login",
-        "testGraphLogout": "Logout",
-        "testGraphSigningIn": "Signing in...",
-        "testGraphSigningOut": "Signing out...",
-        "testGraphLoginFailed": "Login failed: {{message}}",
-        "testGraphLogoutFailed": "Logout failed: {{message}}",
-        "collapseSidebar": "Collapse sidebar",
-        "expandSidebar": "Expand sidebar",
-        "changePat": "Change PAT"
+    "azdoSection": {
+      "title": "Connecting to Azure DevOps",
+      "intro": "The local package loads data only after you save your Azure DevOps organization and PAT in this browser:"
     },
-    "azdoPatSteps": {
-        "step1": "In Azure DevOps, open your profile (top right) and go to User Settings > Personal Access Tokens.",
-        "step2": "Click \"New Token\", give it a name, and set scopes to Work Items (Read) and Test Plans (Read).",
-        "step3": "Click \"Create\" and copy the token right away - Azure DevOps only shows it once.",
-        "step4": "In the dashboard, click \"Change PAT\" (or use the first-run screen) and paste your organization name plus PAT.",
-        "step5": "The values stay only in this browser's local storage and are sent only to your local dashboard process."
+    "navSectionTitle": "What's in the menu",
+    "navSections": {
+      "dynamic-sprint-report": "Build a report scoped to an area path, sprint, and test plan."
     },
-    "onboardingGuide": {
-        "title": "Getting started",
-        "intro": "A quick look at emailing a report and connecting the dashboard to Azure DevOps from this browser.",
-        "emailSection": {
-            "title": "Emailing a report",
-            "statusReport": "Full status report: on the Sprint Report page, click \"Login\" in the top bar to sign in with your Microsoft account, then fill in the recipients under \"Email Status Card\" and click \"Send Email\". Only shown if enabled."
+    "gotIt": "Got it"
+  },
+  "azdoConnectionError": {
+    "title": "Can't reach Azure DevOps",
+    "message": "The dashboard could not load data from Azure DevOps. The saved organization or PAT is usually missing, expired, or invalid.",
+    "retry": "Retry",
+    "changePat": "Change PAT"
+  },
+  "outcome": {
+    "Passed": "Passed",
+    "Failed": "Failed",
+    "Blocked": "Blocked",
+    "NotApplicable": "Not Applicable",
+    "Paused": "Paused",
+    "InProgress": "In Progress",
+    "NotRun": "Not Run"
+  },
+  "planOverviewPage": {
+    "exporting": "Exporting...",
+    "sendEmail": "Send report by email",
+    "emailSending": "Sending email report...",
+    "emailSent": "Email report sent.",
+    "emailFailed": "Failed to send email report: {{message}}"
+  },
+  "defectManagementPage": {
+    "stats": {
+      "days": "{{value}} day(s)"
+    },
+    "sprintReport": {
+      "origin": {
+        "testFactory": "Test Factory",
+        "testAgenti": "Test Agenti",
+        "business": "Business"
+      },
+      "statusCard": {
+        "title": "Sprint Status Card",
+        "headerTitleLabel": "Card title",
+        "headerSubtitleLabel": "Card subtitle",
+        "updatedAt": "Updated: {{date}} at {{time}}",
+        "uatDeadlineLabel": "UAT deadline (optional)",
+        "alertTemplate_one": "UAT window closes: {{date}} - {{count}} working day remains. The System Integrator is required to provide a resolution-date plan for open bugs (details below).",
+        "alertTemplate_other": "UAT window closes: {{date}} - {{count}} working days remain. The System Integrator is required to provide a resolution-date plan for open bugs (details below).",
+        "actionsLabel1": "Action 1 (optional)",
+        "actionsLabel2": "Action 2 (optional)",
+        "actionsPlaceholder": "Action text",
+        "actionsPresetPlaceholder": "Insert template...",
+        "actionsPresetAutoSuggested": "Suggested text (auto-generated from this report)",
+        "actionsPreset1SiDeadline": "System Integrator: update/close bugs by deadline",
+        "actionsPreset1SiMissingDates": "System Integrator: missing resolution dates ({{count}} bugs)",
+        "actionsPreset2TestManagementOutOfScope": "Test Management: complex agent out of scope (Sprint 3)",
+        "actionsPreset2TestFunzionaliNotExecutable": "Functional tests: non-executable test cases (unreleased features)",
+        "actionsTitle": "Actions Required",
+        "exportButton": "Export Status Card",
+        "exportPptxButton": "Export as PPTX",
+        "downloadHtmlButton": "Download HTML",
+        "copyHtmlButton": "Copy for Email/Teams",
+        "copyHtmlButtonCopied": "Copied!",
+        "emailSectionTitle": "Send Report via Email",
+        "emailSectionDescription": "Send the status card below by email. Add one or more recipients, comma-separated.",
+        "emailToLabel": "To",
+        "emailCcLabel": "Cc",
+        "emailAddressPlaceholder": "email1@example.com, email2@example.com",
+        "emailFromNameLabel": "Sender name (optional)",
+        "emailFromNamePlaceholder": "Shown as the sender name",
+        "emailPrefaceLabel": "Message before report",
+        "emailPrefacePlaceholder": "Write a message to include above the status card, e.g. a greeting or summary...",
+        "emailClosingLabel": "Message after report",
+        "emailClosingPlaceholder": "Write a message to include below the status card, e.g. closing remarks or a signature...",
+        "openDashboard": "Open monitoring dashboard",
+        "casesCount": "{{count}} cases",
+        "executed": "executed",
+        "passRate": "Pass rate",
+        "suiteProgressTitle": "Test Execution Progress",
+        "suiteGroupsLabel": "Row labels (suites are merged in automatically)",
+        "suiteGroupsLoading": "Loading suite data...",
+        "suiteGroupsWarning": "\"{{group}}\": no test cases matched ({{hint}})",
+        "noPlanSelected": "No suites matched yet - check the plan/suite names configured for this card.",
+        "bugStatusTitle": "Bug Status",
+        "bugStatusSubtitle": "(reported by {{sources}} · effective bugs only)",
+        "closedOutOfScopeNote": " ({{count}} out of scope included)",
+        "bugsDetected": "{{count}} total bugs detected",
+        "bugStatusSummary": "{{effective}} effective, {{outOfScope}} out of scope",
+        "stillOpen": "of which {{count}} still open",
+        "statusLabels": {
+          "closed": "Closed",
+          "daVerificare": "To verify (DSI retest)",
+          "inVerifica": "In verification",
+          "inProgress": "In progress",
+          "new": "To be picked up",
+          "reopened": "Reopened",
+          "notApplicable": "Not applicable (out of scope)"
         },
-        "azdoSection": {
-            "title": "Connecting to Azure DevOps",
-            "intro": "The local package loads data only after you save your Azure DevOps organization and PAT in this browser:"
+        "severityCaption": "Severity distribution of the {{count}} effective bugs",
+        "openSeverityCaption": "Severity distribution of the {{count}} bugs still open",
+        "kpis": {
+          "testCasesSection": "Test Case Status",
+          "bugsSection": "Bug Status",
+          "totalTestCases": "Total Test Cases",
+          "notRun": "Test Cases To Execute",
+          "executedCount": "Test Cases Executed",
+          "totalPassed": "Test Cases Passed",
+          "passRate": "Pass Rate (Ok / Total)",
+          "notApplicable": "Not Applicable",
+          "bugsClosedRatio": "Bugs Closed / Total\n(all detected)",
+          "bugsToClose": "Bugs To Close",
+          "bugsToCloseRatio": "Bugs To Close (of which {{count}} out of scope)",
+          "criticalBugs": "Critical Bugs (open)",
+          "reopenedBugs": "Reopened Bugs",
+          "avgClosureTime": "Average Bug Closure Time",
+          "effectiveBugsDetected": "Effective /\nTotal Bugs",
+          "outOfScopeBugsDetected": "Out of Scope Bugs",
+          "withoutResolutionDate": "Bugs Without\nResolution Date",
+          "bugsByUs": "Bugs opened by Test Factory",
+          "bugsByDsi": "Bugs opened by DSI"
         },
-        "navSectionTitle": "What's in the menu",
-        "navSections": {
-            "dynamic-sprint-report": "Build a report scoped to an area path, sprint, and test plan."
+        "kpisHelp": {
+          "totalTestCases": "All test cases in the selected plan(s), regardless of their status.",
+          "executedCount": "Cases with outcome Passed, Failed, or Blocked. Any other outcome (Not Applicable, Not Run, Paused, In Progress) isn't counted as executed here - unlike each suite's own \"% Executed\" badge further down, which counts Not Applicable as executed too.",
+          "notApplicable": "Cases marked Not Applicable (N/A), i.e. not relevant for this sprint.",
+          "notRun": "Cases not yet executed: Total minus Executed minus N/A. This also folds in any Paused or In Progress cases, since only Passed/Failed/Blocked count as \"executed\" above.",
+          "totalPassed": "Total number of test cases with outcome Passed.",
+          "passRate": "Percentage of Passed cases over the total usable cases (Total minus N/A). N/A cases are excluded.",
+          "effectiveBugsDetected": "Valid bugs found, excluding out-of-scope ones (duplicates, not relevant, etc.) - shown as effective bugs out of the total detected.",
+          "outOfScopeBugsDetected": "Bugs found but excluded from the main count because they're out of scope (duplicates, not reproducible, not relevant).",
+          "bugsByUs": "Bugs found by our test team: every detected bug (including out-of-scope ones) whose source isn't DSI.",
+          "bugsByDsi": "Bugs reported directly by DSI: every detected bug (including out-of-scope ones) linked to the DSI source.",
+          "bugsClosedRatio": "Percentage of Closed bugs over the total bugs found (Closed divided by Total), including any out-of-scope bugs that were closed.",
+          "bugsToClose": "Bugs not yet Closed over the total bugs found (Total minus Closed), including any out-of-scope bugs not yet closed.",
+          "criticalBugs": "Critical-severity bugs that are still open, counted only among in-scope (effective) bugs - unlike the other bug counts on this card, out-of-scope bugs are excluded here.",
+          "reopenedBugs": "Bugs that have been reopened at least once after being closed, based on their full history - regardless of current status, and counted across every detected bug including out-of-scope ones.",
+          "avgClosureTime": "Average number of days between a bug being opened and closed, across every detected bug (including out-of-scope ones) that has an actual closed date. Bugs still open aren't counted yet.",
+          "withoutResolutionDate": "Bugs still active (not Closed, Da verificare, or In verifica) that don't have an estimated resolution date set yet. A separate figure from the closure-time average above, which is based on each bug's actual closed date."
         },
-        "gotIt": "Got it"
-    },
-    "azdoConnectionError": {
-        "title": "Can't reach Azure DevOps",
-        "message": "The dashboard could not load data from Azure DevOps. The saved organization or PAT is usually missing, expired, or invalid.",
-        "retry": "Retry",
-        "changePat": "Change PAT"
-    },
-    "outcome": {
-        "Passed": "Passed",
-        "Failed": "Failed",
-        "Blocked": "Blocked",
-        "NotApplicable": "Not Applicable",
-        "Paused": "Paused",
-        "InProgress": "In Progress",
-        "NotRun": "Not Run"
-    },
-    "planOverviewPage": {
-        "exporting": "Exporting...",
-        "sendEmail": "Send report by email",
-        "emailSending": "Sending email report...",
-        "emailSent": "Email report sent.",
-        "emailFailed": "Failed to send email report: {{message}}"
-    },
-    "defectManagementPage": {
-        "stats": {
-            "days": "{{value}} day(s)"
+        "sectionHelp": {
+          "suiteProgress": "Each suite's own \"% Executed\" counts Not Applicable as executed too (only Not Run is excluded) - broader than the \"Test Cases Executed\" KPI above, which excludes Not Applicable entirely. Pass Rate = Passed ÷ (Total minus Not Applicable).",
+          "bugStatus": "Every bug detected for this sprint/area, including out-of-scope ones, grouped by current Azure DevOps status. \"Still open\" counts only in-scope (effective) bugs not yet Closed - narrower than the totals above it.",
+          "originBreakdown": "\"Detected\" counts every bug attributed to this source, including out-of-scope ones. \"Accepted\" counts only the in-scope (effective) bugs from that same source. A bug's source is Test Factory by default, unless its linked suite identifies it as Test Agenti, Business, or DSI (DSI bugs are counted in the KPI tile above, not shown as their own panel here)."
         },
-        "sprintReport": {
-            "origin": {
-                "testFactory": "Test Factory",
-                "testAgenti": "Test Agenti",
-                "business": "Business"
-            },
-            "statusCard": {
-                "title": "Sprint Status Card",
-                "headerTitleLabel": "Card title",
-                "headerSubtitleLabel": "Card subtitle",
-                "updatedAt": "Updated: {{date}} at {{time}}",
-                "uatDeadlineLabel": "UAT deadline (optional)",
-                "alertTemplate_one": "UAT window closes: {{date}} - {{count}} working day remains. The System Integrator is required to provide a resolution-date plan for open bugs (details below).",
-                "alertTemplate_other": "UAT window closes: {{date}} - {{count}} working days remain. The System Integrator is required to provide a resolution-date plan for open bugs (details below).",
-                "actionsLabel1": "Action 1 (optional)",
-                "actionsLabel2": "Action 2 (optional)",
-                "actionsPlaceholder": "Action text",
-                "actionsPresetPlaceholder": "Insert template...",
-                "actionsPresetAutoSuggested": "Suggested text (auto-generated from this report)",
-                "actionsPreset1SiDeadline": "System Integrator: update/close bugs by deadline",
-                "actionsPreset1SiMissingDates": "System Integrator: missing resolution dates ({{count}} bugs)",
-                "actionsPreset2TestManagementOutOfScope": "Test Management: complex agent out of scope (Sprint 3)",
-                "actionsPreset2TestFunzionaliNotExecutable": "Functional tests: non-executable test cases (unreleased features)",
-                "actionsTitle": "Actions Required",
-                "exportButton": "Export Status Card",
-                "exportPptxButton": "Export as PPTX",
-                "downloadHtmlButton": "Download HTML",
-                "copyHtmlButton": "Copy for Email/Teams",
-                "copyHtmlButtonCopied": "Copied!",
-                "emailSectionTitle": "Send Report via Email",
-                "emailSectionDescription": "Send the status card below by email. Add one or more recipients, comma-separated.",
-                "emailToLabel": "To",
-                "emailCcLabel": "Cc",
-                "emailAddressPlaceholder": "email1@example.com, email2@example.com",
-                "emailFromNameLabel": "Sender name (optional)",
-                "emailFromNamePlaceholder": "Shown as the sender name",
-                "emailPrefaceLabel": "Message before report",
-                "emailPrefacePlaceholder": "Write a message to include above the status card, e.g. a greeting or summary...",
-                "emailClosingLabel": "Message after report",
-                "emailClosingPlaceholder": "Write a message to include below the status card, e.g. closing remarks or a signature...",
-                "openDashboard": "Open monitoring dashboard",
-                "casesCount": "{{count}} cases",
-                "executed": "executed",
-                "passRate": "Pass rate",
-                "suiteProgressTitle": "Test Execution Progress",
-                "suiteGroupsLabel": "Row labels (suites are merged in automatically)",
-                "suiteGroupsLoading": "Loading suite data...",
-                "suiteGroupsWarning": "\"{{group}}\": no test cases matched ({{hint}})",
-                "noPlanSelected": "No suites matched yet - check the plan/suite names configured for this card.",
-                "bugStatusTitle": "Bug Status",
-                "bugStatusSubtitle": "(reported by {{sources}} · effective bugs only)",
-                "closedOutOfScopeNote": " ({{count}} out of scope included)",
-                "bugsDetected": "{{count}} total bugs detected",
-                "bugStatusSummary": "{{effective}} effective, {{outOfScope}} out of scope",
-                "stillOpen": "of which {{count}} still open",
-                "statusLabels": {
-                    "closed": "Closed",
-                    "daVerificare": "To verify (DSI retest)",
-                    "inVerifica": "In verification",
-                    "inProgress": "In progress",
-                    "new": "To be picked up",
-                    "reopened": "Reopened",
-                    "notApplicable": "Not applicable (out of scope)"
-                },
-                "severityCaption": "Severity distribution of the {{count}} effective bugs",
-                "openSeverityCaption": "Severity distribution of the {{count}} bugs still open",
-                "kpis": {
-                    "testCasesSection": "Test Case Status",
-                    "bugsSection": "Bug Status",
-                    "totalTestCases": "Total Test Cases",
-                    "notRun": "Test Cases To Execute",
-                    "executedCount": "Test Cases Executed",
-                    "totalPassed": "Test Cases Passed",
-                    "passRate": "Pass Rate (Ok / Total)",
-                    "notApplicable": "Not Applicable",
-                    "bugsClosedRatio": "Bugs Closed / Total\n(all detected)",
-                    "criticalBugs": "Critical Bugs (open)",
-                    "reopenedBugs": "Reopened Bugs",
-                    "avgClosureTime": "Average Bug Closure Time",
-                    "effectiveBugsDetected": "Effective /\nTotal Bugs",
-                    "outOfScopeBugsDetected": "Out of Scope Bugs",
-                    "withoutResolutionDate": "Bugs Without\nResolution Date",
-                    "bugsByUs": "Bugs opened by Test Factory",
-                    "bugsByDsi": "Bugs opened by DSI"
-                },
-                "kpisHelp": {
-                    "totalTestCases": "All test cases in the selected plan(s), regardless of their status.",
-                    "executedCount": "Cases with outcome Passed, Failed, or Blocked. Any other outcome (Not Applicable, Not Run, Paused, In Progress) isn't counted as executed here - unlike each suite's own \"% Executed\" badge further down, which counts Not Applicable as executed too.",
-                    "notApplicable": "Cases marked Not Applicable (N/A), i.e. not relevant for this sprint.",
-                    "notRun": "Cases not yet executed: Total minus Executed minus N/A. This also folds in any Paused or In Progress cases, since only Passed/Failed/Blocked count as \"executed\" above.",
-                    "totalPassed": "Total number of test cases with outcome Passed.",
-                    "passRate": "Percentage of Passed cases over the total usable cases (Total minus N/A). N/A cases are excluded.",
-                    "effectiveBugsDetected": "Valid bugs found, excluding out-of-scope ones (duplicates, not relevant, etc.) - shown as effective bugs out of the total detected.",
-                    "outOfScopeBugsDetected": "Bugs found but excluded from the main count because they're out of scope (duplicates, not reproducible, not relevant).",
-                    "bugsByUs": "Bugs found by our test team: every detected bug (including out-of-scope ones) whose source isn't DSI.",
-                    "bugsByDsi": "Bugs reported directly by DSI: every detected bug (including out-of-scope ones) linked to the DSI source.",
-                    "bugsClosedRatio": "Percentage of Closed bugs over the total bugs found (Closed divided by Total), including any out-of-scope bugs that were closed.",
-                    "criticalBugs": "Critical-severity bugs that are still open, counted only among in-scope (effective) bugs - unlike the other bug counts on this card, out-of-scope bugs are excluded here.",
-                    "reopenedBugs": "Bugs that have been reopened at least once after being closed, based on their full history - regardless of current status, and counted across every detected bug including out-of-scope ones.",
-                    "avgClosureTime": "Average number of days between a bug being opened and closed, across every detected bug (including out-of-scope ones) that has an actual closed date. Bugs still open aren't counted yet.",
-                    "withoutResolutionDate": "Bugs still active (not Closed, Da verificare, or In verifica) that don't have an estimated resolution date set yet. A separate figure from the closure-time average above, which is based on each bug's actual closed date."
-                },
-                "sectionHelp": {
-                    "suiteProgress": "Each suite's own \"% Executed\" counts Not Applicable as executed too (only Not Run is excluded) - broader than the \"Test Cases Executed\" KPI above, which excludes Not Applicable entirely. Pass Rate = Passed ÷ (Total minus Not Applicable).",
-                    "bugStatus": "Every bug detected for this sprint/area, including out-of-scope ones, grouped by current Azure DevOps status. \"Still open\" counts only in-scope (effective) bugs not yet Closed - narrower than the totals above it.",
-                    "originBreakdown": "\"Detected\" counts every bug attributed to this source, including out-of-scope ones. \"Accepted\" counts only the in-scope (effective) bugs from that same source. A bug's source is Test Factory by default, unless its linked suite identifies it as Test Agenti, Business, or DSI (DSI bugs are counted in the KPI tile above, not shown as their own panel here)."
-                },
-                "kpiLegend": {
-                    "title": "Sprint Status Card Guide",
-                    "subtitle": "Simple explanation of every indicator shown on the card, so you can see at a glance how each number is calculated.",
-                    "columnIndicator": "Indicator",
-                    "columnExplanation": "How it's calculated",
-                    "downloadButton": "Download Guide (PDF)",
-                    "filename": "sprint_status_card_guide"
-                },
-                "originBreakdown": {
-                    "title": "Bugs by Suite",
-                    "toggleLabel": "Include Bugs by Suite (trial)",
-                    "bugsInSuite": "Bugs in {{suite}}",
-                    "unmatched": "No matching test case found",
-                    "detected": "Bugs detected",
-                    "accepted": "Bugs accepted"
-                }
-            }
+        "kpiLegend": {
+          "title": "Sprint Status Card Guide",
+          "subtitle": "Simple explanation of every indicator shown on the card, so you can see at a glance how each number is calculated.",
+          "columnIndicator": "Indicator",
+          "columnExplanation": "How it's calculated",
+          "downloadButton": "Download Guide (PDF)",
+          "filename": "sprint_status_card_guide"
+        },
+        "originBreakdown": {
+          "title": "Bugs by Suite",
+          "toggleLabel": "Include Bugs by Suite (trial)",
+          "bugsInSuite": "Bugs in {{suite}}",
+          "unmatched": "No matching test case found",
+          "detected": "Bugs detected",
+          "accepted": "Bugs accepted"
         }
-    },
-    "dynamicSprintReportPage": {
-        "title": "Sprint Report",
-        "selectProjectPrompt": "Select a project in the scope bar above to get started.",
-        "selectAreaPathPrompt": "Select an area path in the sidebar to get started.",
-        "selectSprintPrompt": "Select a sprint in the sidebar to load the report.",
-        "defaultHeaderTitle": "Sprint Status Report",
-        "defaultHeaderSubtitle": "Test execution status"
-    },
-    "reportSidebar": {
-        "title": "Report Scope",
-        "loadingPlans": "Loading test plans...",
-        "noPlans": "No test plans found for this sprint.",
-        "noSprints": "No sprints found for this area path.",
-        "newPlanBadge": "New"
-    },
-    "scopeBar": {
-        "projectLabel": "Project",
-        "projectPlaceholder": "Select a project...",
-        "areaPathLabel": "Area Path",
-        "sprintLabel": "Sprint",
-        "allSprints": "All Sprints",
-        "changeScope": "Change scope",
-        "done": "Done"
-    },
-    "filterBar": {
-        "areaPath": "Area Path",
-        "allAreas": "All Areas"
-    },
-    "defectFilterBar": {
-        "iteration": "Sprint/Iteration",
-        "allIterations": "All Sprints",
-        "environment": "Environment",
-        "allEnvironments": "All Environments",
-        "targetVersion": "Target Version",
-        "allTargetVersions": "All Target Versions",
-        "suite": "Test Suite",
-        "allSuites": "All Test Suites",
-        "selectedSuites": "{{count}} selected"
-    },
-    "errorState": {
-        "title": "Something went wrong",
-        "retry": "Retry",
-        "serviceUnavailable": "The dashboard backend is unavailable right now. This can happen when the server's Azure DevOps access token (AZDO_PAT) has expired, or the service is restarting. Please ask an administrator to check it, then retry in a minute."
-    },
-    "loadingState": {
-        "label": "Loading"
-    },
-    "themeSwitcher": {
-        "light": "Light",
-        "dark": "Dark"
-    },
-    "languageSwitcher": {
-        "label": "Language",
-        "english": "English",
-        "italian": "Italiano"
-    },
-    "patSetup": {
-        "title": "Connect your Azure DevOps PAT",
-        "description": "Stored only in this browser's local storage and sent only to your local dashboard process.",
-        "orgLabel": "Azure DevOps organization",
-        "orgPlaceholder": "your-organization-name",
-        "patLabel": "Personal Access Token",
-        "patPlaceholder": "Paste your PAT",
-        "sharedMachineWarning": "Don't paste your PAT on a shared or public computer - use \"Change PAT\" to clear it before you leave.",
-        "connect": "Connect"
+      }
     }
+  },
+  "dynamicSprintReportPage": {
+    "title": "Sprint Report",
+    "selectProjectPrompt": "Select a project in the scope bar above to get started.",
+    "selectAreaPathPrompt": "Select an area path in the sidebar to get started.",
+    "selectSprintPrompt": "Select a sprint in the sidebar to load the report.",
+    "defaultHeaderTitle": "Sprint Status Report",
+    "defaultHeaderSubtitle": "Test execution status"
+  },
+  "reportSidebar": {
+    "title": "Report Scope",
+    "loadingPlans": "Loading test plans...",
+    "noPlans": "No test plans found for this sprint.",
+    "noSprints": "No sprints found for this area path.",
+    "newPlanBadge": "New"
+  },
+  "scopeBar": {
+    "projectLabel": "Project",
+    "projectPlaceholder": "Select a project...",
+    "areaPathLabel": "Area Path",
+    "sprintLabel": "Sprint",
+    "allSprints": "All Sprints",
+    "changeScope": "Change scope",
+    "done": "Done"
+  },
+  "filterBar": {
+    "areaPath": "Area Path",
+    "allAreas": "All Areas"
+  },
+  "defectFilterBar": {
+    "iteration": "Sprint/Iteration",
+    "allIterations": "All Sprints",
+    "environment": "Environment",
+    "allEnvironments": "All Environments",
+    "targetVersion": "Target Version",
+    "allTargetVersions": "All Target Versions",
+    "suite": "Test Suite",
+    "allSuites": "All Test Suites",
+    "selectedSuites": "{{count}} selected"
+  },
+  "errorState": {
+    "title": "Something went wrong",
+    "retry": "Retry",
+    "serviceUnavailable": "The dashboard backend is unavailable right now. This can happen when the server's Azure DevOps access token (AZDO_PAT) has expired, or the service is restarting. Please ask an administrator to check it, then retry in a minute."
+  },
+  "loadingState": {
+    "label": "Loading"
+  },
+  "themeSwitcher": {
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "languageSwitcher": {
+    "label": "Language",
+    "english": "English",
+    "italian": "Italiano"
+  },
+  "patSetup": {
+    "title": "Connect your Azure DevOps PAT",
+    "description": "Stored only in this browser's local storage and sent only to your local dashboard process.",
+    "orgLabel": "Azure DevOps organization",
+    "orgPlaceholder": "your-organization-name",
+    "patLabel": "Personal Access Token",
+    "patPlaceholder": "Paste your PAT",
+    "connect": "Connect"
+  }
 }
