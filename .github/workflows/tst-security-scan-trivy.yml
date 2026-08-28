@@ -155,4 +155,4 @@ jobs:
             trivy-secrets.html
             trivy-iac.json
             trivy-iac.html
-          retention-days: 5
+          retention-days: 1
