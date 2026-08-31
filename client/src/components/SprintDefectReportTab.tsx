@@ -58,7 +58,7 @@ import type {
 const MONITORING_DASHBOARD_URL =
   "https://dev.azure.com/ItasMutua/Nuova%20Frontiera/_dashboards/dashboard/4665852c-cb39-4a89-ac4f-1dca396b539a";
 
-const emailReportEnabled = import.meta.env.VITE_ENABLE_EMAIL_REPORT === "true";
+const emailReportEnabled = import.meta.env.VITE_ENABLE_EMAIL_REPORT !== "false";
 
 // Matches StatusReportCard.tsx's own fixed `card` width - kept in sync
 // there (not derived from the DOM) since it drives the preview's
