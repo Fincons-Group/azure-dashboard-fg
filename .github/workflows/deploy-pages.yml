@@ -34,10 +34,16 @@ jobs:
       # that forwards the browser's Azure DevOps PAT - see src/server.ts and
       # client/src/api/client.ts. VITE_PUBLIC_BASE_PATH matches this repo's
       # GH Pages project-site path so built asset URLs resolve correctly.
+      # VITE_MAIL_ENTRA_* configure the separate app registration used only
+      # by the "Send email"/"Test Graph Mail" button (see mailAuthConfig.ts)
+      # - without these, that button's authority URL resolves to
+      # ".../undefined" and Entra rejects sign-in with AADSTS900023.
       - run: npm run build
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_MAIL_ENTRA_TENANT_ID: ${{ secrets.VITE_MAIL_ENTRA_TENANT_ID }}
+          VITE_MAIL_ENTRA_CLIENT_ID: ${{ secrets.VITE_MAIL_ENTRA_CLIENT_ID }}
 
       - uses: actions/upload-pages-artifact@v4
         with:
