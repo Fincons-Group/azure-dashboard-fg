@@ -165,6 +165,10 @@ export async function buildTestCaseRow(
             id: b.id,
             title: b.fields["System.Title"],
             state: b.fields["System.State"],
+            description: htmlToPlainText(
+                b.fields["System.Description"] ||
+                    b.fields["Microsoft.VSTS.TCM.ReproSteps"]
+            ),
             url: buildWorkItemUrl(b.id, project),
             creator: b.fields["System.CreatedBy"]?.displayName,
             assignee: b.fields["System.AssignedTo"]
@@ -345,6 +349,41 @@ function stripTrailingPunctuation(url: string): string {
     }
 
     return url.slice(0, end);
+}
+
+// Azure DevOps stores a bug's Description / Repro Steps as rich HTML. The Excel
+// report only needs a short readable summary, so this flattens the markup to
+// plain text (keeping paragraph breaks), decodes the common entities, and caps
+// the length to keep the /api/plans/:id/overview payload from ballooning.
+const DESCRIPTION_MAX_LENGTH = 600;
+
+export function htmlToPlainText(html?: string): string | undefined {
+    if (!html) {
+        return undefined;
+    }
+
+    const text = html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/\r/g, "")
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+    if (!text) {
+        return undefined;
+    }
+
+    return text.length > DESCRIPTION_MAX_LENGTH
+        ? `${text.slice(0, DESCRIPTION_MAX_LENGTH - 1)}…`
+        : text;
 }
 
 export async function computeTestPlans(project?: string): Promise<

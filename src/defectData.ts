@@ -8,7 +8,7 @@ import {
     extractWorkItemIds,
     buildWorkItemUrl,
 } from "./azdo.js";
-import { getDashboardData } from "./dashboardData.js";
+import { getDashboardData, htmlToPlainText } from "./dashboardData.js";
 import { parseAllowedSenders, isAllowedSender } from "./teamsNotifier.js";
 import type {
     DefectRecord,
@@ -420,6 +420,10 @@ async function buildDefectRecord(
         id: bug.id,
         title: bug.fields["System.Title"],
         state,
+        description: htmlToPlainText(
+            bug.fields["System.Description"] ||
+                bug.fields["Microsoft.VSTS.TCM.ReproSteps"]
+        ),
         reason,
         tags,
         closureReason: computeClosureReason(state, reason, tags),
@@ -927,6 +931,18 @@ export function computeSprintDefectReport(
         return "Test Factory";
     };
 
+    const toSummary = (r: DefectRecord): DefectSummary => ({
+        id: r.id,
+        title: r.title,
+        state: r.state,
+        description: r.description,
+        priority: r.priority,
+        severity: r.severity,
+        url: r.url,
+        creator: r.creator,
+        assignee: r.assignedTo,
+    });
+
     return {
         total: records.length,
         effectiveCount: effective.length,
@@ -957,16 +973,11 @@ export function computeSprintDefectReport(
         bySeverity: groupCount(effective, (r) => r.severity),
         // Carried through so the UI can drill down from a status/severity bar
         // to the underlying bug list without a second round trip.
-        effectiveDefects: effective.map((r) => ({
-            id: r.id,
-            title: r.title,
-            state: r.state,
-            priority: r.priority,
-            severity: r.severity,
-            url: r.url,
-            creator: r.creator,
-            assignee: r.assignedTo,
-        })),
+        effectiveDefects: effective.map(toSummary),
+        // The DSI-origin subset (all detected, matching byOriginDetected.DSI),
+        // so the Excel report can list them - they're keyed off the bug's own
+        // Custom.Suite = "Test DSI", not any selected plan's suite tree.
+        dsiDefects: records.filter((r) => originOf(r) === "DSI").map(toSummary),
         reopenedCount: records.filter((r) => r.reopenedCount > 0).length,
         mttrDays: computeMttrDays(records),
         // Closed and Da verificare/In verifica bugs are already fixed (just

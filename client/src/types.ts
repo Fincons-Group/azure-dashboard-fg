@@ -12,6 +12,9 @@ export interface BugInfo {
     title: string;
     state: string;
     priority?: number;
+    // Plain-text extract of the bug's Description / Repro Steps, truncated
+    // server-side (see htmlToPlainText in the server's dashboardData.ts).
+    description?: string;
     url?: string;
     creator?: string;
     assignee?: {
@@ -253,6 +256,9 @@ export interface SprintDefectReport {
     testAgentiBySuite: Record<string, number>;
     testBusinessBySuite: Record<string, number>;
     effectiveDefects: DefectSummary[];
+    // Every detected DSI-origin bug (see the server's computeSprintDefectReport)
+    // - may be absent on responses served from an older cache.
+    dsiDefects?: DefectSummary[];
     reopenedCount: number;
     mttrDays: number | null;
     withoutResolutionDateCount: number;

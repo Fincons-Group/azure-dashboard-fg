@@ -624,6 +624,7 @@ export const StatusReportCard = forwardRef<
     avgClosureDays,
     bugsByDsi,
     bugsByUs,
+    bugsByBusiness,
     criticalCount,
   } = computeStatusCardKpis(suiteGroups, report);
 
@@ -786,6 +787,13 @@ export const StatusReportCard = forwardRef<
                   />
                 </>
               )}
+              {/* Always shown - see "anche se ad ora sono 0" */}
+              <KpiTile
+                value={bugsByBusiness}
+                color="#f2b134"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByBusiness"
+              />
               <KpiTile
                 value={`${bugsClosed}/${report.total} (${bugsClosedPct}%)`}
                 color="#f2b134"

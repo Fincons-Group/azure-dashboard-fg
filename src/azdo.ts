@@ -599,6 +599,8 @@ const BUG_FIELDS = [
     "Microsoft.VSTS.Common.ClosedDate",
     "Microsoft.VSTS.Build.FoundIn",
     "System.Tags",
+    "System.Description",
+    "Microsoft.VSTS.TCM.ReproSteps",
     "Custom.Suite",
     "Custom.EstimatedResolutionDate",
 ];

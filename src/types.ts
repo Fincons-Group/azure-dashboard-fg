@@ -11,6 +11,9 @@ export interface BugInfo {
     id: number;
     title: string;
     state: string;
+    // Plain-text extract of the bug's Description / Repro Steps, truncated -
+    // see htmlToPlainText in dashboardData.ts.
+    description?: string;
     url?: string;
     creator?: string;
     assignee?: {
@@ -240,6 +243,9 @@ export interface DefectRecord {
     id: number;
     title: string;
     state: string;
+    // Plain-text extract of the bug's Description / Repro Steps, truncated -
+    // see htmlToPlainText in dashboardData.ts.
+    description?: string;
     reason?: string;
     severity?: string;
     priority?: number;
@@ -289,6 +295,7 @@ export interface DefectSummary {
     id: number;
     title: string;
     state: string;
+    description?: string;
     priority?: number;
     severity?: string;
     ageDays?: number;
@@ -364,6 +371,10 @@ export interface SprintDefectReport {
     testAgentiBySuite: Record<string, number>;
     testBusinessBySuite: Record<string, number>;
     effectiveDefects: DefectSummary[];
+    // Every detected DSI-origin bug (in-scope or not), so the report can list
+    // them without a second query - the DSI suite lives in the bug's own
+    // Custom.Suite field, not in any selected test plan's suite tree.
+    dsiDefects: DefectSummary[];
     // Both scoped to ALL detected bugs (like byStatusAll/total), not just
     // the effective subset - reopened/unresolved-time tracking applies to
     // out-of-scope bugs too.
