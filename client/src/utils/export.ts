@@ -1145,8 +1145,11 @@ export function computeStatusCardKpis(
     : 0;
   const avgClosureDays = Math.round(report.mttrDays ?? 0);
   const bugsByDsi = report.byOriginDetected["DSI"] ?? 0;
-  const bugsByUs = report.total - bugsByDsi;
   const bugsByBusiness = report.byOriginDetected["Business"] ?? 0;
+  // "Everything that's ours": total minus DSI minus Business. Business bugs
+  // get their own tile, so they must not also land in the Test Factory
+  // count. Test Agenti bugs stay folded in here (no separate tile).
+  const bugsByUs = report.total - bugsByDsi - bugsByBusiness;
 
   // Only non-closed bugs count here - a closed critical bug isn't
   // something the reader still needs to act on. Mirrors

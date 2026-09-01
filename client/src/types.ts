@@ -21,6 +21,11 @@ export interface BugInfo {
         displayName: string;
         uniqueName: string;
     };
+    // ISO strings from Azure DevOps (created / last changed / closed).
+    // Optional: absent on responses served from an older server cache.
+    createdDate?: string;
+    changedDate?: string;
+    closedDate?: string;
 }
 
 export type MyWorkItemsMode = "assigned" | "mentioned" | "following" | "created";
@@ -259,6 +264,9 @@ export interface SprintDefectReport {
     // Every detected DSI-origin bug (see the server's computeSprintDefectReport)
     // - may be absent on responses served from an older cache.
     dsiDefects?: DefectSummary[];
+    // Every detected bug created or last changed today (report timezone), for
+    // the Excel export's "Bug Odierni" sheet - absent on older caches.
+    todaysDefects?: DefectSummary[];
     reopenedCount: number;
     mttrDays: number | null;
     withoutResolutionDateCount: number;
@@ -277,6 +285,11 @@ export interface VerificaActivitySummary {
 export interface DefectSummary extends BugInfo {
     severity?: string;
     ageDays?: number;
+    estimatedResolutionDate?: string;
+    // Report origin ("Test Factory" | "Test Agenti" | "Business" | "DSI") and
+    // out-of-scope flag - populated server-side in computeSprintDefectReport.
+    origin?: string;
+    outOfScope?: boolean;
 }
 
 export interface DefectFilterOptions {

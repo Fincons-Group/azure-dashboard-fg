@@ -20,6 +20,12 @@ export interface BugInfo {
         displayName: string;
         uniqueName: string;
     };
+    // ISO strings straight from Azure DevOps (System.CreatedDate /
+    // System.ChangedDate / Microsoft.VSTS.Common.ClosedDate). Optional so
+    // responses served from an older cache still type-check.
+    createdDate?: string;
+    changedDate?: string;
+    closedDate?: string;
 }
 
 export type MyWorkItemsMode = "assigned" | "mentioned" | "following" | "created";
@@ -302,6 +308,17 @@ export interface DefectSummary {
     url?: string;
     creator?: string;
     assignee?: { displayName: string; uniqueName: string };
+    // ISO strings from Azure DevOps - carried through so the Excel export can
+    // show them and build its "today's bugs" sheet. Optional: absent on
+    // responses served from an older server cache.
+    createdDate?: string;
+    changedDate?: string;
+    closedDate?: string;
+    estimatedResolutionDate?: string;
+    // Report origin ("Test Factory" | "Test Agenti" | "Business" | "DSI") and
+    // whether the bug is tagged out-of-scope - see computeSprintDefectReport.
+    origin?: string;
+    outOfScope?: boolean;
 }
 
 export type DefectWithoutTestCase = DefectSummary;
@@ -375,6 +392,10 @@ export interface SprintDefectReport {
     // them without a second query - the DSI suite lives in the bug's own
     // Custom.Suite field, not in any selected test plan's suite tree.
     dsiDefects: DefectSummary[];
+    // Every detected bug (any origin, in-scope or not) created or last changed
+    // "today" in the report timezone (TEAMS_VERIFICA_TIMEZONE, default
+    // Europe/Rome) - drives the Excel export's "Bug Odierni" sheet.
+    todaysDefects: DefectSummary[];
     // Both scoped to ALL detected bugs (like byStatusAll/total), not just
     // the effective subset - reopened/unresolved-time tracking applies to
     // out-of-scope bugs too.

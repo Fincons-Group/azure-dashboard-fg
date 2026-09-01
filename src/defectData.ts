@@ -941,7 +941,19 @@ export function computeSprintDefectReport(
         url: r.url,
         creator: r.creator,
         assignee: r.assignedTo,
+        createdDate: r.createdDate,
+        changedDate: r.changedDate,
+        closedDate: r.closedDate,
+        estimatedResolutionDate: r.estimatedResolutionDate,
+        origin: originOf(r),
+        outOfScope: isOutOfScope(r),
     });
+
+    const reportTimezone =
+        process.env.TEAMS_VERIFICA_TIMEZONE ?? "Europe/Rome";
+    const changedOrCreatedToday = (r: DefectRecord): boolean =>
+        isToday(r.createdDate, reportTimezone) ||
+        isToday(r.changedDate, reportTimezone);
 
     return {
         total: records.length,
@@ -978,6 +990,17 @@ export function computeSprintDefectReport(
         // so the Excel report can list them - they're keyed off the bug's own
         // Custom.Suite = "Test DSI", not any selected plan's suite tree.
         dsiDefects: records.filter((r) => originOf(r) === "DSI").map(toSummary),
+        // Any detected bug created or last changed today (report timezone),
+        // newest activity first - see the "Bug Odierni" sheet in the Excel
+        // export.
+        todaysDefects: records
+            .filter(changedOrCreatedToday)
+            .sort(
+                (a, b) =>
+                    new Date(b.changedDate).getTime() -
+                    new Date(a.changedDate).getTime()
+            )
+            .map(toSummary),
         reopenedCount: records.filter((r) => r.reopenedCount > 0).length,
         mttrDays: computeMttrDays(records),
         // Closed and Da verificare/In verifica bugs are already fixed (just

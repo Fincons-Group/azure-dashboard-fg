@@ -122,6 +122,29 @@ function formatTimestamp(date: Date): string {
     );
 }
 
+// Number format Excel applies to the date columns - keeps the cell a real,
+// sortable/filterable date while showing it as gg/mm/aaaa hh:mm.
+const DATE_NUM_FMT = "dd/mm/yyyy hh:mm";
+
+// A real Date for exceljs (so the cell is a genuine date), or "-" when the
+// timestamp is missing or unparseable so the column still reads cleanly.
+function dateCell(iso?: string): Date | string {
+    if (!iso) {
+        return "-";
+    }
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? "-" : date;
+}
+
+// Same idea for the style-free on-screen preview, which has no date cell kind.
+function formatDate(iso?: string): string {
+    if (!iso) {
+        return "-";
+    }
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? "-" : formatTimestamp(date);
+}
+
 function emptyOutcomeCounts(): Record<Outcome, number> {
     return {
         Passed: 0,
@@ -444,6 +467,7 @@ interface SheetNames {
     summary: string;
     bugs: string;
     bugsBySuite: string;
+    todaysBugs: string;
     dsi: string;
     suites: string;
     plans: string;
@@ -501,6 +525,7 @@ function buildSummarySheet(
     const indexTargets: [string, string][] = [
         [names.bugs, tr("sheetBugs")],
         [names.bugsBySuite, tr("sheetBugsBySuite")],
+        [names.todaysBugs, tr("sheetTodaysBugs")],
         [names.dsi, tr("sheetDsi")],
         [names.suites, tr("sheetSuites")],
         [names.plans, tr("sheetPlans")],
@@ -544,6 +569,7 @@ function buildSummarySheet(
         (bug) => bug.state !== "Closed" && /^1\s*-/.test(bug.severity ?? "")
     ).length;
     const bugsByDsi = report.byOriginDetected["DSI"] ?? 0;
+    const bugsByBusiness = report.byOriginDetected["Business"] ?? 0;
 
     sheet.addRow([tr("totalBugs"), report.total]);
     sheet.addRow([tr("effectiveBugs"), report.effectiveCount]);
@@ -561,9 +587,9 @@ function buildSummarySheet(
         report.mttrDays != null ? Math.round(report.mttrDays) : "-",
     ]);
     sheet.addRow([tr("withoutResolutionDate"), report.withoutResolutionDateCount]);
-    sheet.addRow([tr("bugsByUs"), report.total - bugsByDsi]);
+    sheet.addRow([tr("bugsByUs"), report.total - bugsByDsi - bugsByBusiness]);
     sheet.addRow([tr("bugsByDsi"), bugsByDsi]);
-    sheet.addRow([tr("bugsByBusiness"), report.byOriginDetected["Business"] ?? 0]);
+    sheet.addRow([tr("bugsByBusiness"), bugsByBusiness]);
     zebra(sheet, bugStart, sheet.rowCount, 2);
     sheet.addRow([]);
 
@@ -779,9 +805,12 @@ function buildBugsSheet(
         { header: tr("priority"), width: 10 },
         { header: tr("assignee"), width: 26 },
         { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
         { header: tr("link"), width: 10 },
     ];
-    styleHeaderRow(sheet, 1, 8);
+    styleHeaderRow(sheet, 1, 11);
 
     const bugs = [...data.stats.sprintDefectReport.effectiveDefects].sort(
         (a, b) =>
@@ -797,6 +826,9 @@ function buildBugsSheet(
             bug.priority ?? "-",
             assigneeName(bug.assignee, t),
             bug.creator ?? "-",
+            dateCell(bug.createdDate),
+            dateCell(bug.changedDate),
+            dateCell(bug.closedDate),
             bug.url ? tr("open") : "-",
         ]);
 
@@ -812,15 +844,18 @@ function buildBugsSheet(
         }
 
         if (bug.url) {
-            row.getCell(8).value = { text: tr("open"), hyperlink: bug.url };
-            row.getCell(8).font = { ...LINK_FONT };
+            row.getCell(11).value = { text: tr("open"), hyperlink: bug.url };
+            row.getCell(11).font = { ...LINK_FONT };
         }
     }
 
-    zebra(sheet, 2, sheet.rowCount, 8);
+    zebra(sheet, 2, sheet.rowCount, 11);
     autoFitColumns(sheet);
     sheet.getColumn(2).width = Math.min(sheet.getColumn(2).width ?? 70, 90);
-    sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 8 } };
+    for (const col of [8, 9, 10]) {
+        sheet.getColumn(col).width = 18;
+    }
+    sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 11 } };
 }
 
 function buildBugsBySuiteSheet(
@@ -842,9 +877,12 @@ function buildBugsBySuiteSheet(
         { header: tr("status"), width: 16 },
         { header: tr("assignee"), width: 26 },
         { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
         { header: tr("link"), width: 10 },
     ];
-    styleHeaderRow(sheet, 1, 9);
+    styleHeaderRow(sheet, 1, 12);
 
     for (const plan of data.plans) {
         for (const suite of plan.overview?.suites ?? []) {
@@ -858,6 +896,9 @@ function buildBugsBySuiteSheet(
                     bug.state,
                     assigneeName(bug.assignee, t),
                     bug.creator ?? "-",
+                    dateCell(bug.createdDate),
+                    dateCell(bug.changedDate),
+                    dateCell(bug.closedDate),
                     bug.url ? tr("open") : "-",
                 ]);
                 const stateHex = STATUS_HEX[bug.state];
@@ -868,8 +909,8 @@ function buildBugsBySuiteSheet(
                     };
                 }
                 if (bug.url) {
-                    row.getCell(9).value = { text: tr("open"), hyperlink: bug.url };
-                    row.getCell(9).font = { ...LINK_FONT };
+                    row.getCell(12).value = { text: tr("open"), hyperlink: bug.url };
+                    row.getCell(12).font = { ...LINK_FONT };
                 }
             }
         }
@@ -878,10 +919,93 @@ function buildBugsBySuiteSheet(
     if (sheet.rowCount === 1) {
         sheet.addRow([tr("noData")]);
     }
-    zebra(sheet, 2, sheet.rowCount, 9);
+    zebra(sheet, 2, sheet.rowCount, 12);
     autoFitColumns(sheet);
     sheet.getColumn(5).width = Math.min(sheet.getColumn(5).width ?? 60, 80);
-    sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 9 } };
+    for (const col of [9, 10, 11]) {
+        sheet.getColumn(col).width = 18;
+    }
+    sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 12 } };
+}
+
+// Every detected bug (any origin, in- or out-of-scope) created or last changed
+// today in the report timezone - the list comes pre-filtered and pre-sorted
+// (newest activity first) from the server as report.todaysDefects.
+function buildTodaysBugsSheet(
+    wb: Workbook,
+    names: SheetNames,
+    data: DynamicSprintReportExcelData,
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(names.todaysBugs, {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    sheet.columns = [
+        { header: tr("bugId"), width: 10 },
+        { header: tr("bugTitle"), width: 70 },
+        { header: tr("origin"), width: 16 },
+        { header: tr("scope"), width: 16 },
+        { header: tr("status"), width: 16 },
+        { header: tr("severity"), width: 16 },
+        { header: tr("priority"), width: 10 },
+        { header: tr("assignee"), width: 26 },
+        { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("link"), width: 10 },
+    ];
+    styleHeaderRow(sheet, 1, 13);
+
+    const bugs = data.stats.sprintDefectReport.todaysDefects ?? [];
+
+    for (const bug of bugs) {
+        const row = sheet.addRow([
+            bug.id,
+            bug.title,
+            bug.origin ?? "-",
+            bug.outOfScope ? tr("outOfScope") : tr("inScope"),
+            bug.state,
+            bug.severity ?? "-",
+            bug.priority ?? "-",
+            assigneeName(bug.assignee, t),
+            bug.creator ?? "-",
+            dateCell(bug.createdDate),
+            dateCell(bug.changedDate),
+            dateCell(bug.closedDate),
+            bug.url ? tr("open") : "-",
+        ]);
+
+        const sevCell = row.getCell(6);
+        if (bug.severity && severityRank(bug.severity) <= 3) {
+            sevCell.fill = solid(severityFillArgb(bug.severity));
+            sevCell.font = { color: { argb: "FFFFFFFF" }, bold: true };
+        }
+
+        const stateHex = STATUS_HEX[bug.state];
+        if (stateHex) {
+            row.getCell(5).font = { color: { argb: `FF${stateHex.slice(1)}` }, bold: true };
+        }
+
+        if (bug.url) {
+            row.getCell(13).value = { text: tr("open"), hyperlink: bug.url };
+            row.getCell(13).font = { ...LINK_FONT };
+        }
+    }
+
+    if (bugs.length === 0) {
+        sheet.addRow([tr("noData")]);
+    } else {
+        zebra(sheet, 2, sheet.rowCount, 13);
+        sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 13 } };
+    }
+
+    autoFitColumns(sheet);
+    sheet.getColumn(2).width = Math.min(sheet.getColumn(2).width ?? 70, 90);
+    for (const col of [10, 11, 12]) {
+        sheet.getColumn(col).width = 18;
+    }
 }
 
 function buildDsiSheet(
@@ -902,6 +1026,9 @@ function buildDsiSheet(
         { width: 16 },
         { width: 26 },
         { width: 26 },
+        { width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { width: 18, style: { numFmt: DATE_NUM_FMT } },
         { width: 10 },
     ];
 
@@ -911,7 +1038,7 @@ function buildDsiSheet(
     const open = dsiBugs.filter(isOpenBug).length;
 
     const titleRow = sheet.addRow([tr("dsiSection")]);
-    sheet.mergeCells(titleRow.number, 1, titleRow.number, 7);
+    sheet.mergeCells(titleRow.number, 1, titleRow.number, 10);
     titleRow.getCell(1).font = { bold: true, size: 15, color: { argb: "FFFFFFFF" } };
     titleRow.getCell(1).fill = solid("FFAD1457");
     titleRow.height = 24;
@@ -940,7 +1067,7 @@ function buildDsiSheet(
     sheet.addRow([]);
 
     // Detail table - description / assignee / state front and centre
-    addSectionTitle(sheet, tr("dsiBugListSection"), 7);
+    addSectionTitle(sheet, tr("dsiBugListSection"), 10);
     const headerRow = sheet.addRow([
         tr("bugId"),
         tr("bugTitle"),
@@ -948,9 +1075,12 @@ function buildDsiSheet(
         tr("status"),
         tr("assignee"),
         tr("creator"),
+        tr("createdDate"),
+        tr("changedDate"),
+        tr("closedDate"),
         tr("link"),
     ]);
-    styleHeaderRow(sheet, headerRow.number, 7);
+    styleHeaderRow(sheet, headerRow.number, 10);
     const listStart = sheet.rowCount + 1;
 
     for (const bug of dsiBugs) {
@@ -961,6 +1091,9 @@ function buildDsiSheet(
             bug.state,
             assigneeName(bug.assignee, t),
             bug.creator ?? "-",
+            dateCell(bug.createdDate),
+            dateCell(bug.changedDate),
+            dateCell(bug.closedDate),
             bug.url ? tr("open") : "-",
         ]);
         row.getCell(3).alignment = { wrapText: true, vertical: "top" };
@@ -969,18 +1102,18 @@ function buildDsiSheet(
             row.getCell(4).font = { color: { argb: `FF${stateHex.slice(1)}` }, bold: true };
         }
         if (bug.url) {
-            row.getCell(7).value = { text: tr("open"), hyperlink: bug.url };
-            row.getCell(7).font = { ...LINK_FONT };
+            row.getCell(10).value = { text: tr("open"), hyperlink: bug.url };
+            row.getCell(10).font = { ...LINK_FONT };
         }
     }
 
     if (dsiBugs.length === 0) {
         sheet.addRow([tr("noData")]);
     } else {
-        zebra(sheet, listStart, sheet.rowCount, 7);
+        zebra(sheet, listStart, sheet.rowCount, 10);
         sheet.autoFilter = {
             from: { row: headerRow.number, column: 1 },
-            to: { row: headerRow.number, column: 7 },
+            to: { row: headerRow.number, column: 10 },
         };
     }
 
@@ -998,7 +1131,7 @@ function buildDsiSheet(
                     color: STATUS_HEX[name] ?? "#AD1457",
                 }))
             ),
-            8,
+            11,
             2,
             entries.length
         );
@@ -1185,6 +1318,7 @@ export async function exportDynamicSprintReportToExcel(
         summary: t("dynamicSprintReportPage.excel.sheetSummary"),
         bugs: t("dynamicSprintReportPage.excel.sheetBugs"),
         bugsBySuite: t("dynamicSprintReportPage.excel.sheetBugsBySuite"),
+        todaysBugs: t("dynamicSprintReportPage.excel.sheetTodaysBugs"),
         dsi: t("dynamicSprintReportPage.excel.sheetDsi"),
         suites: t("dynamicSprintReportPage.excel.sheetSuites"),
         plans: t("dynamicSprintReportPage.excel.sheetPlans"),
@@ -1213,6 +1347,7 @@ export async function exportDynamicSprintReportToExcel(
     buildSummarySheet(wb, names, data, dsiBugs, t);
     buildBugsSheet(wb, names, data, t);
     buildBugsBySuiteSheet(wb, names, data, t);
+    buildTodaysBugsSheet(wb, names, data, t);
     buildDsiSheet(wb, names, data, dsiBugs, t);
     buildSuitesSheet(wb, names, data, t);
     buildPlansSheet(wb, names, data, t);
@@ -1308,6 +1443,7 @@ export function buildReportPreview(
     /* -------- Summary -------- */
     const closedAll = report.byStatusAll.Closed ?? 0;
     const bugsByDsi = report.byOriginDetected["DSI"] ?? 0;
+    const bugsByBusiness = report.byOriginDetected["Business"] ?? 0;
     const criticalOpen = report.effectiveDefects.filter(
         (bug) => bug.state !== "Closed" && severityRank(bug.severity) === 1
     ).length;
@@ -1367,12 +1503,12 @@ export function buildReportPreview(
                         txt(tr("withoutResolutionDate")),
                         numCell(report.withoutResolutionDateCount),
                     ],
-                    [txt(tr("bugsByUs")), numCell(report.total - bugsByDsi)],
-                    [txt(tr("bugsByDsi")), numCell(bugsByDsi)],
                     [
-                        txt(tr("bugsByBusiness")),
-                        numCell(report.byOriginDetected["Business"] ?? 0),
+                        txt(tr("bugsByUs")),
+                        numCell(report.total - bugsByDsi - bugsByBusiness),
                     ],
+                    [txt(tr("bugsByDsi")), numCell(bugsByDsi)],
+                    [txt(tr("bugsByBusiness")), numCell(bugsByBusiness)],
                 ],
             },
             {
@@ -1446,6 +1582,9 @@ export function buildReportPreview(
             txt(bug.priority ?? "-"),
             txt(assigneeName(bug.assignee, t)),
             txt(bug.creator ?? "-"),
+            txt(formatDate(bug.createdDate)),
+            txt(formatDate(bug.changedDate)),
+            txt(formatDate(bug.closedDate)),
         ]);
 
     const bugsSheet: PreviewSheet = {
@@ -1461,8 +1600,53 @@ export function buildReportPreview(
                     tr("priority"),
                     tr("assignee"),
                     tr("creator"),
+                    tr("createdDate"),
+                    tr("changedDate"),
+                    tr("closedDate"),
                 ],
                 ...capRows(bugRows),
+            },
+        ],
+    };
+
+    /* -------- Today's bugs -------- */
+    const todaysBugsRows: PreviewCell[][] = (
+        report.todaysDefects ?? []
+    ).map((bug) => [
+        linkCell(String(bug.id), bug.url),
+        txt(bug.title),
+        txt(bug.origin ?? "-"),
+        txt(bug.outOfScope ? tr("outOfScope") : tr("inScope")),
+        { value: bug.state, kind: "status" as const },
+        { value: bug.severity ?? "-", kind: "severity" as const },
+        txt(bug.priority ?? "-"),
+        txt(assigneeName(bug.assignee, t)),
+        txt(bug.creator ?? "-"),
+        txt(formatDate(bug.createdDate)),
+        txt(formatDate(bug.changedDate)),
+        txt(formatDate(bug.closedDate)),
+    ]);
+
+    const todaysBugsSheet: PreviewSheet = {
+        name: tr("sheetTodaysBugs"),
+        tables: [
+            {
+                title: tr("sheetTodaysBugs"),
+                columns: [
+                    tr("bugId"),
+                    tr("bugTitle"),
+                    tr("origin"),
+                    tr("scope"),
+                    tr("status"),
+                    tr("severity"),
+                    tr("priority"),
+                    tr("assignee"),
+                    tr("creator"),
+                    tr("createdDate"),
+                    tr("changedDate"),
+                    tr("closedDate"),
+                ],
+                ...capRows(todaysBugsRows),
             },
         ],
     };
@@ -1481,6 +1665,9 @@ export function buildReportPreview(
                     { value: bug.state, kind: "status" },
                     txt(assigneeName(bug.assignee, t)),
                     txt(bug.creator ?? "-"),
+                    txt(formatDate(bug.createdDate)),
+                    txt(formatDate(bug.changedDate)),
+                    txt(formatDate(bug.closedDate)),
                 ]);
             }
         }
@@ -1500,6 +1687,9 @@ export function buildReportPreview(
                     tr("status"),
                     tr("assignee"),
                     tr("creator"),
+                    tr("createdDate"),
+                    tr("changedDate"),
+                    tr("closedDate"),
                 ],
                 ...capRows(bugsBySuiteRows),
             },
@@ -1537,6 +1727,9 @@ export function buildReportPreview(
                     tr("status"),
                     tr("assignee"),
                     tr("creator"),
+                    tr("createdDate"),
+                    tr("changedDate"),
+                    tr("closedDate"),
                 ],
                 ...capRows(
                     dsiBugs.map((bug) => [
@@ -1546,6 +1739,9 @@ export function buildReportPreview(
                         { value: bug.state, kind: "status" as const },
                         txt(assigneeName(bug.assignee, t)),
                         txt(bug.creator ?? "-"),
+                        txt(formatDate(bug.createdDate)),
+                        txt(formatDate(bug.changedDate)),
+                        txt(formatDate(bug.closedDate)),
                     ])
                 ),
             },
@@ -1664,6 +1860,7 @@ export function buildReportPreview(
         summary,
         bugsSheet,
         bugsBySuiteSheet,
+        todaysBugsSheet,
         dsiSheet,
         suitesSheet,
         plansSheet,

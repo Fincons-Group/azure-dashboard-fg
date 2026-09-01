@@ -179,6 +179,9 @@ export async function buildTestCaseRow(
                         b.fields["System.AssignedTo"].uniqueName,
                 }
                 : undefined,
+            createdDate: b.fields["System.CreatedDate"],
+            changedDate: b.fields["System.ChangedDate"],
+            closedDate: b.fields["Microsoft.VSTS.Common.ClosedDate"],
         })),
         lastRunId,
         lastRunUrl: lastRunId
