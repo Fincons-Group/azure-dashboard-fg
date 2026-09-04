@@ -39,7 +39,7 @@
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "jwks-rsa": "^3.2.0",
+    "jwks-rsa": "^4.1.0",
     "open": "^11.0.1",
     "sirv": "^3.0.2",
     "tsx": "^4.22.4"
