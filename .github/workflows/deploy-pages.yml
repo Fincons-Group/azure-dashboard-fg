@@ -45,7 +45,7 @@ jobs:
           VITE_MAIL_ENTRA_TENANT_ID: ${{ secrets.VITE_MAIL_ENTRA_TENANT_ID }}
           VITE_MAIL_ENTRA_CLIENT_ID: ${{ secrets.VITE_MAIL_ENTRA_CLIENT_ID }}
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
