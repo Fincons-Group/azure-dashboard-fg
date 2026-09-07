@@ -2,7 +2,13 @@ name: Configure Branch Protection
 
 # Applies two repository rulesets to the main branch:
 #   Rule 1 – No direct pushes: all changes must go through a pull request.
-#   Rule 2 – Required checks: Lint and Trivy Security Scan must pass before merging.
+#   Rule 2 – Required checks: Lint must pass before merging.
+#
+# Trivy was previously also required here, but its workflow was removed from
+# the repo (see "Remove Trivy security scan workflow") - a required check
+# that never reports would make main permanently unmergeable, so it's
+# dropped. Re-add it to required_status_checks below if Trivy scanning comes
+# back.
 #
 # The repo-ruleset API requires "Administration: write" on the repo, which the
 # default GITHUB_TOKEN can never be granted (it isn't a valid permissions-block
@@ -77,8 +83,7 @@ jobs:
 
             // ── Rule 2: Required status checks ──────────────────────────────────────────
             // Check-run names come from each workflow's job display name:
-            //   • lint.yml                   → job key "lint"                 → "lint"
-            //   • tst-security-scan-trivy.yml → job name "Trivy – fs / secret / IaC"
+            //   • lint.yml → job key "lint" → "lint"
             await deleteIfExists('Require status checks on main');
             await github.rest.repos.createRepoRuleset({
               owner,
@@ -95,8 +100,7 @@ jobs:
                   parameters: {
                     strict_required_status_checks_policy: true,
                     required_status_checks: [
-                      { context: 'lint' },
-                      { context: 'Trivy – fs / secret / IaC' }
+                      { context: 'lint' }
                     ]
                   }
                 }
