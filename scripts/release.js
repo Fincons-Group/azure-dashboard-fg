@@ -22,6 +22,11 @@ const args = process.argv.slice(2);
 const yes = args.includes("--yes") || args.includes("-y");
 const bump = args.find((a) => a !== "--yes" && a !== "-y") ?? "auto";
 
+// On Windows, npm/npx/gh-adjacent CLIs installed via the standard installer
+// are .cmd shims rather than .exe files, which execFileSync can't launch
+// directly without a shell (spawnSync ENOENT).
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+
 function run(command, cmdArgs, options = {}) {
     return execFileSync(command, cmdArgs, {
         encoding: "utf8",
@@ -143,7 +148,7 @@ if (bump === "auto") {
     console.log(`Detected bump: ${resolvedBump}`);
 }
 
-run("npm", ["version", resolvedBump, "--no-git-tag-version"], { silent: true });
+run(npmCommand, ["version", resolvedBump, "--no-git-tag-version"], { silent: true });
 
 const after = JSON.parse(readFileSync("package.json", "utf8")).version;
 const tag = `v${after}`;
