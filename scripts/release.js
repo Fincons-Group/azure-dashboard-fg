@@ -35,8 +35,11 @@ function run(command, cmdArgs, options = {}) {
     });
 }
 
-function runCapture(command, cmdArgs) {
-    return execFileSync(command, cmdArgs, { encoding: "utf8" }).trim();
+function runCapture(command, cmdArgs, options = {}) {
+    return execFileSync(command, cmdArgs, {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", options.quiet ? "ignore" : "pipe"],
+    }).trim();
 }
 
 function fail(message) {
@@ -58,7 +61,7 @@ async function confirm(question) {
 function detectBump() {
     let lastTag = "";
     try {
-        lastTag = runCapture("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"]);
+        lastTag = runCapture("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"], { quiet: true });
     } catch {
         // no previous tag - this is the first release, consider full history
     }
@@ -148,7 +151,10 @@ if (bump === "auto") {
     console.log(`Detected bump: ${resolvedBump}`);
 }
 
-run(npmCommand, ["version", resolvedBump, "--no-git-tag-version"], { silent: true });
+run(npmCommand, ["version", resolvedBump, "--no-git-tag-version"], {
+    silent: true,
+    shell: process.platform === "win32",
+});
 
 const after = JSON.parse(readFileSync("package.json", "utf8")).version;
 const tag = `v${after}`;
