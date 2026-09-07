@@ -26,7 +26,8 @@
     "build:client": "npm run build --prefix client",
     "build": "npm run build:client",
     "start": "tsx src/server.ts",
-    "kill:dev": "node scripts/kill-dev.js"
+    "kill:dev": "node scripts/kill-dev.js",
+    "release": "node scripts/release.js"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.19.0",
