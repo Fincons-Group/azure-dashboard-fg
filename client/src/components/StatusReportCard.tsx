@@ -697,7 +697,7 @@ export const StatusReportCard = forwardRef<
       <div className={styles.body}>
         {alertText && (
           <div className={styles.alertBanner}>
-            <span>âš ï¸</span>
+            <span>⚠️</span>
             <span>{alertText}</span>
           </div>
         )}
@@ -706,7 +706,7 @@ export const StatusReportCard = forwardRef<
           {/* Stato casi di test */}
           <div className={styles.kpiSection}>
             <span className={styles.kpiSectionTitle}>
-              ðŸ§ª{" "}
+              🧪{" "}
               {t(
                 "defectManagementPage.sprintReport.statusCard.kpis.testCasesSection",
               )}
@@ -754,7 +754,7 @@ export const StatusReportCard = forwardRef<
           {/* Stato bug */}
           <div className={styles.kpiSection}>
             <span className={styles.kpiSectionTitle}>
-              ðŸ›{" "}
+              🐛{" "}
               {t(
                 "defectManagementPage.sprintReport.statusCard.kpis.bugsSection",
               )}
@@ -853,7 +853,7 @@ export const StatusReportCard = forwardRef<
         {actionParagraphs.length > 0 && (
           <div className={styles.section}>
             <span className={styles.sectionTitle}>
-              ðŸ“Œ{" "}
+              📌{" "}
               {t("defectManagementPage.sprintReport.statusCard.actionsTitle")}
             </span>
             {actionParagraphs.map((paragraph, index) => {
@@ -889,7 +889,7 @@ export const StatusReportCard = forwardRef<
         <div className={styles.section}>
           <span className={styles.sectionTitleRow}>
             <span className={styles.sectionTitle}>
-              ðŸ“ˆ{" "}
+              📈{" "}
               {t(
                 "defectManagementPage.sprintReport.statusCard.suiteProgressTitle",
               )}
@@ -917,7 +917,7 @@ export const StatusReportCard = forwardRef<
           <div className={styles.sectionHeader}>
             <span className={styles.sectionTitleRow}>
               <span className={styles.sectionTitle}>
-                ðŸ›{" "}
+                🐛{" "}
                 {t(
                   "defectManagementPage.sprintReport.statusCard.bugStatusTitle",
                 )}
@@ -940,7 +940,7 @@ export const StatusReportCard = forwardRef<
                   { count: report.total },
                 )}
               </strong>{" "}
-              â€“{" "}
+              –{" "}
               {t(
                 "defectManagementPage.sprintReport.statusCard.bugStatusSummary",
                 {
