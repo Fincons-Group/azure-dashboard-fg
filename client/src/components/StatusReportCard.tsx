@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from "react";
+﻿import { forwardRef, useMemo } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Tooltip, makeStyles } from "@fluentui/react-components";
@@ -608,6 +608,7 @@ export const StatusReportCard = forwardRef<
   const {
     totalTestCases,
     totalPassed,
+    passedPct,
     totalNotApplicable,
     totalExecuted,
     executedPct,
@@ -696,7 +697,7 @@ export const StatusReportCard = forwardRef<
       <div className={styles.body}>
         {alertText && (
           <div className={styles.alertBanner}>
-            <span>⚠️</span>
+            <span>âš ï¸</span>
             <span>{alertText}</span>
           </div>
         )}
@@ -705,7 +706,7 @@ export const StatusReportCard = forwardRef<
           {/* Stato casi di test */}
           <div className={styles.kpiSection}>
             <span className={styles.kpiSectionTitle}>
-              🧪{" "}
+              ðŸ§ª{" "}
               {t(
                 "defectManagementPage.sprintReport.statusCard.kpis.testCasesSection",
               )}
@@ -736,10 +737,10 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.notRun"
               />
               <KpiTile
-                value={totalPassed}
+                value={`${totalPassed} (${passedPct}%)`}
                 color="#3fb950"
-                labelKey="defectManagementPage.sprintReport.statusCard.kpis.totalPassed"
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.totalPassed"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.passedCount"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.passedCount"
               />
               <KpiTile
                 value={`${passRate}%`}
@@ -753,7 +754,7 @@ export const StatusReportCard = forwardRef<
           {/* Stato bug */}
           <div className={styles.kpiSection}>
             <span className={styles.kpiSectionTitle}>
-              🐛{" "}
+              ðŸ›{" "}
               {t(
                 "defectManagementPage.sprintReport.statusCard.kpis.bugsSection",
               )}
@@ -852,7 +853,7 @@ export const StatusReportCard = forwardRef<
         {actionParagraphs.length > 0 && (
           <div className={styles.section}>
             <span className={styles.sectionTitle}>
-              📌{" "}
+              ðŸ“Œ{" "}
               {t("defectManagementPage.sprintReport.statusCard.actionsTitle")}
             </span>
             {actionParagraphs.map((paragraph, index) => {
@@ -888,7 +889,7 @@ export const StatusReportCard = forwardRef<
         <div className={styles.section}>
           <span className={styles.sectionTitleRow}>
             <span className={styles.sectionTitle}>
-              📈{" "}
+              ðŸ“ˆ{" "}
               {t(
                 "defectManagementPage.sprintReport.statusCard.suiteProgressTitle",
               )}
@@ -916,7 +917,7 @@ export const StatusReportCard = forwardRef<
           <div className={styles.sectionHeader}>
             <span className={styles.sectionTitleRow}>
               <span className={styles.sectionTitle}>
-                🐛{" "}
+                ðŸ›{" "}
                 {t(
                   "defectManagementPage.sprintReport.statusCard.bugStatusTitle",
                 )}
@@ -939,7 +940,7 @@ export const StatusReportCard = forwardRef<
                   { count: report.total },
                 )}
               </strong>{" "}
-              –{" "}
+              â€“{" "}
               {t(
                 "defectManagementPage.sprintReport.statusCard.bugStatusSummary",
                 {

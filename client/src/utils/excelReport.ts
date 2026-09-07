@@ -4,6 +4,7 @@ import type {
     DefectStats,
     Outcome,
     PlanOverviewResponse,
+    PlanOverviewTestCase,
 } from "../types";
 import type { TranslateFn } from "./export";
 
@@ -208,6 +209,19 @@ function sortedEntries(record: Record<string, number>): [string, number][] {
 function dsiBugsFrom(data: DynamicSprintReportExcelData): BugInfo[] {
     return [...(data.stats.sprintDefectReport.dsiDefects ?? [])].sort(
         (a, b) => a.id - b.id
+    );
+}
+
+// Business-origin bugs (Custom.Suite = "Test Business"), open ones first then
+// by severity - the "Bug Business" sheet is a triage list for them.
+function businessBugsFrom(
+    data: DynamicSprintReportExcelData
+): (BugInfo & { severity?: string; outOfScope?: boolean })[] {
+    return [...(data.stats.sprintDefectReport.businessDefects ?? [])].sort(
+        (a, b) =>
+            Number(!isOpenBug(a)) - Number(!isOpenBug(b)) ||
+            severityRank(a.severity) - severityRank(b.severity) ||
+            a.id - b.id
     );
 }
 
@@ -464,14 +478,295 @@ function placeChart(
 /* ------------------------------------------------------------------ */
 
 interface SheetNames {
+    guide: string;
     summary: string;
     bugs: string;
     bugsBySuite: string;
     todaysBugs: string;
     dsi: string;
+    business: string;
     suites: string;
+    testCases: string;
     plans: string;
     assignees: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Test-case rows (shared by single- and multi-scope builders)         */
+/* ------------------------------------------------------------------ */
+
+const YES = "true";
+const NO = "false";
+
+// Column headers for the test-case sheet, in order. `leading` is prepended
+// (e.g. an "Ambito" column for the combined workbook).
+function testCaseColumns(
+    tr: (key: string) => string,
+    leading: { header: string; width: number }[]
+) {
+    return [
+        ...leading,
+        { header: tr("plan"), width: 26 },
+        { header: tr("suite"), width: 30 },
+        { header: tr("tcId"), width: 10 },
+        { header: tr("tcTitle"), width: 60 },
+        { header: tr("tcState"), width: 12 },
+        { header: tr("priority"), width: 9 },
+        { header: tr("tcOutcome"), width: 14 },
+        { header: tr("tcExecuted"), width: 11 },
+        { header: tr("tcNotRun"), width: 12 },
+        { header: tr("tcNeedsRetest"), width: 13 },
+        { header: tr("tcAutomation"), width: 14 },
+        { header: tr("assignee"), width: 22 },
+        { header: tr("tcTester"), width: 22 },
+        { header: tr("tcLastRunBy"), width: 22 },
+        {
+            header: tr("tcLastRunAt"),
+            width: 18,
+            style: { numFmt: DATE_NUM_FMT },
+        },
+        { header: tr("tcDaysSinceRun"), width: 12 },
+        { header: tr("tcConfiguration"), width: 16 },
+        { header: tr("tcTags"), width: 24 },
+        { header: tr("bugCount"), width: 9 },
+        { header: tr("openBugsShort"), width: 11 },
+        { header: tr("tcBugIds"), width: 20 },
+        { header: tr("areaPath"), width: 26 },
+        { header: tr("link"), width: 8 },
+    ];
+}
+
+// The value cells for one test case (after any `leading` cells), matching
+// testCaseColumns order.
+function testCaseValueCells(
+    planName: string,
+    tc: PlanOverviewTestCase,
+    tr: (key: string) => string
+): (string | number | Date)[] {
+    return [
+        planName,
+        tc.suiteName,
+        tc.testCaseId,
+        tc.title,
+        tc.state ?? "-",
+        tc.priority,
+        tc.outcome,
+        tc.executed ? YES : NO,
+        tc.notRun ? YES : NO,
+        tc.needsRetest ? YES : NO,
+        tc.automationStatus ?? "-",
+        tc.assignedTo ?? "-",
+        tc.tester ?? "-",
+        tc.lastRunBy ?? "-",
+        dateCell(tc.lastRunAt),
+        tc.daysSinceLastRun ?? "-",
+        tc.configuration ?? "-",
+        tc.tags.join(", ") || "-",
+        tc.bugCount,
+        tc.hasOpenBugs ? YES : NO,
+        tc.bugIds.join(", ") || "-",
+        tc.areaPath ?? "-",
+        tc.url ? tr("open") : "-",
+    ];
+}
+
+// Colours the Esito cell + the Da-rieseguire flag on a just-added row.
+// `base` is the 1-based column of the first test-case value cell (plan name);
+// outcome sits at base+6, needsRetest at base+9, link at base+22.
+function styleTestCaseRow(
+    row: ExcelRow,
+    base: number,
+    tc: PlanOverviewTestCase,
+    linkLabel: string
+): void {
+    const hex = OUTCOME_HEX[tc.outcome];
+    if (hex) {
+        row.getCell(base + 6).font = {
+            color: { argb: `FF${hex.slice(1)}` },
+            bold: true,
+        };
+    }
+    if (tc.needsRetest) {
+        row.getCell(base + 9).font = { color: { argb: "FFC62828" }, bold: true };
+    }
+    if (tc.url) {
+        const cell = row.getCell(base + 22);
+        cell.value = { text: linkLabel, hyperlink: tc.url };
+        cell.font = { ...LINK_FONT };
+    }
+}
+
+interface TestCaseEntry {
+    scopeName?: string;
+    planName: string;
+    tc: PlanOverviewTestCase;
+}
+
+function collectTestCases(
+    data: DynamicSprintReportExcelData,
+    scopeName?: string
+): TestCaseEntry[] {
+    const out: TestCaseEntry[] = [];
+    for (const plan of data.plans) {
+        for (const tc of plan.overview?.testCases ?? []) {
+            out.push({ scopeName, planName: plan.name, tc });
+        }
+    }
+    return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* "Guida" sheet - documents every other sheet + legends               */
+/* ------------------------------------------------------------------ */
+
+interface GuideMeta {
+    project: string;
+    areaPath: string;
+    sprint: string;
+    generatedAt: Date;
+    scopeNames?: string[];
+}
+
+interface GuideEntry {
+    label: string;
+    text: string;
+    section?: boolean;
+}
+
+// The guide content as an ordered list, consumed both by the styled Excel
+// sheet and the on-screen preview.
+function guideEntries(meta: GuideMeta, t: TranslateFn): GuideEntry[] {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const g = (key: string) => tr(`guide.${key}`);
+    const multi = (meta.scopeNames?.length ?? 0) > 1;
+    const srcPrefix = g("sourcePrefix");
+
+    const out: GuideEntry[] = [];
+    const section = (label: string) =>
+        out.push({ label, text: "", section: true });
+    const row = (label: string, text: string) => out.push({ label, text });
+    const doc = (sheetKey: string, whatKey: string, sourceKey: string) => {
+        row(tr(sheetKey), g(whatKey));
+        row("", `${srcPrefix}: ${g(sourceKey)}`);
+    };
+
+    section(g("metaTitle"));
+    row(tr("project"), meta.project || "-");
+    row(tr("areaPath"), meta.areaPath || "-");
+    row(tr("sprint"), meta.sprint || "-");
+    row(tr("generatedAt"), formatTimestamp(meta.generatedAt));
+    if (multi) row(tr("scope"), (meta.scopeNames ?? []).join(", "));
+
+    section(g("howTitle"));
+    row("", g("how"));
+    if (multi) row("", g("multiScopeNote"));
+
+    section(g("sheetsTitle"));
+    doc("sheetSummary", "summaryWhat", "summarySource");
+    doc("sheetBugs", "bugsWhat", "bugsSource");
+    doc("sheetBugsBySuite", "bugsBySuiteWhat", "bugsBySuiteSource");
+    doc("sheetTodaysBugs", "todaysBugsWhat", "todaysBugsSource");
+    doc("sheetDsi", "dsiWhat", "dsiSource");
+    doc("sheetBusiness", "businessWhat", "businessSource");
+    doc("sheetSuites", "suitesWhat", "suitesSource");
+    doc("sheetTestCases", "testCasesWhat", "testCasesSource");
+    doc("sheetPlans", "plansWhat", "plansSource");
+    doc("sheetAssignees", "assigneesWhat", "assigneesSource");
+
+    section(g("legendOutcomeTitle"));
+    row("", g("legendOutcome"));
+    section(g("legendFlagsTitle"));
+    row("", g("legendFlags"));
+    section(g("legendColorsTitle"));
+    row("", g("legendColors"));
+    section(g("legendCalcTitle"));
+    row("", g("legendCalc"));
+
+    return out;
+}
+
+function writeGuideSheet(
+    sheet: Worksheet,
+    meta: GuideMeta,
+    t: TranslateFn
+): void {
+    const g = (key: string) => t(`dynamicSprintReportPage.excel.guide.${key}`);
+    sheet.columns = [{ width: 26 }, { width: 120 }];
+
+    const titleRow = sheet.addRow([g("title")]);
+    sheet.mergeCells(titleRow.number, 1, titleRow.number, 2);
+    titleRow.getCell(1).font = {
+        bold: true,
+        size: 16,
+        color: { argb: "FFFFFFFF" },
+    };
+    titleRow.getCell(1).fill = solid(HEADER_FILL);
+    titleRow.height = 24;
+    sheet.addRow(["", g("generatedWith")]).getCell(2).font = {
+        italic: true,
+        color: { argb: "FF6B7280" },
+    };
+
+    for (const entry of guideEntries(meta, t)) {
+        if (entry.section) {
+            sheet.addRow([]);
+            addSectionTitle(sheet, entry.label, 2);
+            continue;
+        }
+        const r = sheet.addRow([entry.label, entry.text]);
+        if (entry.label) {
+            r.getCell(1).font = { bold: true };
+        } else {
+            r.getCell(2).font = { color: { argb: "FF4B5563" } };
+        }
+        r.getCell(2).alignment = { wrapText: true, vertical: "top" };
+        const lines =
+            (entry.text.match(/\n/g)?.length ?? 0) +
+            Math.max(1, Math.ceil(entry.text.length / 115));
+        if (lines > 1) {
+            r.height = 14 * lines + 4;
+        }
+    }
+}
+
+function buildGuideSheet(
+    wb: Workbook,
+    names: SheetNames,
+    data: DynamicSprintReportExcelData,
+    t: TranslateFn
+): void {
+    const sheet = wb.addWorksheet(names.guide, {
+        views: [{ showGridLines: false }],
+    });
+    writeGuideSheet(
+        sheet,
+        {
+            project: data.meta.project,
+            areaPath: data.meta.areaPath,
+            sprint: data.meta.sprint,
+            generatedAt: data.meta.generatedAt,
+        },
+        t
+    );
+}
+
+function guidePreviewSheet(meta: GuideMeta, t: TranslateFn): PreviewSheet {
+    const g = (key: string) => t(`dynamicSprintReportPage.excel.guide.${key}`);
+    const rows: PreviewCell[][] = guideEntries(meta, t).map((entry) =>
+        entry.section
+            ? [{ value: `— ${entry.label} —` }, { value: "" }]
+            : [{ value: entry.label || "·" }, { value: entry.text }]
+    );
+    return {
+        name: g("sheetName"),
+        tables: [
+            {
+                title: g("title"),
+                columns: [g("colProperty"), g("colValue")],
+                rows,
+            },
+        ],
+    };
 }
 
 function buildSummarySheet(
@@ -527,7 +822,9 @@ function buildSummarySheet(
         [names.bugsBySuite, tr("sheetBugsBySuite")],
         [names.todaysBugs, tr("sheetTodaysBugs")],
         [names.dsi, tr("sheetDsi")],
+        [names.business, tr("sheetBusiness")],
         [names.suites, tr("sheetSuites")],
+        [names.testCases, tr("sheetTestCases")],
         [names.plans, tr("sheetPlans")],
         [names.assignees, tr("sheetAssignees")],
     ];
@@ -858,6 +1155,25 @@ function buildBugsSheet(
     sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 11 } };
 }
 
+
+// bug id -> severity, from the sprint's canonical defect list (the per-suite
+// BugInfo objects don't carry severity themselves).
+function severityByBugId(data: DynamicSprintReportExcelData): Map<number, string> {
+    const map = new Map<number, string>();
+    for (const bug of data.stats.sprintDefectReport.effectiveDefects) {
+        if (bug.severity) map.set(bug.id, bug.severity);
+    }
+    for (const list of [
+        data.stats.sprintDefectReport.dsiDefects,
+        data.stats.sprintDefectReport.todaysDefects,
+    ]) {
+        for (const bug of list ?? []) {
+            if (bug.severity && !map.has(bug.id)) map.set(bug.id, bug.severity);
+        }
+    }
+    return map;
+}
+
 function buildBugsBySuiteSheet(
     wb: Workbook,
     names: SheetNames,
@@ -875,6 +1191,7 @@ function buildBugsBySuiteSheet(
         { header: tr("bugId"), width: 10 },
         { header: tr("bugTitle"), width: 60 },
         { header: tr("status"), width: 16 },
+        { header: tr("severity"), width: 16 },
         { header: tr("assignee"), width: 26 },
         { header: tr("creator"), width: 26 },
         { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
@@ -882,11 +1199,14 @@ function buildBugsBySuiteSheet(
         { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
         { header: tr("link"), width: 10 },
     ];
-    styleHeaderRow(sheet, 1, 12);
+    styleHeaderRow(sheet, 1, 13);
+
+    const sevById = severityByBugId(data);
 
     for (const plan of data.plans) {
         for (const suite of plan.overview?.suites ?? []) {
             for (const bug of suite.bugs) {
+                const severity = sevById.get(bug.id);
                 const row = sheet.addRow([
                     plan.name,
                     suite.suiteName,
@@ -894,6 +1214,7 @@ function buildBugsBySuiteSheet(
                     bug.id,
                     bug.title,
                     bug.state,
+                    severity ?? "-",
                     assigneeName(bug.assignee, t),
                     bug.creator ?? "-",
                     dateCell(bug.createdDate),
@@ -908,9 +1229,14 @@ function buildBugsBySuiteSheet(
                         bold: true,
                     };
                 }
+                if (severity && severityRank(severity) <= 3) {
+                    const sevCell = row.getCell(7);
+                    sevCell.fill = solid(severityFillArgb(severity));
+                    sevCell.font = { color: { argb: "FFFFFFFF" }, bold: true };
+                }
                 if (bug.url) {
-                    row.getCell(12).value = { text: tr("open"), hyperlink: bug.url };
-                    row.getCell(12).font = { ...LINK_FONT };
+                    row.getCell(13).value = { text: tr("open"), hyperlink: bug.url };
+                    row.getCell(13).font = { ...LINK_FONT };
                 }
             }
         }
@@ -919,13 +1245,13 @@ function buildBugsBySuiteSheet(
     if (sheet.rowCount === 1) {
         sheet.addRow([tr("noData")]);
     }
-    zebra(sheet, 2, sheet.rowCount, 12);
+    zebra(sheet, 2, sheet.rowCount, 13);
     autoFitColumns(sheet);
     sheet.getColumn(5).width = Math.min(sheet.getColumn(5).width ?? 60, 80);
-    for (const col of [9, 10, 11]) {
+    for (const col of [10, 11, 12]) {
         sheet.getColumn(col).width = 18;
     }
-    sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 12 } };
+    sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 13 } };
 }
 
 // Every detected bug (any origin, in- or out-of-scope) created or last changed
@@ -1138,6 +1464,119 @@ function buildDsiSheet(
     }
 }
 
+const BUSINESS_HEADER_KEYS = [
+    "bugId",
+    "bugTitle",
+    "status",
+    "bugOpen",
+    "severity",
+    "priority",
+    "assignee",
+    "creator",
+    "createdDate",
+    "changedDate",
+    "closedDate",
+    "bugDescription",
+] as const;
+
+function businessValueCells(
+    bug: BugInfo & { severity?: string },
+    t: TranslateFn
+): (string | number | Date)[] {
+    return [
+        bug.id,
+        bug.title,
+        bug.state,
+        isOpenBug(bug) ? YES : NO,
+        bug.severity ?? "-",
+        bug.priority ?? "-",
+        assigneeName(bug.assignee, t),
+        bug.creator ?? "-",
+        dateCell(bug.createdDate),
+        dateCell(bug.changedDate),
+        dateCell(bug.closedDate),
+        bug.description ?? "-",
+    ];
+}
+
+// `base` = 1-based column of the bug id. status at base+2, severity at base+4,
+// description at base+11, link at base+12.
+function styleBusinessRow(
+    row: ExcelRow,
+    base: number,
+    bug: BugInfo & { severity?: string },
+    linkLabel: string
+): void {
+    const stateHex = STATUS_HEX[bug.state];
+    if (stateHex) {
+        row.getCell(base + 2).font = {
+            color: { argb: `FF${stateHex.slice(1)}` },
+            bold: true,
+        };
+    }
+    if (bug.severity && severityRank(bug.severity) <= 3) {
+        const sevCell = row.getCell(base + 4);
+        sevCell.fill = solid(severityFillArgb(bug.severity));
+        sevCell.font = { color: { argb: "FFFFFFFF" }, bold: true };
+    }
+    row.getCell(base + 11).alignment = { wrapText: true, vertical: "top" };
+    if (bug.url) {
+        const linkCell = row.getCell(base + 12);
+        linkCell.value = { text: linkLabel, hyperlink: bug.url };
+        linkCell.font = { ...LINK_FONT };
+    }
+}
+
+function buildBusinessSheet(
+    wb: Workbook,
+    names: SheetNames,
+    data: DynamicSprintReportExcelData,
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(names.business, {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    sheet.columns = [
+        { header: tr("bugId"), width: 10 },
+        { header: tr("bugTitle"), width: 60 },
+        { header: tr("status"), width: 16 },
+        { header: tr("bugOpen"), width: 10 },
+        { header: tr("severity"), width: 16 },
+        { header: tr("priority"), width: 10 },
+        { header: tr("assignee"), width: 26 },
+        { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("bugDescription"), width: 70 },
+        { header: tr("link"), width: 10 },
+    ];
+    styleHeaderRow(sheet, 1, 13);
+
+    const bugs = businessBugsFrom(data);
+    for (const bug of bugs) {
+        const row = sheet.addRow([
+            ...businessValueCells(bug, t),
+            bug.url ? tr("open") : "-",
+        ]);
+        styleBusinessRow(row, 1, bug, tr("open"));
+    }
+
+    if (bugs.length === 0) {
+        sheet.addRow([tr("noData")]);
+    } else {
+        zebra(sheet, 2, sheet.rowCount, 13);
+        sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 13 } };
+    }
+    autoFitColumns(sheet);
+    sheet.getColumn(2).width = Math.min(sheet.getColumn(2).width ?? 60, 80);
+    sheet.getColumn(12).width = 70;
+    for (const col of [9, 10, 11]) {
+        sheet.getColumn(col).width = 18;
+    }
+}
+
 function buildSuitesSheet(
     wb: Workbook,
     names: SheetNames,
@@ -1199,6 +1638,83 @@ function buildSuitesSheet(
     }
     autoFitColumns(sheet);
     sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 12 } };
+}
+
+function fillTestCaseSheet(
+    sheet: Worksheet,
+    entries: TestCaseEntry[],
+    withScope: boolean,
+    tr: (key: string) => string
+): void {
+    const leading = withScope
+        ? [{ header: tr("scope"), width: 22 }]
+        : [];
+    const columns = testCaseColumns(tr, leading);
+    sheet.columns = columns;
+    styleHeaderRow(sheet, 1, columns.length);
+
+    const base = leading.length + 1; // 1-based col of the first tc value cell
+    const titleCol = base + 3;
+
+    const sorted = [...entries].sort(
+        (a, b) =>
+            (a.scopeName ?? "").localeCompare(b.scopeName ?? "") ||
+            a.planName.localeCompare(b.planName) ||
+            a.tc.suiteName.localeCompare(b.tc.suiteName) ||
+            a.tc.testCaseId - b.tc.testCaseId
+    );
+
+    for (const { scopeName, planName, tc } of sorted) {
+        const cells = testCaseValueCells(planName, tc, tr);
+        const row = sheet.addRow(withScope ? [scopeName ?? "-", ...cells] : cells);
+        if (withScope) {
+            row.getCell(1).font = { bold: true };
+        }
+        styleTestCaseRow(row, base, tc, tr("open"));
+    }
+
+    if (sorted.length === 0) {
+        sheet.addRow([tr("noData")]);
+    } else {
+        zebra(sheet, 2, sheet.rowCount, columns.length);
+        sheet.autoFilter = {
+            from: { row: 1, column: 1 },
+            to: { row: 1, column: columns.length },
+        };
+    }
+    autoFitColumns(sheet);
+    sheet.getColumn(titleCol).width = Math.min(
+        sheet.getColumn(titleCol).width ?? 60,
+        80
+    );
+}
+
+function buildTestCasesSheet(
+    wb: Workbook,
+    names: SheetNames,
+    data: DynamicSprintReportExcelData,
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(names.testCases, {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    fillTestCaseSheet(sheet, collectTestCases(data), false, tr);
+}
+
+function buildMultiScopeTestCasesSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetTestCases"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const all = entries.flatMap((entry) =>
+        collectTestCases(entry.data, entry.scopeName)
+    );
+    fillTestCaseSheet(sheet, all, true, tr);
 }
 
 function buildPlansSheet(
@@ -1305,6 +1821,959 @@ function buildAssigneesSheet(
     sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 2 } };
 }
 
+/* ================================================================== */
+/* Multi-scope (combined) workbook                                     */
+/* ================================================================== */
+/* Built when the Excel Export page has more than one scope preset     */
+/* selected (or "Tutto"). Every scope's own DynamicSprintReportExcelData */
+/* is assembled exactly as the single-scope export does; these builders */
+/* only stitch them together - each bug/suite/plan sheet gains a        */
+/* leading "Ambito" column (inside the autofilter) and the summary      */
+/* becomes metric-rows x scope-columns + a Totale column.              */
+
+export interface MultiScopeReportEntry {
+    scopeName: string;
+    data: DynamicSprintReportExcelData;
+}
+
+type ExcelRow = ReturnType<Worksheet["getRow"]>;
+
+function colLetter(n: number): string {
+    let s = "";
+    let x = n;
+    while (x > 0) {
+        const m = (x - 1) % 26;
+        s = String.fromCharCode(65 + m) + s;
+        x = Math.floor((x - 1) / 26);
+    }
+    return s;
+}
+
+function sumMaps(maps: Record<string, number>[]): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const map of maps) {
+        for (const [key, value] of Object.entries(map)) {
+            out[key] = (out[key] ?? 0) + value;
+        }
+    }
+    return out;
+}
+
+// The standard 10 bug cells shared by every bug sheet (id -> closed date),
+// in the same order buildBugsSheet uses.
+function bugValueCells(
+    bug: BugInfo & { severity?: string },
+    t: TranslateFn
+): (string | number | Date)[] {
+    return [
+        bug.id,
+        bug.title,
+        bug.state,
+        bug.severity ?? "-",
+        bug.priority ?? "-",
+        assigneeName(bug.assignee, t),
+        bug.creator ?? "-",
+        dateCell(bug.createdDate),
+        dateCell(bug.changedDate),
+        dateCell(bug.closedDate),
+    ];
+}
+
+// Applies severity fill + state colour + the "Apri" hyperlink to a just-added
+// bug row. `base` is the 1-based column of the first bug cell (the bug id);
+// state sits at base+2, severity at base+3, the link at base+10.
+function styleBugRow(
+    row: ExcelRow,
+    base: number,
+    bug: BugInfo & { severity?: string },
+    linkLabel: string
+): void {
+    if (bug.severity && severityRank(bug.severity) <= 3) {
+        const sevCell = row.getCell(base + 3);
+        sevCell.fill = solid(severityFillArgb(bug.severity));
+        sevCell.font = { color: { argb: "FFFFFFFF" }, bold: true };
+    }
+
+    const stateHex = STATUS_HEX[bug.state];
+    if (stateHex) {
+        row.getCell(base + 2).font = {
+            color: { argb: `FF${stateHex.slice(1)}` },
+            bold: true,
+        };
+    }
+
+    if (bug.url) {
+        const linkCell = row.getCell(base + 10);
+        linkCell.value = { text: linkLabel, hyperlink: bug.url };
+        linkCell.font = { ...LINK_FONT };
+    }
+}
+
+interface SummaryMetrics {
+    totalTestCases: number;
+    executed: number;
+    decided: number;
+    notApplicable: number;
+    notRun: number;
+    passed: number;
+    totalBugs: number;
+    effectiveBugs: number;
+    outOfScopeBugs: number;
+    closedBugs: number;
+    openBugs: number;
+    criticalOpen: number;
+    reopened: number;
+    withoutResolutionDate: number;
+    mttrDays: number | null;
+    bugsByUs: number;
+    bugsByDsi: number;
+    bugsByBusiness: number;
+    dsiDetected: number;
+    dsiAccepted: number;
+    dsiOpen: number;
+    dsiClosed: number;
+    dsiPending: number;
+    byStatusAll: Record<string, number>;
+    bySeverity: Record<string, number>;
+    byOriginDetected: Record<string, number>;
+}
+
+// Same numbers buildSummarySheet computes inline, but as a plain object so
+// the combined summary can lay them out per scope and re-derive the Totale.
+function computeSummaryMetrics(data: DynamicSprintReportExcelData): SummaryMetrics {
+    const report = data.stats.sprintDefectReport;
+    const agg = aggregatePlans(data.plans);
+    const closedAll = report.byStatusAll.Closed ?? 0;
+    const bugsByDsi = report.byOriginDetected["DSI"] ?? 0;
+    const bugsByBusiness = report.byOriginDetected["Business"] ?? 0;
+    const dsiBugs = dsiBugsFrom(data);
+    const dsiOpen = dsiBugs.filter(isOpenBug).length;
+
+    return {
+        totalTestCases: agg.total,
+        executed: executedCount(agg.counts),
+        decided: agg.total - agg.counts.NotApplicable,
+        notApplicable: agg.counts.NotApplicable,
+        notRun: agg.counts.NotRun,
+        passed: agg.counts.Passed,
+        totalBugs: report.total,
+        effectiveBugs: report.effectiveCount,
+        outOfScopeBugs: report.outOfScopeCount,
+        closedBugs: closedAll,
+        openBugs: report.total - closedAll,
+        criticalOpen: report.effectiveDefects.filter(
+            (bug) => bug.state !== "Closed" && /^1\s*-/.test(bug.severity ?? "")
+        ).length,
+        reopened: report.reopenedCount,
+        withoutResolutionDate: report.withoutResolutionDateCount,
+        mttrDays: report.mttrDays,
+        bugsByUs: report.total - bugsByDsi - bugsByBusiness,
+        bugsByDsi,
+        bugsByBusiness,
+        dsiDetected: bugsByDsi,
+        dsiAccepted: report.byOrigin["DSI"] ?? 0,
+        dsiOpen,
+        dsiClosed: Math.max(dsiBugs.length - dsiOpen, 0),
+        dsiPending: data.stats.verificaActivitySummary.dsiPendingCount,
+        byStatusAll: report.byStatusAll,
+        bySeverity: report.bySeverity,
+        byOriginDetected: report.byOriginDetected,
+    };
+}
+
+function multiScopeGuideMeta(entries: MultiScopeReportEntry[]): GuideMeta {
+    const uniq = (values: string[]) =>
+        [...new Set(values.filter(Boolean))].join(", ") || "-";
+    return {
+        project: uniq(entries.map((e) => e.data.meta.project)),
+        areaPath: uniq(entries.map((e) => e.data.meta.areaPath)),
+        sprint: uniq(entries.map((e) => e.data.meta.sprint)),
+        generatedAt: entries[0]?.data.meta.generatedAt ?? new Date(),
+        scopeNames: entries.map((e) => e.scopeName),
+    };
+}
+
+function buildMultiScopeGuideSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const sheet = wb.addWorksheet(
+        t("dynamicSprintReportPage.excel.guide.sheetName"),
+        { views: [{ showGridLines: false }] }
+    );
+    writeGuideSheet(sheet, multiScopeGuideMeta(entries), t);
+}
+
+function buildMultiScopeSummarySheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string, opts?: Record<string, unknown>) =>
+        t(`dynamicSprintReportPage.excel.${key}`, opts);
+    const sheet = wb.addWorksheet(tr("sheetSummary"), {
+        views: [{ showGridLines: false }],
+    });
+
+    const metrics = entries.map((entry) => computeSummaryMetrics(entry.data));
+    const totalCol = entries.length + 2; // label + N scopes + Totale
+    const colCount = totalCol;
+    const totalLetter = colLetter(totalCol);
+
+    sheet.columns = [
+        { width: 34 },
+        ...entries.map(() => ({ width: 18 })),
+        { width: 16 },
+    ];
+
+    const titleRow = sheet.addRow([tr("combinedTitle")]);
+    sheet.mergeCells(titleRow.number, 1, titleRow.number, colCount);
+    titleRow.getCell(1).font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+    titleRow.getCell(1).fill = solid(HEADER_FILL);
+    titleRow.height = 26;
+
+    const metaValue = (values: string[]) => {
+        const uniq = [...new Set(values.filter(Boolean))];
+        if (uniq.length === 0) return "-";
+        if (uniq.length === 1) return uniq[0];
+        return tr("multiScopeValue");
+    };
+    sheet.addRow([tr("project"), metaValue(entries.map((e) => e.data.meta.project))]);
+    sheet.addRow([tr("areaPath"), metaValue(entries.map((e) => e.data.meta.areaPath))]);
+    sheet.addRow([tr("sprint"), metaValue(entries.map((e) => e.data.meta.sprint))]);
+    sheet.addRow([tr("generatedAt"), formatTimestamp(new Date())]);
+    for (let r = 2; r <= 5; r += 1) {
+        sheet.getRow(r).getCell(1).font = { bold: true };
+    }
+    sheet.addRow([]);
+
+    const addGroupHeader = (firstLabel: string) => {
+        const row = sheet.addRow([
+            firstLabel,
+            ...entries.map((entry) => entry.scopeName),
+            tr("total"),
+        ]);
+        styleHeaderRow(sheet, row.number, colCount);
+    };
+
+    const numRow = (label: string, pick: (m: SummaryMetrics) => number) => {
+        const values = metrics.map(pick);
+        const row = sheet.addRow([
+            label,
+            ...values,
+            values.reduce((a, b) => a + b, 0),
+        ]);
+        row.getCell(1).font = { bold: true };
+    };
+
+    const pctRow = (
+        label: string,
+        parts: (m: SummaryMetrics) => [number, number],
+        higherIsBetter = true
+    ) => {
+        const perScope = metrics.map(parts);
+        const totalNum = perScope.reduce((a, [n]) => a + n, 0);
+        const totalDen = perScope.reduce((a, [, d]) => a + d, 0);
+        const row = sheet.addRow([
+            label,
+            ...perScope.map(([n, d]) => pct(n, d)),
+            pct(totalNum, totalDen),
+        ]);
+        row.getCell(1).font = { bold: true };
+        for (let c = 2; c <= colCount; c += 1) {
+            setPercentCell(
+                row.getCell(c),
+                Number(row.getCell(c).value),
+                higherIsBetter
+            );
+        }
+    };
+
+    // KPI - test execution
+    addSectionTitle(sheet, tr("kpiTestSection"), colCount);
+    addGroupHeader(tr("metric"));
+    let sectionStart = sheet.rowCount + 1;
+    numRow(tr("totalTestCases"), (m) => m.totalTestCases);
+    numRow(tr("executed"), (m) => m.executed);
+    pctRow(tr("executedPct"), (m) => [m.executed, m.totalTestCases]);
+    pctRow(tr("passRate"), (m) => [m.passed, m.decided]);
+    numRow(tr("notApplicable"), (m) => m.notApplicable);
+    numRow(tr("notRun"), (m) => m.notRun);
+    zebra(sheet, sectionStart, sheet.rowCount, colCount);
+    sheet.addRow([]);
+
+    // KPI - bugs
+    addSectionTitle(sheet, tr("kpiBugSection"), colCount);
+    addGroupHeader(tr("metric"));
+    sectionStart = sheet.rowCount + 1;
+    numRow(tr("totalBugs"), (m) => m.totalBugs);
+    numRow(tr("effectiveBugs"), (m) => m.effectiveBugs);
+    numRow(tr("outOfScopeBugs"), (m) => m.outOfScopeBugs);
+    numRow(tr("closedBugs"), (m) => m.closedBugs);
+    pctRow(tr("closedPct"), (m) => [m.closedBugs, m.totalBugs]);
+    numRow(tr("openBugs"), (m) => m.openBugs);
+    numRow(tr("criticalOpen"), (m) => m.criticalOpen);
+    numRow(tr("reopened"), (m) => m.reopened);
+    const mttrRow = sheet.addRow([
+        tr("avgClosureDays"),
+        ...metrics.map((m) => (m.mttrDays != null ? Math.round(m.mttrDays) : "-")),
+        "-",
+    ]);
+    mttrRow.getCell(1).font = { bold: true };
+    numRow(tr("withoutResolutionDate"), (m) => m.withoutResolutionDate);
+    numRow(tr("bugsByUs"), (m) => m.bugsByUs);
+    numRow(tr("bugsByDsi"), (m) => m.bugsByDsi);
+    numRow(tr("bugsByBusiness"), (m) => m.bugsByBusiness);
+    zebra(sheet, sectionStart, sheet.rowCount, colCount);
+    sheet.addRow([]);
+
+    // DSI
+    addSectionTitle(sheet, tr("dsiSection"), colCount);
+    addGroupHeader(tr("metric"));
+    sectionStart = sheet.rowCount + 1;
+    numRow(tr("dsiDetected"), (m) => m.dsiDetected);
+    numRow(tr("dsiAccepted"), (m) => m.dsiAccepted);
+    pctRow(tr("dsiShareOfTotal"), (m) => [m.dsiDetected, m.totalBugs], false);
+    numRow(tr("dsiOpen"), (m) => m.dsiOpen);
+    numRow(tr("dsiClosed"), (m) => m.dsiClosed);
+    numRow(tr("dsiPendingVerification"), (m) => m.dsiPending);
+    zebra(sheet, sectionStart, sheet.rowCount, colCount);
+    sheet.addRow([]);
+
+    const breakdown = (
+        titleKey: string,
+        firstHeader: string,
+        map: (m: SummaryMetrics) => Record<string, number>,
+        sortKeys: (keys: string[]) => string[],
+        labelFill?: (name: string) => string | undefined
+    ) => {
+        addSectionTitle(sheet, tr(titleKey), colCount);
+        addGroupHeader(firstHeader);
+        const start = sheet.rowCount + 1;
+        const merged = sumMaps(metrics.map(map));
+        for (const name of sortKeys(Object.keys(merged))) {
+            const values = metrics.map((m) => map(m)[name] ?? 0);
+            const row = sheet.addRow([
+                name,
+                ...values,
+                values.reduce((a, b) => a + b, 0),
+            ]);
+            const fill = labelFill?.(name);
+            if (fill) {
+                row.getCell(1).fill = solid(fill);
+                row.getCell(1).font = { color: { argb: "FFFFFFFF" }, bold: true };
+            }
+        }
+        if (sheet.rowCount >= start) {
+            zebra(sheet, start, sheet.rowCount, colCount);
+            addDataBar(
+                sheet,
+                `${totalLetter}${start}:${totalLetter}${sheet.rowCount}`,
+                "FF1F3864"
+            );
+        }
+        sheet.addRow([]);
+    };
+
+    breakdown(
+        "byStatusSection",
+        tr("status"),
+        (m) => m.byStatusAll,
+        (keys) =>
+            keys.sort(
+                (a, b) => (sumMaps(metrics.map((m) => m.byStatusAll))[b] ?? 0) -
+                    (sumMaps(metrics.map((m) => m.byStatusAll))[a] ?? 0)
+            ),
+        (name) => {
+            const hex = STATUS_HEX[name];
+            return hex ? `FF${hex.slice(1)}` : undefined;
+        }
+    );
+    breakdown(
+        "bySeveritySection",
+        tr("severity"),
+        (m) => m.bySeverity,
+        (keys) => keys.sort((a, b) => severityRank(a) - severityRank(b)),
+        (name) => severityFillArgb(name)
+    );
+    breakdown(
+        "byOriginSection",
+        tr("origin"),
+        (m) => m.byOriginDetected,
+        (keys) => keys.sort((a, b) => a.localeCompare(b))
+    );
+}
+
+function multiScopeBugColumns(
+    tr: (key: string) => string,
+    leading: { header: string; width: number }[]
+) {
+    return [
+        ...leading,
+        { header: tr("bugId"), width: 10 },
+        { header: tr("bugTitle"), width: 70 },
+        { header: tr("status"), width: 16 },
+        { header: tr("severity"), width: 16 },
+        { header: tr("priority"), width: 10 },
+        { header: tr("assignee"), width: 26 },
+        { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("link"), width: 10 },
+    ];
+}
+
+function finishBugSheet(sheet: Worksheet, rowCount: number, colCount: number, tr: (k: string) => string, titleCol: number) {
+    if (rowCount === 0) {
+        sheet.addRow([tr("noData")]);
+    } else {
+        zebra(sheet, 2, sheet.rowCount, colCount);
+        sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: colCount } };
+    }
+    autoFitColumns(sheet);
+    sheet.getColumn(titleCol).width = Math.min(sheet.getColumn(titleCol).width ?? 70, 90);
+}
+
+function buildMultiScopeBugsSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetBugs"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const columns = multiScopeBugColumns(tr, [{ header: tr("scope"), width: 22 }]);
+    sheet.columns = columns;
+    styleHeaderRow(sheet, 1, columns.length);
+
+    const rows = entries.flatMap((entry) =>
+        entry.data.stats.sprintDefectReport.effectiveDefects.map((bug) => ({
+            scope: entry.scopeName,
+            bug,
+        }))
+    );
+    rows.sort(
+        (a, b) =>
+            a.scope.localeCompare(b.scope) ||
+            severityRank(a.bug.severity) - severityRank(b.bug.severity) ||
+            a.bug.id - b.bug.id
+    );
+
+    for (const { scope, bug } of rows) {
+        const row = sheet.addRow([
+            scope,
+            ...bugValueCells(bug, t),
+            bug.url ? tr("open") : "-",
+        ]);
+        row.getCell(1).font = { bold: true };
+        styleBugRow(row, 2, bug, tr("open"));
+    }
+
+    finishBugSheet(sheet, rows.length, columns.length, tr, 3);
+}
+
+function buildMultiScopeBugsBySuiteSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetBugsBySuite"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const columns = [
+        { header: tr("scope"), width: 22 },
+        { header: tr("plan"), width: 30 },
+        { header: tr("suite"), width: 34 },
+        { header: tr("suiteId"), width: 10 },
+        { header: tr("bugId"), width: 10 },
+        { header: tr("bugTitle"), width: 60 },
+        { header: tr("status"), width: 16 },
+        { header: tr("severity"), width: 16 },
+        { header: tr("assignee"), width: 26 },
+        { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("link"), width: 10 },
+    ];
+    sheet.columns = columns;
+    styleHeaderRow(sheet, 1, columns.length);
+
+    let count = 0;
+    for (const entry of entries) {
+        const sevById = severityByBugId(entry.data);
+        for (const plan of entry.data.plans) {
+            for (const suite of plan.overview?.suites ?? []) {
+                for (const bug of suite.bugs) {
+                    const severity = sevById.get(bug.id);
+                    const row = sheet.addRow([
+                        entry.scopeName,
+                        plan.name,
+                        suite.suiteName,
+                        suite.suiteId,
+                        bug.id,
+                        bug.title,
+                        bug.state,
+                        severity ?? "-",
+                        assigneeName(bug.assignee, t),
+                        bug.creator ?? "-",
+                        dateCell(bug.createdDate),
+                        dateCell(bug.changedDate),
+                        dateCell(bug.closedDate),
+                        bug.url ? tr("open") : "-",
+                    ]);
+                    row.getCell(1).font = { bold: true };
+                    const stateHex = STATUS_HEX[bug.state];
+                    if (stateHex) {
+                        row.getCell(7).font = {
+                            color: { argb: `FF${stateHex.slice(1)}` },
+                            bold: true,
+                        };
+                    }
+                    if (severity && severityRank(severity) <= 3) {
+                        const sevCell = row.getCell(8);
+                        sevCell.fill = solid(severityFillArgb(severity));
+                        sevCell.font = { color: { argb: "FFFFFFFF" }, bold: true };
+                    }
+                    if (bug.url) {
+                        row.getCell(14).value = {
+                            text: tr("open"),
+                            hyperlink: bug.url,
+                        };
+                        row.getCell(14).font = { ...LINK_FONT };
+                    }
+                    count += 1;
+                }
+            }
+        }
+    }
+
+    finishBugSheet(sheet, count, columns.length, tr, 6);
+}
+
+function buildMultiScopeTodaysBugsSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetTodaysBugs"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const columns = [
+        { header: tr("scope"), width: 22 },
+        { header: tr("bugId"), width: 10 },
+        { header: tr("bugTitle"), width: 70 },
+        { header: tr("origin"), width: 16 },
+        { header: tr("status"), width: 16 },
+        { header: tr("severity"), width: 16 },
+        { header: tr("priority"), width: 10 },
+        { header: tr("assignee"), width: 26 },
+        { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("link"), width: 10 },
+    ];
+    sheet.columns = columns;
+    styleHeaderRow(sheet, 1, columns.length);
+
+    let count = 0;
+    for (const entry of entries) {
+        for (const bug of entry.data.stats.sprintDefectReport.todaysDefects ?? []) {
+            const row = sheet.addRow([
+                entry.scopeName,
+                bug.id,
+                bug.title,
+                bug.origin ?? "-",
+                bug.state,
+                bug.severity ?? "-",
+                bug.priority ?? "-",
+                assigneeName(bug.assignee, t),
+                bug.creator ?? "-",
+                dateCell(bug.createdDate),
+                dateCell(bug.changedDate),
+                dateCell(bug.closedDate),
+                bug.url ? tr("open") : "-",
+            ]);
+            row.getCell(1).font = { bold: true };
+            if (bug.severity && severityRank(bug.severity) <= 3) {
+                const sevCell = row.getCell(6);
+                sevCell.fill = solid(severityFillArgb(bug.severity));
+                sevCell.font = { color: { argb: "FFFFFFFF" }, bold: true };
+            }
+            const stateHex = STATUS_HEX[bug.state];
+            if (stateHex) {
+                row.getCell(5).font = {
+                    color: { argb: `FF${stateHex.slice(1)}` },
+                    bold: true,
+                };
+            }
+            if (bug.url) {
+                row.getCell(13).value = { text: tr("open"), hyperlink: bug.url };
+                row.getCell(13).font = { ...LINK_FONT };
+            }
+            count += 1;
+        }
+    }
+
+    finishBugSheet(sheet, count, columns.length, tr, 3);
+}
+
+function buildMultiScopeDsiSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetDsi"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const columns = [
+        { header: tr("scope"), width: 22 },
+        { header: tr("bugId"), width: 12 },
+        { header: tr("bugTitle"), width: 44 },
+        { header: tr("bugDescription"), width: 70 },
+        { header: tr("status"), width: 16 },
+        { header: tr("assignee"), width: 26 },
+        { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("link"), width: 10 },
+    ];
+    sheet.columns = columns;
+    styleHeaderRow(sheet, 1, columns.length);
+
+    let count = 0;
+    for (const entry of entries) {
+        for (const bug of dsiBugsFrom(entry.data)) {
+            const row = sheet.addRow([
+                entry.scopeName,
+                bug.id,
+                bug.title,
+                bug.description ?? "-",
+                bug.state,
+                assigneeName(bug.assignee, t),
+                bug.creator ?? "-",
+                dateCell(bug.createdDate),
+                dateCell(bug.changedDate),
+                dateCell(bug.closedDate),
+                bug.url ? tr("open") : "-",
+            ]);
+            row.getCell(1).font = { bold: true };
+            row.getCell(4).alignment = { wrapText: true, vertical: "top" };
+            const stateHex = STATUS_HEX[bug.state];
+            if (stateHex) {
+                row.getCell(5).font = {
+                    color: { argb: `FF${stateHex.slice(1)}` },
+                    bold: true,
+                };
+            }
+            if (bug.url) {
+                row.getCell(11).value = { text: tr("open"), hyperlink: bug.url };
+                row.getCell(11).font = { ...LINK_FONT };
+            }
+            count += 1;
+        }
+    }
+
+    finishBugSheet(sheet, count, columns.length, tr, 3);
+}
+
+function buildMultiScopeBusinessSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetBusiness"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const columns = [
+        { header: tr("scope"), width: 22 },
+        { header: tr("bugId"), width: 10 },
+        { header: tr("bugTitle"), width: 60 },
+        { header: tr("status"), width: 16 },
+        { header: tr("bugOpen"), width: 10 },
+        { header: tr("severity"), width: 16 },
+        { header: tr("priority"), width: 10 },
+        { header: tr("assignee"), width: 26 },
+        { header: tr("creator"), width: 26 },
+        { header: tr("createdDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("changedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("closedDate"), width: 18, style: { numFmt: DATE_NUM_FMT } },
+        { header: tr("bugDescription"), width: 70 },
+        { header: tr("link"), width: 10 },
+    ];
+    sheet.columns = columns;
+    styleHeaderRow(sheet, 1, columns.length);
+
+    const rows = entries.flatMap((entry) =>
+        businessBugsFrom(entry.data).map((bug) => ({
+            scope: entry.scopeName,
+            bug,
+        }))
+    );
+    rows.sort(
+        (a, b) =>
+            a.scope.localeCompare(b.scope) ||
+            Number(!isOpenBug(a.bug)) - Number(!isOpenBug(b.bug)) ||
+            severityRank(a.bug.severity) - severityRank(b.bug.severity) ||
+            a.bug.id - b.bug.id
+    );
+
+    for (const { scope, bug } of rows) {
+        const row = sheet.addRow([
+            scope,
+            ...businessValueCells(bug, t),
+            bug.url ? tr("open") : "-",
+        ]);
+        row.getCell(1).font = { bold: true };
+        styleBusinessRow(row, 2, bug, tr("open"));
+    }
+
+    if (rows.length === 0) {
+        sheet.addRow([tr("noData")]);
+    } else {
+        zebra(sheet, 2, sheet.rowCount, columns.length);
+        sheet.autoFilter = {
+            from: { row: 1, column: 1 },
+            to: { row: 1, column: columns.length },
+        };
+    }
+    autoFitColumns(sheet);
+    sheet.getColumn(3).width = Math.min(sheet.getColumn(3).width ?? 60, 80);
+    sheet.getColumn(13).width = 70;
+}
+
+function buildMultiScopeSuitesSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetSuites"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const columns = [
+        { header: tr("scope"), width: 22 },
+        { header: tr("plan"), width: 30 },
+        { header: tr("suite"), width: 38 },
+        { header: tr("suiteId"), width: 10 },
+        { header: tr("totalTestCases"), width: 14 },
+        { header: tr("passed"), width: 12 },
+        { header: tr("failed"), width: 12 },
+        { header: tr("blocked"), width: 12 },
+        { header: tr("notApplicable"), width: 14 },
+        { header: tr("notRun"), width: 14 },
+        { header: tr("executedPct"), width: 14 },
+        { header: tr("passRate"), width: 12 },
+        { header: tr("openBugsShort"), width: 12 },
+    ];
+    sheet.columns = columns;
+    styleHeaderRow(sheet, 1, columns.length);
+
+    let count = 0;
+    for (const entry of entries) {
+        for (const plan of entry.data.plans) {
+            for (const suite of plan.overview?.suites ?? []) {
+                const c = suite.outcomeCounts;
+                const executed = executedCount(c);
+                const decided = suite.totalTestCases - c.NotApplicable;
+                const row = sheet.addRow([
+                    entry.scopeName,
+                    plan.name,
+                    suite.suiteName,
+                    suite.suiteId,
+                    suite.totalTestCases,
+                    c.Passed,
+                    c.Failed,
+                    c.Blocked,
+                    c.NotApplicable,
+                    c.NotRun,
+                    0,
+                    0,
+                    suite.bugs.filter(isOpenBug).length,
+                ]);
+                row.getCell(1).font = { bold: true };
+                setPercentCell(row.getCell(11), pct(executed, suite.totalTestCases));
+                setPercentCell(row.getCell(12), pct(c.Passed, decided));
+                count += 1;
+            }
+        }
+    }
+
+    if (count === 0) {
+        sheet.addRow([tr("noData")]);
+    } else {
+        zebra(sheet, 2, sheet.rowCount, columns.length);
+        addDataBar(sheet, `M2:M${sheet.rowCount}`, "FFC62828");
+        sheet.autoFilter = {
+            from: { row: 1, column: 1 },
+            to: { row: 1, column: columns.length },
+        };
+    }
+    autoFitColumns(sheet);
+}
+
+function buildMultiScopePlansSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetPlans"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const columns = [
+        { header: tr("scope"), width: 22 },
+        { header: tr("planId"), width: 10 },
+        { header: tr("planName"), width: 40 },
+        { header: tr("suiteCount"), width: 12 },
+        { header: tr("totalTestCases"), width: 14 },
+        { header: tr("executed"), width: 12 },
+        { header: tr("executedPct"), width: 14 },
+        { header: tr("passRate"), width: 12 },
+        { header: tr("bugCount"), width: 12 },
+    ];
+    sheet.columns = columns;
+    styleHeaderRow(sheet, 1, columns.length);
+
+    let count = 0;
+    for (const entry of entries) {
+        for (const plan of entry.data.plans) {
+            const overview = plan.overview;
+            const executed = overview ? executedCount(overview.outcomeCounts) : 0;
+            const decided = overview
+                ? overview.totalTestCases - overview.outcomeCounts.NotApplicable
+                : 0;
+            const row = sheet.addRow([
+                entry.scopeName,
+                plan.id,
+                plan.name,
+                overview ? overview.suites.length : 0,
+                overview ? overview.totalTestCases : 0,
+                executed,
+                0,
+                0,
+                overview ? overview.totalBugs : 0,
+            ]);
+            row.getCell(1).font = { bold: true };
+            setPercentCell(
+                row.getCell(7),
+                overview ? pct(executed, overview.totalTestCases) : 0
+            );
+            setPercentCell(
+                row.getCell(8),
+                overview ? pct(overview.outcomeCounts.Passed, decided) : 0
+            );
+            count += 1;
+        }
+    }
+
+    if (count === 0) {
+        sheet.addRow([tr("noData")]);
+    } else {
+        zebra(sheet, 2, sheet.rowCount, columns.length);
+        addDataBar(sheet, `I2:I${sheet.rowCount}`, "FFC62828");
+        sheet.autoFilter = {
+            from: { row: 1, column: 1 },
+            to: { row: 1, column: columns.length },
+        };
+    }
+    autoFitColumns(sheet);
+}
+
+function buildMultiScopeAssigneesSheet(
+    wb: Workbook,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): void {
+    const tr = (key: string) => t(`dynamicSprintReportPage.excel.${key}`);
+    const sheet = wb.addWorksheet(tr("sheetAssignees"), {
+        views: [{ state: "frozen", ySplit: 1 }],
+    });
+    const colCount = entries.length + 2;
+    sheet.columns = [
+        { header: tr("assignee"), width: 34 },
+        ...entries.map((entry) => ({ header: entry.scopeName, width: 18 })),
+        { header: tr("total"), width: 12 },
+    ];
+    styleHeaderRow(sheet, 1, colCount);
+
+    const perScope = entries.map((entry) => entry.data.stats.byAssignee);
+    const names = sortedEntries(sumMaps(perScope)).map(([name]) => name);
+
+    for (const name of names) {
+        const values = perScope.map((map) => map[name] ?? 0);
+        sheet.addRow([name, ...values, values.reduce((a, b) => a + b, 0)]);
+    }
+
+    if (names.length === 0) {
+        sheet.addRow([tr("noData")]);
+    } else {
+        zebra(sheet, 2, sheet.rowCount, colCount);
+        addDataBar(
+            sheet,
+            `${colLetter(colCount)}2:${colLetter(colCount)}${sheet.rowCount}`,
+            "FF1F3864"
+        );
+        sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: colCount } };
+    }
+    autoFitColumns(sheet);
+}
+
+export async function exportMultiScopeReportToExcel(
+    filename: string,
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): Promise<void> {
+    if (entries.length === 0) {
+        return;
+    }
+    if (entries.length === 1) {
+        return exportDynamicSprintReportToExcel(filename, entries[0].data, t);
+    }
+
+    const excelModule = (await import("exceljs")) as typeof import("exceljs") & {
+        default?: typeof import("exceljs");
+    };
+    const Workbook = excelModule.Workbook ?? excelModule.default?.Workbook;
+
+    if (!Workbook) {
+        throw new Error("exceljs failed to load");
+    }
+
+    const wb = new Workbook();
+    wb.creator = "Azure QA Dashboard";
+    wb.created = new Date();
+
+    buildMultiScopeGuideSheet(wb, entries, t);
+    buildMultiScopeSummarySheet(wb, entries, t);
+    buildMultiScopeBugsSheet(wb, entries, t);
+    buildMultiScopeBugsBySuiteSheet(wb, entries, t);
+    buildMultiScopeTodaysBugsSheet(wb, entries, t);
+    buildMultiScopeDsiSheet(wb, entries, t);
+    buildMultiScopeBusinessSheet(wb, entries, t);
+    buildMultiScopeSuitesSheet(wb, entries, t);
+    buildMultiScopeTestCasesSheet(wb, entries, t);
+    buildMultiScopePlansSheet(wb, entries, t);
+    buildMultiScopeAssigneesSheet(wb, entries, t);
+
+    const buffer = await wb.xlsx.writeBuffer();
+    downloadBlob(
+        new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        filename
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /* Entry point                                                         */
 /* ------------------------------------------------------------------ */
@@ -1315,12 +2784,15 @@ export async function exportDynamicSprintReportToExcel(
     t: TranslateFn
 ): Promise<void> {
     const names: SheetNames = {
+        guide: t("dynamicSprintReportPage.excel.guide.sheetName"),
         summary: t("dynamicSprintReportPage.excel.sheetSummary"),
         bugs: t("dynamicSprintReportPage.excel.sheetBugs"),
         bugsBySuite: t("dynamicSprintReportPage.excel.sheetBugsBySuite"),
         todaysBugs: t("dynamicSprintReportPage.excel.sheetTodaysBugs"),
         dsi: t("dynamicSprintReportPage.excel.sheetDsi"),
+        business: t("dynamicSprintReportPage.excel.sheetBusiness"),
         suites: t("dynamicSprintReportPage.excel.sheetSuites"),
+        testCases: t("dynamicSprintReportPage.excel.sheetTestCases"),
         plans: t("dynamicSprintReportPage.excel.sheetPlans"),
         assignees: t("dynamicSprintReportPage.excel.sheetAssignees"),
     };
@@ -1344,12 +2816,15 @@ export async function exportDynamicSprintReportToExcel(
     wb.creator = "Azure QA Dashboard";
     wb.created = data.meta.generatedAt;
 
+    buildGuideSheet(wb, names, data, t);
     buildSummarySheet(wb, names, data, dsiBugs, t);
     buildBugsSheet(wb, names, data, t);
     buildBugsBySuiteSheet(wb, names, data, t);
     buildTodaysBugsSheet(wb, names, data, t);
     buildDsiSheet(wb, names, data, dsiBugs, t);
+    buildBusinessSheet(wb, names, data, t);
     buildSuitesSheet(wb, names, data, t);
+    buildTestCasesSheet(wb, names, data, t);
     buildPlansSheet(wb, names, data, t);
     buildAssigneesSheet(wb, names, data, t);
 
@@ -1402,6 +2877,11 @@ export interface PreviewSheet {
 // downloaded workbook is never capped.
 const PREVIEW_ROW_CAP = 100;
 
+// The multi-scope preview feeds the embedded Univer spreadsheet (UniverSheet)
+// rather than a static table, so it keeps far more rows - still bounded so a
+// huge combined report can't lock the browser.
+const MULTI_SCOPE_PREVIEW_CAP = 3000;
+
 const txt = (value: string | number | null | undefined): PreviewCell => ({
     value: value ?? "-",
 });
@@ -1416,13 +2896,16 @@ const pctCell = (value: number, inverse = false): PreviewCell => ({
 const linkCell = (label: string, href?: string): PreviewCell =>
     href ? { value: label, kind: "link", href } : { value: label };
 
-function capRows(rows: PreviewCell[][]): Pick<PreviewTable, "rows" | "hiddenRowCount"> {
-    if (rows.length <= PREVIEW_ROW_CAP) {
+function capRows(
+    rows: PreviewCell[][],
+    cap = PREVIEW_ROW_CAP
+): Pick<PreviewTable, "rows" | "hiddenRowCount"> {
+    if (rows.length <= cap) {
         return { rows };
     }
     return {
-        rows: rows.slice(0, PREVIEW_ROW_CAP),
-        hiddenRowCount: rows.length - PREVIEW_ROW_CAP,
+        rows: rows.slice(0, cap),
+        hiddenRowCount: rows.length - cap,
     };
 }
 
@@ -1609,6 +3092,7 @@ export function buildReportPreview(
         ],
     };
 
+
     /* -------- Today's bugs -------- */
     const todaysBugsRows: PreviewCell[][] = (
         report.todaysDefects ?? []
@@ -1652,6 +3136,7 @@ export function buildReportPreview(
     };
 
     /* -------- Bugs by suite -------- */
+    const sevBySuiteBug = severityByBugId(data);
     const bugsBySuiteRows: PreviewCell[][] = [];
     for (const plan of data.plans) {
         for (const suite of plan.overview?.suites ?? []) {
@@ -1663,6 +3148,10 @@ export function buildReportPreview(
                     linkCell(String(bug.id), bug.url),
                     txt(bug.title),
                     { value: bug.state, kind: "status" },
+                    {
+                        value: sevBySuiteBug.get(bug.id) ?? "-",
+                        kind: "severity",
+                    },
                     txt(assigneeName(bug.assignee, t)),
                     txt(bug.creator ?? "-"),
                     txt(formatDate(bug.createdDate)),
@@ -1685,6 +3174,7 @@ export function buildReportPreview(
                     tr("bugId"),
                     tr("bugTitle"),
                     tr("status"),
+                    tr("severity"),
                     tr("assignee"),
                     tr("creator"),
                     tr("createdDate"),
@@ -1748,6 +3238,33 @@ export function buildReportPreview(
         ],
     };
 
+    /* -------- Business -------- */
+    const businessSheet: PreviewSheet = {
+        name: tr("sheetBusiness"),
+        tables: [
+            {
+                title: tr("sheetBusiness"),
+                columns: BUSINESS_HEADER_KEYS.map((k) => tr(k)),
+                ...capRows(
+                    businessBugsFrom(data).map((bug) => [
+                        linkCell(String(bug.id), bug.url),
+                        txt(bug.title),
+                        { value: bug.state, kind: "status" as const },
+                        txt(isOpenBug(bug) ? YES : NO),
+                        { value: bug.severity ?? "-", kind: "severity" as const },
+                        txt(bug.priority ?? "-"),
+                        txt(assigneeName(bug.assignee, t)),
+                        txt(bug.creator ?? "-"),
+                        txt(formatDate(bug.createdDate)),
+                        txt(formatDate(bug.changedDate)),
+                        txt(formatDate(bug.closedDate)),
+                        txt(bug.description ?? "-"),
+                    ])
+                ),
+            },
+        ],
+    };
+
     /* -------- Suites -------- */
     const suiteRows: PreviewCell[][] = [];
     for (const plan of data.plans) {
@@ -1792,6 +3309,75 @@ export function buildReportPreview(
                     tr("openBugsShort"),
                 ],
                 ...capRows(suiteRows),
+            },
+        ],
+    };
+
+    /* -------- Test cases -------- */
+    const testCaseRows: PreviewCell[][] = collectTestCases(data)
+        .sort(
+            (a, b) =>
+                a.planName.localeCompare(b.planName) ||
+                a.tc.suiteName.localeCompare(b.tc.suiteName) ||
+                a.tc.testCaseId - b.tc.testCaseId
+        )
+        .map(({ planName, tc }) => [
+            txt(planName),
+            txt(tc.suiteName),
+            linkCell(String(tc.testCaseId), tc.url),
+            txt(tc.title),
+            txt(tc.state ?? "-"),
+            numCell(tc.priority),
+            txt(tc.outcome),
+            txt(tc.executed ? YES : NO),
+            txt(tc.notRun ? YES : NO),
+            txt(tc.needsRetest ? YES : NO),
+            txt(tc.automationStatus ?? "-"),
+            txt(tc.assignedTo ?? "-"),
+            txt(tc.tester ?? "-"),
+            txt(tc.lastRunBy ?? "-"),
+            txt(formatDate(tc.lastRunAt)),
+            tc.daysSinceLastRun != null
+                ? numCell(tc.daysSinceLastRun)
+                : txt("-"),
+            txt(tc.configuration ?? "-"),
+            txt(tc.tags.join(", ") || "-"),
+            numCell(tc.bugCount),
+            txt(tc.hasOpenBugs ? YES : NO),
+            txt(tc.bugIds.join(", ") || "-"),
+            txt(tc.areaPath ?? "-"),
+        ]);
+
+    const testCasesSheet: PreviewSheet = {
+        name: tr("sheetTestCases"),
+        tables: [
+            {
+                title: tr("sheetTestCases"),
+                columns: [
+                    tr("plan"),
+                    tr("suite"),
+                    tr("tcId"),
+                    tr("tcTitle"),
+                    tr("tcState"),
+                    tr("priority"),
+                    tr("tcOutcome"),
+                    tr("tcExecuted"),
+                    tr("tcNotRun"),
+                    tr("tcNeedsRetest"),
+                    tr("tcAutomation"),
+                    tr("assignee"),
+                    tr("tcTester"),
+                    tr("tcLastRunBy"),
+                    tr("tcLastRunAt"),
+                    tr("tcDaysSinceRun"),
+                    tr("tcConfiguration"),
+                    tr("tcTags"),
+                    tr("bugCount"),
+                    tr("openBugsShort"),
+                    tr("tcBugIds"),
+                    tr("areaPath"),
+                ],
+                ...capRows(testCaseRows),
             },
         ],
     };
@@ -1857,12 +3443,591 @@ export function buildReportPreview(
     };
 
     return [
+        guidePreviewSheet(
+            {
+                project: data.meta.project,
+                areaPath: data.meta.areaPath,
+                sprint: data.meta.sprint,
+                generatedAt: data.meta.generatedAt,
+            },
+            t
+        ),
         summary,
         bugsSheet,
         bugsBySuiteSheet,
         todaysBugsSheet,
         dsiSheet,
+        businessSheet,
         suitesSheet,
+        testCasesSheet,
+        plansSheet,
+        assigneesSheet,
+    ];
+}
+
+/* ================================================================== */
+/* Multi-scope on-screen preview                                       */
+/* ================================================================== */
+
+export function buildMultiScopePreview(
+    entries: MultiScopeReportEntry[],
+    t: TranslateFn
+): PreviewSheet[] {
+    if (entries.length === 1) {
+        return buildReportPreview(entries[0].data, t);
+    }
+
+    const tr = (key: string, opts?: Record<string, unknown>) =>
+        t(`dynamicSprintReportPage.excel.${key}`, opts);
+    const cap = (list: PreviewCell[][]) =>
+        capRows(list, MULTI_SCOPE_PREVIEW_CAP);
+    const scopeNames = entries.map((entry) => entry.scopeName);
+    const metrics = entries.map((entry) => computeSummaryMetrics(entry.data));
+
+    const numRow = (label: string, pick: (m: SummaryMetrics) => number): PreviewCell[] => {
+        const values = metrics.map(pick);
+        return [
+            txt(label),
+            ...values.map((v) => numCell(v)),
+            numCell(values.reduce((a, b) => a + b, 0)),
+        ];
+    };
+    const pctRow = (
+        label: string,
+        parts: (m: SummaryMetrics) => [number, number],
+        inverse = false
+    ): PreviewCell[] => {
+        const perScope = metrics.map(parts);
+        const totalNum = perScope.reduce((a, [n]) => a + n, 0);
+        const totalDen = perScope.reduce((a, [, d]) => a + d, 0);
+        return [
+            txt(label),
+            ...perScope.map(([n, d]) => pctCell(pct(n, d), inverse)),
+            pctCell(pct(totalNum, totalDen), inverse),
+        ];
+    };
+    const mapRows = (
+        pick: (m: SummaryMetrics) => Record<string, number>,
+        sortKeys: (keys: string[]) => string[]
+    ): PreviewCell[][] => {
+        const merged = sumMaps(metrics.map(pick));
+        return sortKeys(Object.keys(merged)).map((name) => {
+            const values = metrics.map((m) => pick(m)[name] ?? 0);
+            return [
+                txt(name),
+                ...values.map((v) => numCell(v)),
+                numCell(values.reduce((a, b) => a + b, 0)),
+            ];
+        });
+    };
+
+    const metricCols = [tr("metric"), ...scopeNames, tr("total")];
+
+    const summarySheet: PreviewSheet = {
+        name: tr("sheetSummary"),
+        tables: [
+            {
+                title: tr("kpiTestSection"),
+                columns: metricCols,
+                rows: [
+                    numRow(tr("totalTestCases"), (m) => m.totalTestCases),
+                    numRow(tr("executed"), (m) => m.executed),
+                    pctRow(tr("executedPct"), (m) => [m.executed, m.totalTestCases]),
+                    pctRow(tr("passRate"), (m) => [m.passed, m.decided]),
+                    numRow(tr("notApplicable"), (m) => m.notApplicable),
+                    numRow(tr("notRun"), (m) => m.notRun),
+                ],
+            },
+            {
+                title: tr("kpiBugSection"),
+                columns: metricCols,
+                rows: [
+                    numRow(tr("totalBugs"), (m) => m.totalBugs),
+                    numRow(tr("effectiveBugs"), (m) => m.effectiveBugs),
+                    numRow(tr("outOfScopeBugs"), (m) => m.outOfScopeBugs),
+                    numRow(tr("closedBugs"), (m) => m.closedBugs),
+                    pctRow(tr("closedPct"), (m) => [m.closedBugs, m.totalBugs]),
+                    numRow(tr("openBugs"), (m) => m.openBugs),
+                    numRow(tr("criticalOpen"), (m) => m.criticalOpen),
+                    numRow(tr("reopened"), (m) => m.reopened),
+                    [
+                        txt(tr("avgClosureDays")),
+                        ...metrics.map((m) =>
+                            m.mttrDays != null ? numCell(Math.round(m.mttrDays)) : txt("-")
+                        ),
+                        txt("-"),
+                    ],
+                    numRow(tr("withoutResolutionDate"), (m) => m.withoutResolutionDate),
+                    numRow(tr("bugsByUs"), (m) => m.bugsByUs),
+                    numRow(tr("bugsByDsi"), (m) => m.bugsByDsi),
+                    numRow(tr("bugsByBusiness"), (m) => m.bugsByBusiness),
+                ],
+            },
+            {
+                title: tr("dsiSection"),
+                columns: metricCols,
+                rows: [
+                    numRow(tr("dsiDetected"), (m) => m.dsiDetected),
+                    numRow(tr("dsiAccepted"), (m) => m.dsiAccepted),
+                    pctRow(tr("dsiShareOfTotal"), (m) => [m.dsiDetected, m.totalBugs], true),
+                    numRow(tr("dsiOpen"), (m) => m.dsiOpen),
+                    numRow(tr("dsiClosed"), (m) => m.dsiClosed),
+                    numRow(tr("dsiPendingVerification"), (m) => m.dsiPending),
+                ],
+            },
+            {
+                title: tr("byStatusSection"),
+                columns: [tr("status"), ...scopeNames, tr("total")],
+                rows: mapRows(
+                    (m) => m.byStatusAll,
+                    (keys) => {
+                        const merged = sumMaps(metrics.map((m) => m.byStatusAll));
+                        return keys.sort((a, b) => (merged[b] ?? 0) - (merged[a] ?? 0));
+                    }
+                ),
+            },
+            {
+                title: tr("bySeveritySection"),
+                columns: [tr("severity"), ...scopeNames, tr("total")],
+                rows: mapRows(
+                    (m) => m.bySeverity,
+                    (keys) => keys.sort((a, b) => severityRank(a) - severityRank(b))
+                ),
+            },
+            {
+                title: tr("byOriginSection"),
+                columns: [tr("origin"), ...scopeNames, tr("total")],
+                rows: mapRows(
+                    (m) => m.byOriginDetected,
+                    (keys) => keys.sort((a, b) => a.localeCompare(b))
+                ),
+            },
+        ],
+    };
+
+    const bugCells = (bug: BugInfo & { severity?: string }): PreviewCell[] => [
+        linkCell(String(bug.id), bug.url),
+        txt(bug.title),
+        { value: bug.state, kind: "status" as const },
+        { value: bug.severity ?? "-", kind: "severity" as const },
+        txt(bug.priority ?? "-"),
+        txt(assigneeName(bug.assignee, t)),
+        txt(bug.creator ?? "-"),
+        txt(formatDate(bug.createdDate)),
+        txt(formatDate(bug.changedDate)),
+        txt(formatDate(bug.closedDate)),
+    ];
+    const bugCols = [
+        tr("bugId"),
+        tr("bugTitle"),
+        tr("status"),
+        tr("severity"),
+        tr("priority"),
+        tr("assignee"),
+        tr("creator"),
+        tr("createdDate"),
+        tr("changedDate"),
+        tr("closedDate"),
+    ];
+
+    const bugsRows = entries
+        .flatMap((entry) =>
+            entry.data.stats.sprintDefectReport.effectiveDefects.map((bug) => ({
+                scope: entry.scopeName,
+                bug,
+            }))
+        )
+        .sort(
+            (a, b) =>
+                a.scope.localeCompare(b.scope) ||
+                severityRank(a.bug.severity) - severityRank(b.bug.severity) ||
+                a.bug.id - b.bug.id
+        )
+        .map(({ scope, bug }) => [txt(scope), ...bugCells(bug)]);
+
+    const bugsSheet: PreviewSheet = {
+        name: tr("sheetBugs"),
+        tables: [
+            {
+                title: tr("sheetBugs"),
+                columns: [tr("scope"), ...bugCols],
+                ...cap(bugsRows),
+            },
+        ],
+    };
+
+    const bySuiteRows: PreviewCell[][] = [];
+    for (const entry of entries) {
+        const sevById = severityByBugId(entry.data);
+        for (const plan of entry.data.plans) {
+            for (const suite of plan.overview?.suites ?? []) {
+                for (const bug of suite.bugs) {
+                    bySuiteRows.push([
+                        txt(entry.scopeName),
+                        txt(plan.name),
+                        txt(suite.suiteName),
+                        txt(suite.suiteId),
+                        linkCell(String(bug.id), bug.url),
+                        txt(bug.title),
+                        { value: bug.state, kind: "status" },
+                        {
+                            value: sevById.get(bug.id) ?? "-",
+                            kind: "severity",
+                        },
+                        txt(assigneeName(bug.assignee, t)),
+                        txt(bug.creator ?? "-"),
+                        txt(formatDate(bug.createdDate)),
+                        txt(formatDate(bug.changedDate)),
+                        txt(formatDate(bug.closedDate)),
+                    ]);
+                }
+            }
+        }
+    }
+
+    const bugsBySuiteSheet: PreviewSheet = {
+        name: tr("sheetBugsBySuite"),
+        tables: [
+            {
+                title: tr("sheetBugsBySuite"),
+                columns: [
+                    tr("scope"),
+                    tr("plan"),
+                    tr("suite"),
+                    tr("suiteId"),
+                    tr("bugId"),
+                    tr("bugTitle"),
+                    tr("status"),
+                    tr("severity"),
+                    tr("assignee"),
+                    tr("creator"),
+                    tr("createdDate"),
+                    tr("changedDate"),
+                    tr("closedDate"),
+                ],
+                ...cap(bySuiteRows),
+            },
+        ],
+    };
+
+    const todaysRows: PreviewCell[][] = entries.flatMap((entry) =>
+        (entry.data.stats.sprintDefectReport.todaysDefects ?? []).map((bug) => [
+            txt(entry.scopeName),
+            linkCell(String(bug.id), bug.url),
+            txt(bug.title),
+            txt(bug.origin ?? "-"),
+            { value: bug.state, kind: "status" as const },
+            { value: bug.severity ?? "-", kind: "severity" as const },
+            txt(bug.priority ?? "-"),
+            txt(assigneeName(bug.assignee, t)),
+            txt(bug.creator ?? "-"),
+            txt(formatDate(bug.createdDate)),
+            txt(formatDate(bug.changedDate)),
+            txt(formatDate(bug.closedDate)),
+        ])
+    );
+    const todaysSheet: PreviewSheet = {
+        name: tr("sheetTodaysBugs"),
+        tables: [
+            {
+                title: tr("sheetTodaysBugs"),
+                columns: [
+                    tr("scope"),
+                    tr("bugId"),
+                    tr("bugTitle"),
+                    tr("origin"),
+                    tr("status"),
+                    tr("severity"),
+                    tr("priority"),
+                    tr("assignee"),
+                    tr("creator"),
+                    tr("createdDate"),
+                    tr("changedDate"),
+                    tr("closedDate"),
+                ],
+                ...cap(todaysRows),
+            },
+        ],
+    };
+
+    const dsiRows: PreviewCell[][] = entries.flatMap((entry) =>
+        dsiBugsFrom(entry.data).map((bug) => [
+            txt(entry.scopeName),
+            linkCell(String(bug.id), bug.url),
+            txt(bug.title),
+            txt(bug.description ?? "-"),
+            { value: bug.state, kind: "status" as const },
+            txt(assigneeName(bug.assignee, t)),
+            txt(bug.creator ?? "-"),
+            txt(formatDate(bug.createdDate)),
+            txt(formatDate(bug.changedDate)),
+            txt(formatDate(bug.closedDate)),
+        ])
+    );
+    const dsiSheet: PreviewSheet = {
+        name: tr("sheetDsi"),
+        tables: [
+            {
+                title: tr("dsiBugListSection"),
+                columns: [
+                    tr("scope"),
+                    tr("bugId"),
+                    tr("bugTitle"),
+                    tr("bugDescription"),
+                    tr("status"),
+                    tr("assignee"),
+                    tr("creator"),
+                    tr("createdDate"),
+                    tr("changedDate"),
+                    tr("closedDate"),
+                ],
+                ...cap(dsiRows),
+            },
+        ],
+    };
+
+    const businessRows: PreviewCell[][] = entries
+        .flatMap((entry) =>
+            businessBugsFrom(entry.data).map((bug) => ({
+                scope: entry.scopeName,
+                bug,
+            }))
+        )
+        .sort(
+            (a, b) =>
+                a.scope.localeCompare(b.scope) ||
+                Number(!isOpenBug(a.bug)) - Number(!isOpenBug(b.bug)) ||
+                severityRank(a.bug.severity) - severityRank(b.bug.severity) ||
+                a.bug.id - b.bug.id
+        )
+        .map(({ scope, bug }) => [
+            txt(scope),
+            linkCell(String(bug.id), bug.url),
+            txt(bug.title),
+            { value: bug.state, kind: "status" as const },
+            txt(isOpenBug(bug) ? YES : NO),
+            { value: bug.severity ?? "-", kind: "severity" as const },
+            txt(bug.priority ?? "-"),
+            txt(assigneeName(bug.assignee, t)),
+            txt(bug.creator ?? "-"),
+            txt(formatDate(bug.createdDate)),
+            txt(formatDate(bug.changedDate)),
+            txt(formatDate(bug.closedDate)),
+            txt(bug.description ?? "-"),
+        ]);
+    const businessSheet: PreviewSheet = {
+        name: tr("sheetBusiness"),
+        tables: [
+            {
+                title: tr("sheetBusiness"),
+                columns: [tr("scope"), ...BUSINESS_HEADER_KEYS.map((k) => tr(k))],
+                ...cap(businessRows),
+            },
+        ],
+    };
+
+    const suiteRows: PreviewCell[][] = [];
+    for (const entry of entries) {
+        for (const plan of entry.data.plans) {
+            for (const suite of plan.overview?.suites ?? []) {
+                const c = suite.outcomeCounts;
+                const executed = executedCount(c);
+                const decided = suite.totalTestCases - c.NotApplicable;
+                suiteRows.push([
+                    txt(entry.scopeName),
+                    txt(plan.name),
+                    txt(suite.suiteName),
+                    txt(suite.suiteId),
+                    numCell(suite.totalTestCases),
+                    numCell(c.Passed),
+                    numCell(c.Failed),
+                    numCell(c.Blocked),
+                    numCell(c.NotApplicable),
+                    numCell(c.NotRun),
+                    pctCell(pct(executed, suite.totalTestCases)),
+                    pctCell(pct(c.Passed, decided)),
+                    numCell(suite.bugs.filter(isOpenBug).length),
+                ]);
+            }
+        }
+    }
+    const suitesSheet: PreviewSheet = {
+        name: tr("sheetSuites"),
+        tables: [
+            {
+                title: tr("sheetSuites"),
+                columns: [
+                    tr("scope"),
+                    tr("plan"),
+                    tr("suite"),
+                    tr("suiteId"),
+                    tr("totalTestCases"),
+                    tr("passed"),
+                    tr("failed"),
+                    tr("blocked"),
+                    tr("notApplicable"),
+                    tr("notRun"),
+                    tr("executedPct"),
+                    tr("passRate"),
+                    tr("openBugsShort"),
+                ],
+                ...cap(suiteRows),
+            },
+        ],
+    };
+
+    const testCaseRows: PreviewCell[][] = entries
+        .flatMap((entry) =>
+            collectTestCases(entry.data, entry.scopeName)
+        )
+        .sort(
+            (a, b) =>
+                (a.scopeName ?? "").localeCompare(b.scopeName ?? "") ||
+                a.planName.localeCompare(b.planName) ||
+                a.tc.suiteName.localeCompare(b.tc.suiteName) ||
+                a.tc.testCaseId - b.tc.testCaseId
+        )
+        .map(({ scopeName, planName, tc }) => [
+            txt(scopeName ?? "-"),
+            txt(planName),
+            txt(tc.suiteName),
+            linkCell(String(tc.testCaseId), tc.url),
+            txt(tc.title),
+            txt(tc.state ?? "-"),
+            numCell(tc.priority),
+            txt(tc.outcome),
+            txt(tc.executed ? YES : NO),
+            txt(tc.notRun ? YES : NO),
+            txt(tc.needsRetest ? YES : NO),
+            txt(tc.automationStatus ?? "-"),
+            txt(tc.assignedTo ?? "-"),
+            txt(tc.tester ?? "-"),
+            txt(tc.lastRunBy ?? "-"),
+            txt(formatDate(tc.lastRunAt)),
+            tc.daysSinceLastRun != null
+                ? numCell(tc.daysSinceLastRun)
+                : txt("-"),
+            txt(tc.configuration ?? "-"),
+            txt(tc.tags.join(", ") || "-"),
+            numCell(tc.bugCount),
+            txt(tc.hasOpenBugs ? YES : NO),
+            txt(tc.bugIds.join(", ") || "-"),
+            txt(tc.areaPath ?? "-"),
+        ]);
+    const testCasesSheet: PreviewSheet = {
+        name: tr("sheetTestCases"),
+        tables: [
+            {
+                title: tr("sheetTestCases"),
+                columns: [
+                    tr("scope"),
+                    tr("plan"),
+                    tr("suite"),
+                    tr("tcId"),
+                    tr("tcTitle"),
+                    tr("tcState"),
+                    tr("priority"),
+                    tr("tcOutcome"),
+                    tr("tcExecuted"),
+                    tr("tcNotRun"),
+                    tr("tcNeedsRetest"),
+                    tr("tcAutomation"),
+                    tr("assignee"),
+                    tr("tcTester"),
+                    tr("tcLastRunBy"),
+                    tr("tcLastRunAt"),
+                    tr("tcDaysSinceRun"),
+                    tr("tcConfiguration"),
+                    tr("tcTags"),
+                    tr("bugCount"),
+                    tr("openBugsShort"),
+                    tr("tcBugIds"),
+                    tr("areaPath"),
+                ],
+                ...cap(testCaseRows),
+            },
+        ],
+    };
+
+    const planRows: PreviewCell[][] = entries.flatMap((entry) =>
+        entry.data.plans.map((plan) => {
+            const overview = plan.overview;
+            const planExecuted = overview
+                ? executedCount(overview.outcomeCounts)
+                : 0;
+            const planDecided = overview
+                ? overview.totalTestCases - overview.outcomeCounts.NotApplicable
+                : 0;
+            return [
+                txt(entry.scopeName),
+                txt(plan.id),
+                linkCell(plan.name, plan.url),
+                numCell(overview ? overview.suites.length : 0),
+                numCell(overview ? overview.totalTestCases : 0),
+                numCell(planExecuted),
+                pctCell(overview ? pct(planExecuted, overview.totalTestCases) : 0),
+                pctCell(
+                    overview
+                        ? pct(overview.outcomeCounts.Passed, planDecided)
+                        : 0
+                ),
+                numCell(overview ? overview.totalBugs : 0),
+            ];
+        })
+    );
+    const plansSheet: PreviewSheet = {
+        name: tr("sheetPlans"),
+        tables: [
+            {
+                title: tr("sheetPlans"),
+                columns: [
+                    tr("scope"),
+                    tr("planId"),
+                    tr("planName"),
+                    tr("suiteCount"),
+                    tr("totalTestCases"),
+                    tr("executed"),
+                    tr("executedPct"),
+                    tr("passRate"),
+                    tr("bugCount"),
+                ],
+                ...cap(planRows),
+            },
+        ],
+    };
+
+    const assigneesPerScope = entries.map((entry) => entry.data.stats.byAssignee);
+    const assigneeNames = sortedEntries(sumMaps(assigneesPerScope)).map(
+        ([name]) => name
+    );
+    const assigneesSheet: PreviewSheet = {
+        name: tr("sheetAssignees"),
+        tables: [
+            {
+                title: tr("byAssigneeSection"),
+                columns: [tr("assignee"), ...scopeNames, tr("total")],
+                rows: assigneeNames.map((name) => {
+                    const values = assigneesPerScope.map((map) => map[name] ?? 0);
+                    return [
+                        txt(name),
+                        ...values.map((v) => numCell(v)),
+                        numCell(values.reduce((a, b) => a + b, 0)),
+                    ];
+                }),
+            },
+        ],
+    };
+
+    return [
+        guidePreviewSheet(multiScopeGuideMeta(entries), t),
+        summarySheet,
+        bugsSheet,
+        bugsBySuiteSheet,
+        todaysSheet,
+        dsiSheet,
+        businessSheet,
+        suitesSheet,
+        testCasesSheet,
         plansSheet,
         assigneesSheet,
     ];

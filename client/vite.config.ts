@@ -8,6 +8,59 @@ import react from '@vitejs/plugin-react'
 // disappear cleanly for same-origin builds that don't set this var.
 process.env.VITE_API_BASE_URL ??= ''
 
+// Univer (embedded spreadsheet on the Excel Export page) is a plugin-mode
+// setup: the app imports ~17 @univerjs/* packages plus their `/facade` and
+// `/locale/en-US` sub-entries. Listing every entry point here forces Vite's
+// dev dep-optimizer to pre-bundle them together in one pass - otherwise it
+// discovers the facade side-effect imports late and produces a second
+// optimize chunk, which re-evaluates @univerjs/engine-render and logs
+// "Identifier ... already exists" warnings.
+const UNIVER_PACKAGES = [
+  'core',
+  'design',
+  'themes',
+  'engine-render',
+  'engine-formula',
+  'ui',
+  'docs',
+  'docs-ui',
+  'sheets',
+  'sheets-ui',
+  'sheets-formula',
+  'sheets-formula-ui',
+  'sheets-numfmt',
+  'sheets-numfmt-ui',
+  'sheets-filter',
+  'sheets-filter-ui',
+  'sheets-sort',
+  'sheets-sort-ui',
+]
+
+const UNIVER_FACADE = [
+  'core',
+  'engine-formula',
+  'ui',
+  'docs-ui',
+  'sheets',
+  'sheets-ui',
+  'sheets-formula',
+  'sheets-numfmt',
+  'sheets-filter',
+  'sheets-sort',
+]
+
+const UNIVER_LOCALES = [
+  'design',
+  'ui',
+  'docs-ui',
+  'sheets',
+  'sheets-ui',
+  'sheets-formula-ui',
+  'sheets-numfmt-ui',
+  'sheets-filter-ui',
+  'sheets-sort-ui',
+]
+
 // https://vite.dev/config/
 export default defineConfig(() => ({
   base: process.env.VITE_PUBLIC_BASE_PATH ?? '/',
@@ -17,6 +70,13 @@ export default defineConfig(() => ({
     proxy: {
       '/api': 'http://localhost:3001',
     },
+  },
+  optimizeDeps: {
+    include: [
+      ...UNIVER_PACKAGES.map((p) => `@univerjs/${p}`),
+      ...UNIVER_FACADE.map((p) => `@univerjs/${p}/facade`),
+      ...UNIVER_LOCALES.map((p) => `@univerjs/${p}/locale/en-US`),
+    ],
   },
   build: {
     outDir: '../dist',

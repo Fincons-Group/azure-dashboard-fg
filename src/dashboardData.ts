@@ -9,6 +9,8 @@ import {
     buildWorkItemUrl,
     buildTestRunUrl,
 } from "./azdo.js";
+import { mapWithConcurrency } from "./concurrency.js";
+import { dedupe } from "./inflight.js";
 import type {
     TestCaseRow,
     Outcome,
@@ -199,7 +201,7 @@ interface SuiteTestPointIndex {
 // outcome (for pass/fail history) and the run ID of its most recently
 // completed result (ties broken by dateCompleted, since a test case can be
 // re-run and points don't come back in run order).
-function indexSuiteTestPoints(testPoints: any[]): SuiteTestPointIndex {
+export function indexSuiteTestPoints(testPoints: any[]): SuiteTestPointIndex {
     const outcomesByTestCase: Record<number, string[]> = {};
     const lastRunByTestCase: Record<number, number> = {};
     const lastRunDateByTestCase: Record<number, number> = {};
@@ -242,6 +244,9 @@ function indexSuiteTestPoints(testPoints: any[]): SuiteTestPointIndex {
     return { outcomesByTestCase, lastRunByTestCase };
 }
 
+// Reference (unbatched) build - kept only so compare-optimized.ts can diff
+// it against buildDashboardOptimized(). The live path (getDashboardData)
+// uses the optimized build.
 export async function buildDashboard(project?: string): Promise<
     TestCaseRow[]
 > {
@@ -294,22 +299,210 @@ export async function getDashboardData(project?: string): Promise<
     TestCaseRow[]
 > {
     const projectKey = resolveProjectKey(project);
-    const now = Date.now();
     const cached = dashboardCache.get(projectKey);
 
-    if (cached && now - cached.timestamp < CACHE_DURATION_MS) {
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
         return cached.data;
     }
 
-    const data = await buildDashboard(project);
+    // dedupe: getTestCaseLookups() and getAllSuiteNames() both call this, and
+    // the Excel Export page fires several project queries at once - without
+    // this they'd each kick off a full (cache-missing) rebuild in parallel.
+    return dedupe(`dashboard:${projectKey}`, async () => {
+        const fresh = dashboardCache.get(projectKey);
+        if (fresh && Date.now() - fresh.timestamp < CACHE_DURATION_MS) {
+            return fresh.data;
+        }
 
-    dashboardCache.set(projectKey, { data, timestamp: now });
-
-    return data;
+        const data = await buildDashboardOptimized(project);
+        dashboardCache.set(projectKey, { data, timestamp: Date.now() });
+        return data;
+    });
 }
 
 export function clearDashboardCache(): void {
     dashboardCache.clear();
+}
+
+/* ================================================================== */
+/* Optimized (batched) dashboard build - the live path (getDashboardData */
+/* calls this). Instead of 2 HTTP calls per test case it does a        */
+/* handful of batched getWorkItems() calls. buildDashboard() above is  */
+/* kept only as the reference for src/scripts/compare-optimized.ts.    */
+/* ================================================================== */
+
+// The pure tail of buildTestCaseRow(): everything after its two awaits,
+// working off pre-fetched `workItem` (with .relations) and `linkedItems`.
+export function assembleTestCaseRow(
+    tc: any,
+    planName: string,
+    suiteName: string,
+    suiteId: number,
+    workItem: any,
+    linkedItems: any[],
+    outcomesByTestCase: Record<number, string[]>,
+    lastRunByTestCase: Record<number, number>,
+    planIteration: string | undefined,
+    project: string | undefined
+): TestCaseRow {
+    const bugs = linkedItems.filter(
+        (item: any) => item.fields["System.WorkItemType"] === "Bug"
+    );
+
+    const openBugs = bugs.filter(
+        (b: any) => b.fields["System.State"] !== "Closed"
+    );
+
+    const lastRunId = lastRunByTestCase[tc.workItem.id];
+
+    return {
+        planName,
+        areaPath: workItem.fields["System.AreaPath"],
+        iteration: planIteration,
+        suiteName,
+        suiteId,
+        testCaseId: tc.workItem.id,
+        testCaseTitle: tc.workItem.name,
+        testCaseUrl: workItem._links?.html?.href,
+        priority:
+            workItem.fields["Microsoft.VSTS.Common.Priority"] ?? 4,
+        hasOpenBugs: openBugs.length > 0,
+        outcome: resolveOutcome(
+            outcomesByTestCase[tc.workItem.id] ?? []
+        ),
+        bugs: bugs.map((b: any) => ({
+            id: b.id,
+            title: b.fields["System.Title"],
+            state: b.fields["System.State"],
+            description: htmlToPlainText(
+                b.fields["System.Description"] ||
+                    b.fields["Microsoft.VSTS.TCM.ReproSteps"]
+            ),
+            url: buildWorkItemUrl(b.id, project),
+            creator: b.fields["System.CreatedBy"]?.displayName,
+            assignee: b.fields["System.AssignedTo"]
+                ? {
+                      displayName: b.fields["System.AssignedTo"].displayName,
+                      uniqueName: b.fields["System.AssignedTo"].uniqueName,
+                  }
+                : undefined,
+            createdDate: b.fields["System.CreatedDate"],
+            changedDate: b.fields["System.ChangedDate"],
+            closedDate: b.fields["Microsoft.VSTS.Common.ClosedDate"],
+        })),
+        lastRunId,
+        lastRunUrl: lastRunId
+            ? buildTestRunUrl(lastRunId, project)
+            : undefined,
+    };
+}
+
+const PLAN_FETCH_CONCURRENCY = 6;
+const SUITE_FETCH_CONCURRENCY = 12;
+
+export async function buildDashboardOptimized(
+    project?: string
+): Promise<TestCaseRow[]> {
+    const plans = await getTestPlans(project);
+
+    // (plan, suite) pairs in the exact order buildDashboard() walks them -
+    // getTestCaseLookups() relies on that order (first-seen wins for a test
+    // case's iteration / resolved suite). getSuites runs concurrency-limited
+    // but the results are stitched back in plan order.
+    const suitesPerPlan = await mapWithConcurrency(
+        plans,
+        PLAN_FETCH_CONCURRENCY,
+        (plan: any) => getSuites(plan.id, project)
+    );
+    const planSuites: { plan: any; suite: any }[] = [];
+    plans.forEach((plan: any, i: number) => {
+        for (const suite of suitesPerPlan[i]) {
+            planSuites.push({ plan, suite });
+        }
+    });
+
+    // testcases + points per suite, concurrency-limited, results kept in order.
+    const suiteData = await mapWithConcurrency(
+        planSuites,
+        SUITE_FETCH_CONCURRENCY,
+        async ({ plan, suite }) => {
+            const [testCases, testPoints] = await Promise.all([
+                getTestCases(plan.id, suite.id, project),
+                getTestPoints(plan.id, suite.id, project),
+            ]);
+            return {
+                plan,
+                suite,
+                testCases,
+                index: indexSuiteTestPoints(testPoints),
+            };
+        }
+    );
+
+    // One batched relations fetch for every test case work item, then one
+    // batched fetch for every linked work item.
+    const allTcIds = [
+        ...new Set(
+            suiteData.flatMap((s) =>
+                s.testCases.map((tc: any) => tc.workItem.id)
+            )
+        ),
+    ];
+    // `all` (not just `relations`) so the batch response carries `_links`
+    // too - the batch endpoint omits it under `$expand=relations`, and
+    // buildTestCaseRow reads `workItem._links.html.href` for testCaseUrl.
+    const tcItems = await getWorkItems(allTcIds, undefined, project, {
+        expand: "all",
+    });
+    const tcItemById = new Map<number, any>(
+        tcItems.map((i: any) => [i.id, i])
+    );
+
+    const allLinkedIds = [
+        ...new Set(
+            tcItems.flatMap((i: any) => extractWorkItemIds(i.relations))
+        ),
+    ];
+    const linkedItems = await getWorkItems(allLinkedIds, undefined, project);
+    const linkedById = new Map<number, any>(
+        linkedItems.map((i: any) => [i.id, i])
+    );
+
+    const rows: TestCaseRow[] = [];
+    for (const { plan, suite, testCases, index } of suiteData) {
+        for (const tc of testCases) {
+            const workItem = tcItemById.get(tc.workItem.id);
+            if (!workItem) {
+                // buildTestCaseRow() would have thrown on a deleted TC work
+                // item; healthy plans never hit this.
+                continue;
+            }
+            // dedupe ids: Azure's ?ids= batch collapses duplicates, so
+            // getWorkItems() in the original path already did; a test case
+            // can reference the same bug via two relation types.
+            const linked = [
+                ...new Set(extractWorkItemIds(workItem.relations)),
+            ]
+                .map((id) => linkedById.get(id))
+                .filter((x): x is any => x != null);
+            rows.push(
+                assembleTestCaseRow(
+                    tc,
+                    plan.name,
+                    suite.name,
+                    suite.id,
+                    workItem,
+                    linked,
+                    index.outcomesByTestCase,
+                    index.lastRunByTestCase,
+                    plan.iteration,
+                    project
+                )
+            );
+        }
+    }
+
+    return rows;
 }
 
 // Plan descriptions are used as a place to hand-paste that sprint's report

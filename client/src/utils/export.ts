@@ -158,20 +158,17 @@ function statusCountLabel(
   return `${count} ${label}${suffix}`;
 }
 
-// "Bug da chiudere" KPI label - the out-of-scope note only shows up when
-// there actually are open out-of-scope bugs (in practice rare, since
-// out-of-scope bugs tend to get closed as soon as they're triaged - see
-// computeBugStatusData's closedOutOfScopeCount comment), unlike the "Bug
-// chiusi" tile's note which is basically always shown.
+// "Bug da chiudere" KPI label - always carries the "(di cui N out of scope)"
+// note, mirroring the "Bug chiusi" tile's bugsClosedRatio wording (which is
+// likewise shown even when N is 0) so the two bug-count tiles read the same
+// way. The plain bugsToClose key is kept for the KPI legend only.
 export function bugsToCloseLabel(
   t: TranslateFn,
   toCloseOutOfScopeCount: number,
 ): string {
-  return toCloseOutOfScopeCount > 0
-    ? t("defectManagementPage.sprintReport.statusCard.kpis.bugsToCloseRatio", {
-        count: toCloseOutOfScopeCount,
-      })
-    : t("defectManagementPage.sprintReport.statusCard.kpis.bugsToClose");
+  return t("defectManagementPage.sprintReport.statusCard.kpis.bugsToCloseRatio", {
+    count: toCloseOutOfScopeCount,
+  });
 }
 
 function formatEmailTimestamp(date: Date): {
@@ -531,6 +528,7 @@ export function buildStatusReportCardEmailBodyHtml(
   const {
     totalTestCases,
     totalPassed,
+    passedPct,
     totalNotApplicable,
     totalExecuted,
     executedPct,
@@ -679,9 +677,9 @@ export function buildStatusReportCardEmailBodyHtml(
       "16.66%",
     ) +
     lightKpiTile(
-      String(totalPassed),
+      `${totalPassed} (${passedPct}%)`,
       1,
-      t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"),
+      t("defectManagementPage.sprintReport.statusCard.kpis.passedCount"),
       "16.66%",
     ) +
     lightKpiTile(
@@ -1054,6 +1052,9 @@ function pdfSeverityChipsRow(
 export interface StatusCardKpis {
   totalTestCases: number;
   totalPassed: number;
+  // Passed as a share of all test cases (like executedPct) - not the same
+  // as passRate, which divides by the decided-only total (Total minus N/A).
+  passedPct: number;
   totalNotApplicable: number;
   totalDecided: number;
   totalExecuted: number;
@@ -1099,6 +1100,9 @@ export function computeStatusCardKpis(
   const totalDecided = totalTestCases - totalNotApplicable;
   const passRate = totalDecided
     ? Math.round((totalPassed / totalDecided) * 100)
+    : 0;
+  const passedPct = totalTestCases
+    ? Math.round((totalPassed / totalTestCases) * 100)
     : 0;
   const notApplicableRate = totalTestCases
     ? Math.round((totalNotApplicable / totalTestCases) * 100)
@@ -1162,6 +1166,7 @@ export function computeStatusCardKpis(
   return {
     totalTestCases,
     totalPassed,
+    passedPct,
     totalNotApplicable,
     totalDecided,
     totalExecuted,
@@ -1846,7 +1851,7 @@ export function buildStatusReportCardPdfDocument(
         t("defectManagementPage.sprintReport.statusCard.kpis.executedCount"),
         t("defectManagementPage.sprintReport.statusCard.kpis.notApplicable"),
         t("defectManagementPage.sprintReport.statusCard.kpis.notRun"),
-        t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"),
+        t("defectManagementPage.sprintReport.statusCard.kpis.passedCount"),
         t("defectManagementPage.sprintReport.statusCard.kpis.passRate"),
       ],
     ],
@@ -1856,7 +1861,7 @@ export function buildStatusReportCardPdfDocument(
         `${kpis.totalExecuted} (${kpis.executedPct}%)`,
         `${kpis.totalNotApplicable} (${kpis.notApplicableRate}%)`,
         String(kpis.totalNotRun),
-        String(kpis.totalPassed),
+        `${kpis.totalPassed} (${kpis.passedPct}%)`,
         `${kpis.passRate}%`,
       ],
     ],
@@ -2025,7 +2030,7 @@ const KPI_LEGEND_TEST_CASES: KpiLegendEntry[] = [
   { labelKey: "executedCount", helpKey: "executedCount" },
   { labelKey: "notApplicable", helpKey: "notApplicable" },
   { labelKey: "notRun", helpKey: "notRun" },
-  { labelKey: "totalPassed", helpKey: "totalPassed" },
+  { labelKey: "passedCount", helpKey: "passedCount" },
   { labelKey: "passRate", helpKey: "passRate" },
 ];
 
@@ -2529,8 +2534,8 @@ function buildPptxKpiDefs(
       label: t("defectManagementPage.sprintReport.statusCard.kpis.notRun"),
     },
     {
-      value: String(kpis.totalPassed),
-      label: t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"),
+      value: `${kpis.totalPassed} (${kpis.passedPct}%)`,
+      label: t("defectManagementPage.sprintReport.statusCard.kpis.passedCount"),
     },
     {
       value: `${kpis.passRate}%`,

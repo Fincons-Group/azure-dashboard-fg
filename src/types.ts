@@ -392,6 +392,9 @@ export interface SprintDefectReport {
     // them without a second query - the DSI suite lives in the bug's own
     // Custom.Suite field, not in any selected test plan's suite tree.
     dsiDefects: DefectSummary[];
+    // Same idea for Business-origin bugs (Custom.Suite = "Test Business") -
+    // drives the Excel export's "Bug Business" sheet.
+    businessDefects: DefectSummary[];
     // Every detected bug (any origin, in-scope or not) created or last changed
     // "today" in the report timezone (TEAMS_VERIFICA_TIMEZONE, default
     // Europe/Rome) - drives the Excel export's "Bug Odierni" sheet.
@@ -489,6 +492,43 @@ export interface PlanOverviewSuiteDetail {
     bugs: BugInfo[];
 }
 
+// One row per test case in a plan, with everything the Excel export's
+// filterable "Casi di Test" sheet needs. Populated by computePlanOverview().
+export interface PlanOverviewTestCase {
+    suiteId: number;
+    suiteName: string;
+    testCaseId: number;
+    title: string;
+    url?: string;
+    // Test Case work item state (Design | Ready | Closed).
+    state?: string;
+    priority: number;
+    // Aggregated execution verdict across the test case's points (same value
+    // that feeds the suite outcome counts).
+    outcome: Outcome;
+    // Reached a real verdict (Passed | Failed | Blocked).
+    executed: boolean;
+    notRun: boolean;
+    // Executed but has open bugs -> needs another pass once they're fixed.
+    needsRetest: boolean;
+    automationStatus?: string;
+    assignedTo?: string;
+    // Tester the point is assigned to (may differ from who actually ran it).
+    tester?: string;
+    // Identity that ran the most recent result.
+    lastRunBy?: string;
+    lastRunAt?: string;
+    daysSinceLastRun?: number;
+    configuration?: string;
+    tags: string[];
+    bugCount: number;
+    hasOpenBugs: boolean;
+    bugIds: number[];
+    areaPath?: string;
+    lastRunId?: number;
+    lastRunUrl?: string;
+}
+
 export interface PlanOverviewResponse {
     planId: number;
     planName: string;
@@ -501,6 +541,7 @@ export interface PlanOverviewResponse {
     bugsByState: PlanOverviewBugStateCount[];
     bugs: BugInfo[];
     suites: PlanOverviewSuiteDetail[];
+    testCases: PlanOverviewTestCase[];
 }
 
 // Sourced from the Analytics OData feed (TestPointHistorySnapshot), which

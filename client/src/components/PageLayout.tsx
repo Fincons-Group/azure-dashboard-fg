@@ -20,6 +20,14 @@ const useStyles = makeStyles({
         transitionDuration: tokens.durationSlow,
         transitionTimingFunction: tokens.curveEasyEase,
     },
+    // Full-bleed pages own the whole viewport below the top bars and manage
+    // their own scrolling (e.g. the embedded spreadsheet on the Excel Export
+    // page), so the outer frame must not scroll or add a centered column.
+    mainFullBleed: {
+        height: "100vh",
+        minHeight: 0,
+        overflow: "hidden",
+    },
     mainExpanded: {
         marginLeft: SIDEBAR_WIDTH,
     },
@@ -41,6 +49,16 @@ const useStyles = makeStyles({
         // the report content, so the usual 1200px column feels cramped.
         maxWidth: "1600px",
     },
+    contentFullBleed: {
+        flex: "1 1 auto",
+        minHeight: 0,
+        maxWidth: "none",
+        width: "100%",
+        margin: 0,
+        padding: 0,
+        gap: 0,
+        overflow: "hidden",
+    },
 });
 
 function getInitialCollapsed(): boolean {
@@ -52,11 +70,13 @@ export function PageLayout({
     children,
     hideAreaSprintScope = false,
     wide = false,
+    fullBleed = false,
 }: {
     title: string;
     children: ReactNode;
     hideAreaSprintScope?: boolean;
     wide?: boolean;
+    fullBleed?: boolean;
 }) {
     const styles = useStyles();
     const [collapsed, setCollapsed] = useState(getInitialCollapsed);
@@ -76,7 +96,8 @@ export function PageLayout({
             <div
                 className={mergeClasses(
                     styles.main,
-                    collapsed ? styles.mainCollapsed : styles.mainExpanded
+                    collapsed ? styles.mainCollapsed : styles.mainExpanded,
+                    fullBleed && styles.mainFullBleed
                 )}
             >
                 <TopBar title={title} />
@@ -85,7 +106,8 @@ export function PageLayout({
                 <div
                     className={mergeClasses(
                         styles.content,
-                        wide && styles.contentWide
+                        wide && styles.contentWide,
+                        fullBleed && styles.contentFullBleed
                     )}
                 >
                     {children}

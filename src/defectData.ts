@@ -9,6 +9,8 @@ import {
     buildWorkItemUrl,
 } from "./azdo.js";
 import { getDashboardData, htmlToPlainText } from "./dashboardData.js";
+import { mapWithConcurrency } from "./concurrency.js";
+import { dedupe } from "./inflight.js";
 import { parseAllowedSenders, isAllowedSender } from "./teamsNotifier.js";
 import type {
     DefectRecord,
@@ -468,6 +470,8 @@ async function buildDefectRecord(
     };
 }
 
+// Reference (unbatched) build - kept only for compare-optimized.ts. The live
+// path (getDefectData) uses buildDefectRecordsOptimized().
 export async function buildDefectRecords(project?: string): Promise<DefectRecord[]> {
     const [bugs, lookups] = await Promise.all([
         getAllBugFields(project),
@@ -483,24 +487,249 @@ export async function buildDefectRecords(project?: string): Promise<DefectRecord
 
 export async function getDefectData(project?: string): Promise<DefectRecord[]> {
     const projectKey = resolveProjectKey(project);
-    const now = Date.now();
     const cached = defectCache.get(projectKey);
 
-    if (cached && now - cached.timestamp < CACHE_DURATION_MS) {
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
         return cached.data;
     }
 
-    const data = await buildDefectRecords(project);
+    return dedupe(`defectData:${projectKey}`, async () => {
+        const fresh = defectCache.get(projectKey);
+        if (fresh && Date.now() - fresh.timestamp < CACHE_DURATION_MS) {
+            return fresh.data;
+        }
 
-    defectCache.set(projectKey, { data, timestamp: now });
-
-    return data;
+        const data = await buildDefectRecordsOptimized(project);
+        defectCache.set(projectKey, { data, timestamp: Date.now() });
+        return data;
+    });
 }
 
 export function clearDefectCache(): void {
     defectCache.clear();
     storyPointsCache.clear();
     suiteNamesCache.clear();
+    revisionsCache.clear();
+}
+
+/* ================================================================== */
+/* Optimized (batched) defect-record build - the live path.            */
+/* Per-bug relations come from a single batched                        */
+/* getWorkItems($expand=relations) instead of one getWorkItem() per    */
+/* bug; linked test-case types from one batched fetch; revisions run   */
+/* concurrency-limited + cached by ChangedDate.                        */
+/* buildDefectRecords/buildDefectRecord are kept only as the reference */
+/* for src/scripts/compare-optimized.ts.                               */
+/* ================================================================== */
+
+const revisionsCache = new Map<
+    string,
+    { data: any[]; timestamp: number }
+>();
+const REVISIONS_TTL_MS = 60 * 60 * 1000;
+const BUG_FETCH_CONCURRENCY = 20;
+
+async function getRevisionsCached(
+    bugId: number,
+    changedDate: string | undefined,
+    project?: string
+): Promise<any[]> {
+    const key = `${resolveProjectKey(project)}:${bugId}:${changedDate ?? ""}`;
+    const now = Date.now();
+    const hit = revisionsCache.get(key);
+
+    if (changedDate && hit && now - hit.timestamp < REVISIONS_TTL_MS) {
+        return hit.data;
+    }
+
+    const data = await getWorkItemRevisions(bugId, project);
+
+    if (changedDate) {
+        revisionsCache.set(key, { data, timestamp: now });
+    }
+
+    return data;
+}
+
+// Sync equivalent of getLinkedTestCaseIds(), off pre-fetched relations +
+// a workItemType-by-id map. Same "linkedIds order, Test Case only" result.
+function linkedTestCaseIdsFrom(
+    relations: any[],
+    typeById: Map<number, string>
+): number[] {
+    const testedByRelations = relations.filter(
+        (r: any) =>
+            typeof r.rel === "string" &&
+            r.rel.startsWith("Microsoft.VSTS.Common.TestedBy")
+    );
+
+    // dedupe: the original getLinkedTestCaseIds() fetched these via
+    // getWorkItems(), and Azure's ?ids= batch collapses duplicate ids.
+    return [...new Set(extractWorkItemIds(testedByRelations))].filter(
+        (id) => typeById.get(id) === "Test Case"
+    );
+}
+
+// Pure tail of buildDefectRecord() - identical logic, pre-fetched inputs.
+function assembleDefectRecord(
+    bug: any,
+    lookups: TestCaseLookups,
+    linkedTestCaseIds: number[],
+    revisions: any[],
+    project: string | undefined
+): DefectRecord {
+    const suiteName: string | undefined = normalizeSuiteName(
+        bug.fields["Custom.Suite"]
+    );
+
+    let iterationPath: string | undefined = isSpecificIterationPath(
+        bug.fields["System.IterationPath"]
+    )
+        ? bug.fields["System.IterationPath"]
+        : undefined;
+
+    if (!iterationPath) {
+        for (const tcId of linkedTestCaseIds) {
+            iterationPath ??= lookups.iterationByTestCase.get(tcId);
+        }
+    }
+
+    let resolvedSuiteName: string | undefined;
+
+    if (suiteName && suiteName in DUPLICATE_SUITE_ORIGINS) {
+        for (const tcId of linkedTestCaseIds) {
+            const title = lookups.titleByTestCase.get(tcId);
+            const matchedSuite = title
+                ? lookups.suiteByTitle.get(title)
+                : undefined;
+
+            if (matchedSuite) {
+                resolvedSuiteName = matchedSuite;
+                break;
+            }
+        }
+    }
+
+    const state = bug.fields["System.State"];
+    const reason = bug.fields["System.Reason"];
+    const tags = parseTags(bug.fields["System.Tags"]);
+
+    return {
+        id: bug.id,
+        title: bug.fields["System.Title"],
+        state,
+        description: htmlToPlainText(
+            bug.fields["System.Description"] ||
+                bug.fields["Microsoft.VSTS.TCM.ReproSteps"]
+        ),
+        reason,
+        tags,
+        closureReason: computeClosureReason(state, reason, tags),
+        severity: bug.fields["Microsoft.VSTS.Common.Severity"],
+        priority: bug.fields["Microsoft.VSTS.Common.Priority"],
+        areaPath: bug.fields["System.AreaPath"],
+        iterationPath,
+        suiteName,
+        resolvedSuiteName,
+        environment: bug.fields["Microsoft.VSTS.Build.FoundIn"],
+        createdDate: bug.fields["System.CreatedDate"],
+        closedDate: bug.fields["Microsoft.VSTS.Common.ClosedDate"],
+        changedDate: bug.fields["System.ChangedDate"],
+        estimatedResolutionDate: bug.fields["Custom.EstimatedResolutionDate"],
+        reopenedCount: countReopenings(revisions),
+        verificaTransition: findLastTransitionInto(revisions, [VERIFICA_STATE]),
+        verificaPendingTransition: findLastTransitionInto(
+            revisions,
+            VERIFICA_PENDING_STATES
+        ),
+        verificaExitTransition: findLastTransitionOutOf(
+            revisions,
+            VERIFICA_PENDING_STATES
+        ),
+        lastReopenedTransition: findLastTransitionInto(
+            revisions,
+            REOPENED_TO_STATES
+        ),
+        hasLinkedTestCase: linkedTestCaseIds.length > 0,
+        url: buildWorkItemUrl(bug.id, project),
+        creator: bug.fields["System.CreatedBy"]?.displayName,
+        assignedTo: bug.fields["System.AssignedTo"]
+            ? {
+                  displayName: bug.fields["System.AssignedTo"].displayName,
+                  uniqueName: bug.fields["System.AssignedTo"].uniqueName,
+              }
+            : undefined,
+    };
+}
+
+export async function buildDefectRecordsOptimized(
+    project?: string
+): Promise<DefectRecord[]> {
+    // getTestCaseLookups() reads getDashboardData(), which is now itself the
+    // batched build, so no separate optimized lookup is needed.
+    const [bugs, lookups] = await Promise.all([
+        getAllBugFields(project),
+        getTestCaseLookups(project),
+    ]);
+
+    const bugIds = bugs.map((b: any) => b.id);
+
+    // One batched relations fetch instead of one getWorkItem() per bug.
+    const bugItems = await getWorkItems(bugIds, undefined, project, {
+        expand: "relations",
+    });
+    const relationsById = new Map<number, any[]>(
+        bugItems.map((i: any) => [i.id, i.relations ?? []])
+    );
+
+    // Union of every bug's TestedBy targets -> one batched fetch to learn
+    // which of those are Test Cases.
+    const testedByIds = [
+        ...new Set(
+            bugs.flatMap((b: any) => {
+                const rels = (relationsById.get(b.id) ?? []).filter(
+                    (r: any) =>
+                        typeof r.rel === "string" &&
+                        r.rel.startsWith("Microsoft.VSTS.Common.TestedBy")
+                );
+                return extractWorkItemIds(rels);
+            })
+        ),
+    ];
+    const linkedItems = await getWorkItems(testedByIds, undefined, project);
+    const typeById = new Map<number, string>(
+        linkedItems.map((i: any) => [
+            i.id,
+            i.fields["System.WorkItemType"],
+        ])
+    );
+
+    // Revisions: no batch API, so concurrency-limited + cached by ChangedDate.
+    const revisionsByBug = new Map<number, any[]>();
+    await mapWithConcurrency(bugs, BUG_FETCH_CONCURRENCY, async (bug: any) => {
+        revisionsByBug.set(
+            bug.id,
+            await getRevisionsCached(
+                bug.id,
+                bug.fields["System.ChangedDate"],
+                project
+            )
+        );
+    });
+
+    return bugs.map((bug: any) => {
+        const linkedTestCaseIds = linkedTestCaseIdsFrom(
+            relationsById.get(bug.id) ?? [],
+            typeById
+        );
+        return assembleDefectRecord(
+            bug,
+            lookups,
+            linkedTestCaseIds,
+            revisionsByBug.get(bug.id) ?? [],
+            project
+        );
+    });
 }
 
 function groupCount(
@@ -990,6 +1219,9 @@ export function computeSprintDefectReport(
         // so the Excel report can list them - they're keyed off the bug's own
         // Custom.Suite = "Test DSI", not any selected plan's suite tree.
         dsiDefects: records.filter((r) => originOf(r) === "DSI").map(toSummary),
+        businessDefects: records
+            .filter((r) => originOf(r) === "Business")
+            .map(toSummary),
         // Any detected bug created or last changed today (report timezone),
         // newest activity first - see the "Bug Odierni" sheet in the Excel
         // export.
