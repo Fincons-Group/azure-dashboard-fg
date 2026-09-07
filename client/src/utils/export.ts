@@ -140,6 +140,17 @@ function outcomeCountLabel(
   return `${count} ${label}`;
 }
 
+// The "(di cui N out of scope)" / "(N out of scope included)" clause is only
+// meaningful once there's at least one such bug - shown as blank otherwise
+// rather than a permanent "(di cui 0 out of scope)".
+function outOfScopeSuffix(t: TranslateFn, outOfScopeCount: number): string {
+  return outOfScopeCount > 0
+    ? t("defectManagementPage.sprintReport.statusCard.closedOutOfScopeNote", {
+        count: outOfScopeCount,
+      })
+    : "";
+}
+
 function statusCountLabel(
   t: TranslateFn,
   name: string,
@@ -150,25 +161,34 @@ function statusCountLabel(
     `defectManagementPage.sprintReport.statusCard.statusLabels.${EMAIL_STATUS_LABEL_KEYS[name]}`,
   );
   const suffix =
-    name === "Closed" && closedOutOfScopeCount > 0
-      ? t("defectManagementPage.sprintReport.statusCard.closedOutOfScopeNote", {
-          count: closedOutOfScopeCount,
-        })
-      : "";
+    name === "Closed" ? outOfScopeSuffix(t, closedOutOfScopeCount) : "";
   return `${count} ${label}${suffix}`;
 }
 
-// "Bug da chiudere" KPI label - always carries the "(di cui N out of scope)"
-// note, mirroring the "Bug chiusi" tile's bugsClosedRatio wording (which is
-// likewise shown even when N is 0) so the two bug-count tiles read the same
-// way. The plain bugsToClose key is kept for the KPI legend only.
+// "Bug chiusi" KPI label, with the "(di cui N out of scope)" note appended
+// only when N > 0.
+export function bugsClosedLabel(
+  t: TranslateFn,
+  closedOutOfScopeCount: number,
+): string {
+  return (
+    t("defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio") +
+    outOfScopeSuffix(t, closedOutOfScopeCount)
+  );
+}
+
+// "Bug da chiudere" KPI label, with the "(di cui N out of scope)" note
+// appended only when N > 0 - mirrors bugsClosedLabel above so the two
+// bug-count tiles read the same way. The plain bugsToClose key is kept for
+// the KPI legend only.
 export function bugsToCloseLabel(
   t: TranslateFn,
   toCloseOutOfScopeCount: number,
 ): string {
-  return t("defectManagementPage.sprintReport.statusCard.kpis.bugsToCloseRatio", {
-    count: toCloseOutOfScopeCount,
-  });
+  return (
+    t("defectManagementPage.sprintReport.statusCard.kpis.bugsToCloseRatio") +
+    outOfScopeSuffix(t, toCloseOutOfScopeCount)
+  );
 }
 
 function formatEmailTimestamp(date: Date): {
@@ -712,9 +732,7 @@ export function buildStatusReportCardEmailBodyHtml(
     lightKpiTile(
       `${bugsClosed}/${report.total} (${bugsClosedPct}%)`,
       2,
-      t("defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio", {
-        count: closedOutOfScopeCount,
-      }),
+      bugsClosedLabel(t, closedOutOfScopeCount),
       "25%",
     ) +
     lightKpiTile(
@@ -1374,12 +1392,7 @@ function buildPdfBugRow1KpiDefs(
     },
     {
       kpi: LIGHT_KPI[2],
-      label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio",
-        {
-          count: closedOutOfScopeCount,
-        },
-      ),
+      label: bugsClosedLabel(t, closedOutOfScopeCount),
       value: `${kpis.bugsClosed}/${report.total} (${kpis.bugsClosedPct}%)`,
     },
     {
@@ -2565,12 +2578,7 @@ function buildPptxRow2KpiDefs(
     },
     {
       value: `${kpis.bugsClosed}/${report.total} (${kpis.bugsClosedPct}%)`,
-      label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio",
-        {
-          count: closedOutOfScopeCount,
-        },
-      ),
+      label: bugsClosedLabel(t, closedOutOfScopeCount),
     },
     {
       value: `${kpis.bugsToClose}/${report.total} (${kpis.toClosePct}%)`,

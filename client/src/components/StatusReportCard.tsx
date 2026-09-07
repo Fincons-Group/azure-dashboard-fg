@@ -5,6 +5,7 @@ import { Tooltip, makeStyles } from "@fluentui/react-components";
 import { InfoRegular } from "@fluentui/react-icons";
 import { SuiteProgressBar } from "./SuiteProgressBar";
 import {
+  bugsClosedLabel,
   bugsToCloseLabel,
   computeBugStatusData,
   computeStatusCardKpis,
@@ -517,26 +518,20 @@ function KpiTile({
   labelKey,
   label,
   helpKey,
-  labelCount,
 }: {
   value: ReactNode;
   color: string;
   labelKey?: string;
   label?: string;
   helpKey: string;
-  labelCount?: number;
 }) {
   const { t } = useTranslation();
   const styles = useStyles();
 
-  // `label` (already-resolved text) wins over the labelKey/labelCount
-  // translation lookup - used when the label needs conditional wording
-  // that a single translation key can't express (e.g. bugsToCloseLabel).
-  const resolvedLabel =
-    label ??
-    (labelCount === undefined
-      ? t(labelKey ?? "")
-      : t(labelKey ?? "", { count: labelCount }));
+  // `label` (already-resolved text) wins over the labelKey translation
+  // lookup - used when the label needs conditional wording that a single
+  // translation key can't express (e.g. bugsClosedLabel/bugsToCloseLabel).
+  const resolvedLabel = label ?? t(labelKey ?? "");
 
   return (
     <div className={styles.kpiTile}>
@@ -798,9 +793,8 @@ export const StatusReportCard = forwardRef<
               <KpiTile
                 value={`${bugsClosed}/${report.total} (${bugsClosedPct}%)`}
                 color="#f2b134"
-                labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsClosedRatio"
+                label={bugsClosedLabel(t, closedOutOfScopeCount)}
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsClosedRatio"
-                labelCount={closedOutOfScopeCount}
               />
               <KpiTile
                 value={`${bugsToClose}/${report.total} (${toClosePct}%)`}

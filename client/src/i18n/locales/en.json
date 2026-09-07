@@ -150,7 +150,7 @@
           "notApplicable": "Not Applicable",
           "bugsClosedRatio": "Bugs Closed / Total\n(all detected)",
           "bugsToClose": "Bugs To Close",
-          "bugsToCloseRatio": "Bugs To Close (of which {{count}} out of scope)",
+          "bugsToCloseRatio": "Bugs To Close",
           "criticalBugs": "Critical Bugs (open)",
           "reopenedBugs": "Reopened Bugs",
           "avgClosureTime": "Average Bug Closure Time",
