@@ -1,10 +1,13 @@
 // Automates the release process end to end:
 //   1. picks patch/minor/major from the Conventional Commits since the last tag
-//   2. bumps the root package.json version
-//   3. commits and pushes that bump to main
+//   2. bumps the root package.json version on a release/vX.Y.Z branch
+//   3. opens a PR into main, waits for required checks, and merges it
+//      (main requires a PR - see .github/workflows/configure-branch-protection.yml)
 //   4. creates and pushes the vX.Y.Z tag
 // Pushing the tag is what triggers publish-package.yml (npm publish) and
 // deploy-pages.yml (GitHub Pages deploy) - see .github/workflows/.
+//
+// Requires the "gh" CLI, authenticated for this repo's GitHub host.
 //
 // Usage:
 //   npm run release                  # auto-detect bump from commit messages
@@ -13,6 +16,11 @@
 //   npm run release -- patch         # force a patch bump
 //   npm run release -- 1.4.2         # explicit version
 //   npm run release -- --yes         # skip the confirmation prompt
+//
+//   npm run release -- --tag-only    # main already has the version bump
+//                                     # (e.g. you merged the release PR by
+//                                     # hand) - just tag current main HEAD
+//                                     # and push, skipping the branch/PR/merge
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -20,12 +28,14 @@ import { createInterface } from "node:readline/promises";
 
 const args = process.argv.slice(2);
 const yes = args.includes("--yes") || args.includes("-y");
-const bump = args.find((a) => a !== "--yes" && a !== "-y") ?? "auto";
+const tagOnly = args.includes("--tag-only");
+const bump = args.find((a) => a !== "--yes" && a !== "-y" && a !== "--tag-only") ?? "auto";
 
 // On Windows, npm/npx/gh-adjacent CLIs installed via the standard installer
 // are .cmd shims rather than .exe files, which execFileSync can't launch
-// directly without a shell (spawnSync ENOENT).
+// directly without a shell (spawnSync ENOENT/EINVAL).
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const winShell = process.platform === "win32";
 
 function run(command, cmdArgs, options = {}) {
     return execFileSync(command, cmdArgs, {
@@ -39,6 +49,7 @@ function runCapture(command, cmdArgs, options = {}) {
     return execFileSync(command, cmdArgs, {
         encoding: "utf8",
         stdio: ["ignore", "pipe", options.quiet ? "ignore" : "pipe"],
+        ...options,
     }).trim();
 }
 
@@ -94,6 +105,36 @@ function detectBump() {
     return { type, lastTag, commits };
 }
 
+function tagAndPublish(tag) {
+    const existingTags = runCapture("git", ["tag", "-l", tag]);
+    if (existingTags !== "") {
+        fail(`tag ${tag} already exists`);
+    }
+
+    run("git", ["tag", "-a", tag, "-m", `Release ${tag}`]);
+
+    console.log(`Pushing tag ${tag}...`);
+    try {
+        run("git", ["push", "origin", tag]);
+    } catch {
+        fail(`pushing tag ${tag} failed - push it manually with: git push origin ${tag}`);
+    }
+
+    try {
+        run("gh", ["release", "create", tag, "--title", tag, "--generate-notes"], { silent: true });
+        console.log(`\nGitHub release ${tag} created.`);
+    } catch {
+        console.log(
+            `\n(skipped creating a GitHub release - "gh" isn't available/authenticated for this repo's host; ` +
+                "the tag push already triggered the publish and deploy workflows)"
+        );
+    }
+
+    console.log(
+        `\nDone. ${tag} is pushed - check the Actions tab for the "Publish package" and "Deploy to GitHub Pages" runs.`
+    );
+}
+
 // --- preflight -------------------------------------------------------------
 
 if (!["auto", "patch", "minor", "major"].includes(bump) && !/^\d+\.\d+\.\d+$/.test(bump)) {
@@ -124,6 +165,18 @@ try {
     fail("local main has diverged from origin/main - reconcile manually and re-run");
 }
 
+// --- --tag-only: main already has the bump, just tag it --------------------
+
+if (tagOnly) {
+    const version = JSON.parse(readFileSync("package.json", "utf8")).version;
+    const tag = `v${version}`;
+    console.log(`\nmain is at version ${version}.`);
+    const proceed = await confirm(`Tag current main HEAD as ${tag} and push it (triggers npm publish + GitHub Pages deploy)?`);
+    if (!proceed) fail("cancelled");
+    tagAndPublish(tag);
+    process.exit(0);
+}
+
 // --- version bump ------------------------------------------------------------
 
 const before = JSON.parse(readFileSync("package.json", "utf8")).version;
@@ -151,13 +204,11 @@ if (bump === "auto") {
     console.log(`Detected bump: ${resolvedBump}`);
 }
 
-run(npmCommand, ["version", resolvedBump, "--no-git-tag-version"], {
-    silent: true,
-    shell: process.platform === "win32",
-});
+run(npmCommand, ["version", resolvedBump, "--no-git-tag-version"], { silent: true, shell: winShell });
 
 const after = JSON.parse(readFileSync("package.json", "utf8")).version;
 const tag = `v${after}`;
+const branchName = `release/${tag}`;
 
 const existingTags = runCapture("git", ["tag", "-l", tag]);
 if (existingTags !== "") {
@@ -167,49 +218,68 @@ if (existingTags !== "") {
 
 console.log(`New version:     ${after}`);
 const proceed = await confirm(
-    `\nThis will commit the bump, push to main, then push tag ${tag} (triggering npm publish + GitHub Pages deploy). Continue?`
+    `\nThis will open branch "${branchName}", PR it into main, wait for checks, merge, then push tag ${tag} ` +
+        "(triggering npm publish + GitHub Pages deploy). Continue?"
 );
 if (!proceed) {
     run("git", ["checkout", "--", "package.json", "package-lock.json"]);
     fail("cancelled");
 }
 
-// --- commit, tag, push -------------------------------------------------------
+// --- branch, commit, PR, merge -----------------------------------------------
 
+run("git", ["checkout", "-b", branchName]);
 run("git", ["add", "package.json", "package-lock.json"]);
 run("git", ["commit", "-m", `chore(release): ${tag}`]);
 
-console.log("\nPushing release commit to main...");
+console.log(`\nPushing ${branchName}...`);
+run("git", ["push", "-u", "origin", branchName]);
+
+console.log("Opening PR...");
+let prNumber;
 try {
-    run("git", ["push", "origin", "main"]);
+    run("gh", [
+        "pr",
+        "create",
+        "--base",
+        "main",
+        "--title",
+        `chore(release): ${tag}`,
+        "--body",
+        `Automated release PR: ${before} -> ${after}.`,
+    ]);
+    prNumber = runCapture("gh", ["pr", "view", "--json", "number", "--jq", ".number"]);
 } catch {
     fail(
-        "push to main was rejected (branch protection?) - the release commit is still local on main; " +
-            "push it via a PR, then re-run to just create/push the tag"
+        `could not open a PR automatically - "${branchName}" is pushed, open a PR into main and merge it by hand, ` +
+            `then run: npm run release -- --tag-only`
     );
 }
 
-run("git", ["tag", "-a", tag, "-m", `Release ${tag}`]);
-
-console.log(`Pushing tag ${tag}...`);
+console.log(`\nWaiting for required checks on PR #${prNumber}...`);
 try {
-    run("git", ["push", "origin", tag]);
+    run("gh", ["pr", "checks", String(prNumber), "--watch"]);
 } catch {
-    fail(`main was updated but pushing tag ${tag} failed - push it manually with: git push origin ${tag}`);
-}
-
-// --- optional GitHub release notes ------------------------------------------
-
-try {
-    run("gh", ["release", "create", tag, "--title", tag, "--generate-notes"], { silent: true });
-    console.log(`\nGitHub release ${tag} created.`);
-} catch {
-    console.log(
-        `\n(skipped creating a GitHub release - "gh" isn't available/authenticated for this repo's host; ` +
-            "the tag push already triggered the publish and deploy workflows)"
+    fail(
+        `checks failed (or didn't complete) for PR #${prNumber} - review it on GitHub. Once it's merged, run: ` +
+            `npm run release -- --tag-only`
     );
 }
 
-console.log(
-    `\nDone. ${tag} is pushed - check the Actions tab for the "Publish package" and "Deploy to GitHub Pages" runs.`
-);
+console.log(`Merging PR #${prNumber}...`);
+try {
+    run("gh", ["pr", "merge", String(prNumber), "--squash", "--delete-branch", "--subject", `chore(release): ${tag}`]);
+} catch {
+    fail(`merge failed for PR #${prNumber} - merge it manually on GitHub, then run: npm run release -- --tag-only`);
+}
+
+run("git", ["checkout", "main"]);
+try {
+    run("git", ["pull", "--ff-only", "origin", "main"]);
+} catch {
+    fail(`PR #${prNumber} merged, but syncing local main failed - run "git pull" then: npm run release -- --tag-only`);
+}
+
+// --- tag, push, publish -------------------------------------------------------
+
+tagAndPublish(tag);
