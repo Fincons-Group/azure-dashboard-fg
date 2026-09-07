@@ -3,7 +3,7 @@
 ## Run locally
 
 ```bash
-npx @acahet/azure-dashboard
+npx @fincons-group/azure-dashboard
 ```
 
 First run asks for your Azure DevOps organization and Personal Access Token
@@ -12,7 +12,7 @@ First run asks for your Azure DevOps organization and Personal Access Token
 > Note: this package is hosted on GitHub Packages (private to the org).
 > One-time setup per machine — add to `~/.npmrc`:
 > ```
-> @acahet:registry=https://npm.pkg.github.com
+> @fincons-group:registry=https://npm.pkg.github.com
 > //npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
 > ```
 > GitHub Packages requires auth even for package install/read access in a

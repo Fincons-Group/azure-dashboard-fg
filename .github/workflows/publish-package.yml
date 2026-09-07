@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 20
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@acahet'
+          scope: '@fincons-group'
       - run: npm ci
       - run: npm ci --prefix client
       - run: npm run build
