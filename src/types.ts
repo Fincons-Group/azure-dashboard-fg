@@ -11,12 +11,21 @@ export interface BugInfo {
     id: number;
     title: string;
     state: string;
+    // Plain-text extract of the bug's Description / Repro Steps, truncated -
+    // see htmlToPlainText in dashboardData.ts.
+    description?: string;
     url?: string;
     creator?: string;
     assignee?: {
         displayName: string;
         uniqueName: string;
     };
+    // ISO strings straight from Azure DevOps (System.CreatedDate /
+    // System.ChangedDate / Microsoft.VSTS.Common.ClosedDate). Optional so
+    // responses served from an older cache still type-check.
+    createdDate?: string;
+    changedDate?: string;
+    closedDate?: string;
 }
 
 export type MyWorkItemsMode = "assigned" | "mentioned" | "following" | "created";
@@ -240,6 +249,9 @@ export interface DefectRecord {
     id: number;
     title: string;
     state: string;
+    // Plain-text extract of the bug's Description / Repro Steps, truncated -
+    // see htmlToPlainText in dashboardData.ts.
+    description?: string;
     reason?: string;
     severity?: string;
     priority?: number;
@@ -289,12 +301,24 @@ export interface DefectSummary {
     id: number;
     title: string;
     state: string;
+    description?: string;
     priority?: number;
     severity?: string;
     ageDays?: number;
     url?: string;
     creator?: string;
     assignee?: { displayName: string; uniqueName: string };
+    // ISO strings from Azure DevOps - carried through so the Excel export can
+    // show them and build its "today's bugs" sheet. Optional: absent on
+    // responses served from an older server cache.
+    createdDate?: string;
+    changedDate?: string;
+    closedDate?: string;
+    estimatedResolutionDate?: string;
+    // Report origin ("Test Factory" | "Test Agenti" | "Business" | "DSI") and
+    // whether the bug is tagged out-of-scope - see computeSprintDefectReport.
+    origin?: string;
+    outOfScope?: boolean;
 }
 
 export type DefectWithoutTestCase = DefectSummary;
@@ -364,6 +388,17 @@ export interface SprintDefectReport {
     testAgentiBySuite: Record<string, number>;
     testBusinessBySuite: Record<string, number>;
     effectiveDefects: DefectSummary[];
+    // Every detected DSI-origin bug (in-scope or not), so the report can list
+    // them without a second query - the DSI suite lives in the bug's own
+    // Custom.Suite field, not in any selected test plan's suite tree.
+    dsiDefects: DefectSummary[];
+    // Same idea for Business-origin bugs (Custom.Suite = "Test Business") -
+    // drives the Excel export's "Bug Business" sheet.
+    businessDefects: DefectSummary[];
+    // Every detected bug (any origin, in-scope or not) created or last changed
+    // "today" in the report timezone (TEAMS_VERIFICA_TIMEZONE, default
+    // Europe/Rome) - drives the Excel export's "Bug Odierni" sheet.
+    todaysDefects: DefectSummary[];
     // Both scoped to ALL detected bugs (like byStatusAll/total), not just
     // the effective subset - reopened/unresolved-time tracking applies to
     // out-of-scope bugs too.
@@ -457,6 +492,43 @@ export interface PlanOverviewSuiteDetail {
     bugs: BugInfo[];
 }
 
+// One row per test case in a plan, with everything the Excel export's
+// filterable "Casi di Test" sheet needs. Populated by computePlanOverview().
+export interface PlanOverviewTestCase {
+    suiteId: number;
+    suiteName: string;
+    testCaseId: number;
+    title: string;
+    url?: string;
+    // Test Case work item state (Design | Ready | Closed).
+    state?: string;
+    priority: number;
+    // Aggregated execution verdict across the test case's points (same value
+    // that feeds the suite outcome counts).
+    outcome: Outcome;
+    // Reached a real verdict (Passed | Failed | Blocked).
+    executed: boolean;
+    notRun: boolean;
+    // Executed but has open bugs -> needs another pass once they're fixed.
+    needsRetest: boolean;
+    automationStatus?: string;
+    assignedTo?: string;
+    // Tester the point is assigned to (may differ from who actually ran it).
+    tester?: string;
+    // Identity that ran the most recent result.
+    lastRunBy?: string;
+    lastRunAt?: string;
+    daysSinceLastRun?: number;
+    configuration?: string;
+    tags: string[];
+    bugCount: number;
+    hasOpenBugs: boolean;
+    bugIds: number[];
+    areaPath?: string;
+    lastRunId?: number;
+    lastRunUrl?: string;
+}
+
 export interface PlanOverviewResponse {
     planId: number;
     planName: string;
@@ -469,6 +541,7 @@ export interface PlanOverviewResponse {
     bugsByState: PlanOverviewBugStateCount[];
     bugs: BugInfo[];
     suites: PlanOverviewSuiteDetail[];
+    testCases: PlanOverviewTestCase[];
 }
 
 // Sourced from the Analytics OData feed (TestPointHistorySnapshot), which

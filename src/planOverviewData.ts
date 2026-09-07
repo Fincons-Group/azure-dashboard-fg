@@ -4,17 +4,24 @@ import {
     getTestCases,
     getTestPoints,
     getBugWorkItemTypeStates,
+    getWorkItems,
+    extractWorkItemIds,
 } from "./azdo.js";
 import {
     buildTestCaseRow,
+    assembleTestCaseRow,
+    indexSuiteTestPoints,
     extractReportUrlFromDescription,
     resolveTestPointStatus,
 } from "./dashboardData.js";
+import { mapWithConcurrency } from "./concurrency.js";
+import { dedupe } from "./inflight.js";
 import type {
     BugInfo,
     Outcome,
     PlanOverviewResponse,
     PlanOverviewSuiteDetail,
+    PlanOverviewTestCase,
     TestCaseRow,
 } from "./types.js";
 
@@ -160,18 +167,66 @@ export async function computePlanOverview(
     // could otherwise collide on the same cache entry - key by both.
     const cacheKey = `${project ?? ""}:${planId}`;
     const cached = cache.get(cacheKey);
-    const now = Date.now();
 
-    if (cached && now - cached.timestamp < CACHE_DURATION_MS) {
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
         return cached.data;
     }
 
+    // dedupe: the Sprint Report page and the Excel Export page can each ask
+    // for the same plan's overview at the same moment.
+    return dedupe(`planOverview:${cacheKey}`, async () => {
+        const fresh = cache.get(cacheKey);
+        if (fresh && Date.now() - fresh.timestamp < CACHE_DURATION_MS) {
+            return fresh.data;
+        }
+
+        const plan = await getTestPlan(planId, project);
+        const planName = plan?.name ?? String(planId);
+        const reportUrl = extractReportUrlFromDescription(plan?.description);
+
+        const { rows, testCases } = await buildPlanRowsOptimized(
+            planId,
+            planName,
+            project
+        );
+
+        const data = await assemblePlanOverview(
+            planId,
+            planName,
+            reportUrl,
+            rows,
+            testCases,
+            project
+        );
+
+        cache.set(cacheKey, { data, timestamp: Date.now() });
+        return data;
+    });
+}
+
+// Reference (unbatched) build - kept only for compare-optimized.ts. Does not
+// populate `testCases` (that's an Excel-export-only addition with no legacy
+// behaviour to diff against).
+export async function computePlanOverviewReference(
+    planId: number,
+    project?: string
+): Promise<PlanOverviewResponse> {
     const plan = await getTestPlan(planId, project);
     const planName = plan?.name ?? String(planId);
     const reportUrl = extractReportUrlFromDescription(plan?.description);
-
     const rows = await buildPlanRows(planId, planName, project);
+    return assemblePlanOverview(planId, planName, reportUrl, rows, [], project);
+}
 
+// Pure aggregation of buildPlanRows() output into a PlanOverviewResponse.
+async function assemblePlanOverview(
+    planId: number,
+    planName: string,
+    reportUrl: string | undefined,
+    rows: TestCaseRow[],
+    testCases: PlanOverviewTestCase[],
+    project?: string
+): Promise<PlanOverviewResponse> {
     const testsBySuiteMap = new Map<string, number>();
     const outcomeCounts: Record<Outcome, number> = {
         Passed: 0,
@@ -301,9 +356,202 @@ export async function computePlanOverview(
         bugsByState,
         bugs,
         suites,
+        testCases,
     };
 
-    cache.set(cacheKey, { data, timestamp: now });
-
     return data;
+}
+
+/* ================================================================== */
+/* Optimized (batched) plan-row build - the live path. One batched     */
+/* getWorkItems($expand=all) for every test case + one for every       */
+/* linked item, instead of 2 HTTP calls per test case.                 */
+/* ================================================================== */
+
+const SUITE_FETCH_CONCURRENCY = 12;
+
+const VERDICT_OUTCOMES = new Set<Outcome>(["Passed", "Failed", "Blocked"]);
+
+interface PointDetail {
+    tester?: string;
+    configuration?: string;
+    lastRunBy?: string;
+    lastRunAt?: string;
+    lastRunId?: number;
+}
+
+// Per test case, the metadata of its most-recently-completed point (ties: the
+// later point in the list wins, matching indexSuiteTestPoints' lastRun rule).
+function indexSuitePointDetails(testPoints: any[]): Map<number, PointDetail> {
+    const byTc = new Map<number, PointDetail>();
+    const bestDate = new Map<number, number>();
+
+    for (const point of testPoints) {
+        const tcId = point.testCaseReference?.id;
+        if (tcId == null) continue;
+
+        const completed = new Date(
+            point.results?.lastResultDetails?.dateCompleted ?? 0
+        ).getTime();
+
+        if (!byTc.has(tcId) || completed >= (bestDate.get(tcId) ?? -1)) {
+            bestDate.set(tcId, completed);
+            byTc.set(tcId, {
+                tester:
+                    point.tester?.displayName ??
+                    point.assignedTo?.displayName,
+                configuration: point.configuration?.name,
+                lastRunBy:
+                    point.results?.lastResultDetails?.runBy?.displayName,
+                lastRunAt:
+                    point.results?.lastResultDetails?.dateCompleted ||
+                    undefined,
+                lastRunId: point.results?.lastTestRunId ?? undefined,
+            });
+        }
+    }
+
+    return byTc;
+}
+
+function parseTagList(raw: unknown): string[] {
+    return typeof raw === "string"
+        ? raw
+              .split(";")
+              .map((t) => t.trim())
+              .filter(Boolean)
+        : [];
+}
+
+function buildPlanTestCase(
+    row: TestCaseRow,
+    workItem: any,
+    detail: PointDetail | undefined
+): PlanOverviewTestCase {
+    const f = workItem.fields ?? {};
+    const executed = VERDICT_OUTCOMES.has(row.outcome);
+    const bugIds = row.bugs.map((b) => b.id);
+    const lastRunAt = detail?.lastRunAt;
+
+    return {
+        suiteId: row.suiteId,
+        suiteName: row.suiteName,
+        testCaseId: row.testCaseId,
+        title: row.testCaseTitle,
+        url: row.testCaseUrl,
+        state: f["System.State"],
+        priority: row.priority,
+        outcome: row.outcome,
+        executed,
+        notRun: row.outcome === "NotRun",
+        needsRetest: executed && row.hasOpenBugs,
+        automationStatus: f["Microsoft.VSTS.TCM.AutomationStatus"],
+        assignedTo: f["System.AssignedTo"]?.displayName,
+        tester: detail?.tester,
+        lastRunBy: detail?.lastRunBy,
+        lastRunAt,
+        daysSinceLastRun: lastRunAt
+            ? Math.floor(
+                  (Date.now() - new Date(lastRunAt).getTime()) / 86_400_000
+              )
+            : undefined,
+        configuration: detail?.configuration,
+        tags: parseTagList(f["System.Tags"]),
+        bugCount: bugIds.length,
+        hasOpenBugs: row.hasOpenBugs,
+        bugIds,
+        areaPath: row.areaPath,
+        lastRunId: row.lastRunId ?? detail?.lastRunId,
+        lastRunUrl: row.lastRunUrl,
+    };
+}
+
+async function buildPlanRowsOptimized(
+    planId: number,
+    planName: string,
+    project?: string
+): Promise<{ rows: TestCaseRow[]; testCases: PlanOverviewTestCase[] }> {
+    const suites = await getSuites(planId, project);
+
+    const perSuite = await mapWithConcurrency(
+        suites,
+        SUITE_FETCH_CONCURRENCY,
+        async (suite: any) => {
+            const [testCases, testPoints] = await Promise.all([
+                getTestCases(planId, suite.id, project),
+                getTestPoints(planId, suite.id, project),
+            ]);
+            return {
+                suite,
+                testCases,
+                index: indexSuiteTestPoints(testPoints),
+                pointDetails: indexSuitePointDetails(testPoints),
+            };
+        }
+    );
+
+    const allTcIds = [
+        ...new Set(
+            perSuite.flatMap((s) =>
+                s.testCases.map((tc: any) => tc.workItem.id)
+            )
+        ),
+    ];
+    // `all` so `_links` is present (batch omits it under `$expand=relations`).
+    const tcItems = await getWorkItems(allTcIds, undefined, project, {
+        expand: "all",
+    });
+    const tcById = new Map<number, any>(
+        tcItems.map((i: any) => [i.id, i])
+    );
+
+    const allLinkedIds = [
+        ...new Set(
+            tcItems.flatMap((i: any) => extractWorkItemIds(i.relations))
+        ),
+    ];
+    const linkedItems = await getWorkItems(allLinkedIds, undefined, project);
+    const linkedById = new Map<number, any>(
+        linkedItems.map((i: any) => [i.id, i])
+    );
+
+    const rows: TestCaseRow[] = [];
+    const testCases: PlanOverviewTestCase[] = [];
+    for (const { suite, testCases: tcs, index, pointDetails } of perSuite) {
+        for (const tc of tcs) {
+            const workItem = tcById.get(tc.workItem.id);
+            if (!workItem) {
+                continue;
+            }
+            // dedupe: Azure's ?ids= batch collapses duplicates (a test case
+            // can link the same bug via two relation types).
+            const linked = [
+                ...new Set(extractWorkItemIds(workItem.relations)),
+            ]
+                .map((id) => linkedById.get(id))
+                .filter((x): x is any => x != null);
+            const row = assembleTestCaseRow(
+                tc,
+                planName,
+                suite.name,
+                suite.id,
+                workItem,
+                linked,
+                index.outcomesByTestCase,
+                index.lastRunByTestCase,
+                undefined,
+                project
+            );
+            rows.push(row);
+            testCases.push(
+                buildPlanTestCase(
+                    row,
+                    workItem,
+                    pointDetails.get(tc.workItem.id)
+                )
+            );
+        }
+    }
+
+    return { rows, testCases };
 }

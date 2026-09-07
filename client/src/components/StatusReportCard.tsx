@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from "react";
+﻿import { forwardRef, useMemo } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Tooltip, makeStyles } from "@fluentui/react-components";
@@ -608,6 +608,7 @@ export const StatusReportCard = forwardRef<
   const {
     totalTestCases,
     totalPassed,
+    passedPct,
     totalNotApplicable,
     totalExecuted,
     executedPct,
@@ -624,6 +625,7 @@ export const StatusReportCard = forwardRef<
     avgClosureDays,
     bugsByDsi,
     bugsByUs,
+    bugsByBusiness,
     criticalCount,
   } = computeStatusCardKpis(suiteGroups, report);
 
@@ -735,10 +737,10 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.notRun"
               />
               <KpiTile
-                value={totalPassed}
+                value={`${totalPassed} (${passedPct}%)`}
                 color="#3fb950"
-                labelKey="defectManagementPage.sprintReport.statusCard.kpis.totalPassed"
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.totalPassed"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.passedCount"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.passedCount"
               />
               <KpiTile
                 value={`${passRate}%`}
@@ -786,6 +788,13 @@ export const StatusReportCard = forwardRef<
                   />
                 </>
               )}
+              {/* Always shown - see "anche se ad ora sono 0" */}
+              <KpiTile
+                value={bugsByBusiness}
+                color="#f2b134"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByBusiness"
+              />
               <KpiTile
                 value={`${bugsClosed}/${report.total} (${bugsClosedPct}%)`}
                 color="#f2b134"

@@ -520,7 +520,8 @@ export async function getWorkItem(id: number, project?: string) {
 export async function getWorkItems(
     ids: number[],
     fields?: string[],
-    project?: string
+    project?: string,
+    opts?: { expand?: "relations" | "all" }
 ) {
     if (!ids.length) {
         return [];
@@ -532,7 +533,11 @@ export async function getWorkItems(
         chunks.push(ids.slice(i, i + 200));
     }
 
-    const fieldsParam = fields?.length
+    // Azure DevOps rejects `fields` + `$expand` together, so an expand request
+    // just returns every field of the matched items (one call instead of N).
+    const queryParam = opts?.expand
+        ? `&$expand=${opts.expand}`
+        : fields?.length
         ? `&fields=${fields.join(",")}`
         : "";
 
@@ -543,7 +548,7 @@ export async function getWorkItems(
             const response = await clientFor(project).get(
                 `/wit/workitems?ids=${chunk.join(
                     ","
-                )}${fieldsParam}&api-version=7.1`
+                )}${queryParam}&api-version=7.1`
             );
 
             return response.data.value;
@@ -599,6 +604,8 @@ const BUG_FIELDS = [
     "Microsoft.VSTS.Common.ClosedDate",
     "Microsoft.VSTS.Build.FoundIn",
     "System.Tags",
+    "System.Description",
+    "Microsoft.VSTS.TCM.ReproSteps",
     "Custom.Suite",
     "Custom.EstimatedResolutionDate",
 ];

@@ -158,20 +158,17 @@ function statusCountLabel(
   return `${count} ${label}${suffix}`;
 }
 
-// "Bug da chiudere" KPI label - the out-of-scope note only shows up when
-// there actually are open out-of-scope bugs (in practice rare, since
-// out-of-scope bugs tend to get closed as soon as they're triaged - see
-// computeBugStatusData's closedOutOfScopeCount comment), unlike the "Bug
-// chiusi" tile's note which is basically always shown.
+// "Bug da chiudere" KPI label - always carries the "(di cui N out of scope)"
+// note, mirroring the "Bug chiusi" tile's bugsClosedRatio wording (which is
+// likewise shown even when N is 0) so the two bug-count tiles read the same
+// way. The plain bugsToClose key is kept for the KPI legend only.
 export function bugsToCloseLabel(
   t: TranslateFn,
   toCloseOutOfScopeCount: number,
 ): string {
-  return toCloseOutOfScopeCount > 0
-    ? t("defectManagementPage.sprintReport.statusCard.kpis.bugsToCloseRatio", {
-        count: toCloseOutOfScopeCount,
-      })
-    : t("defectManagementPage.sprintReport.statusCard.kpis.bugsToClose");
+  return t("defectManagementPage.sprintReport.statusCard.kpis.bugsToCloseRatio", {
+    count: toCloseOutOfScopeCount,
+  });
 }
 
 function formatEmailTimestamp(date: Date): {
@@ -531,6 +528,7 @@ export function buildStatusReportCardEmailBodyHtml(
   const {
     totalTestCases,
     totalPassed,
+    passedPct,
     totalNotApplicable,
     totalExecuted,
     executedPct,
@@ -547,6 +545,7 @@ export function buildStatusReportCardEmailBodyHtml(
     avgClosureDays,
     bugsByDsi,
     bugsByUs,
+    bugsByBusiness,
   } = computeStatusCardKpis(suiteGroups, report);
 
   const {
@@ -678,9 +677,9 @@ export function buildStatusReportCardEmailBodyHtml(
       "16.66%",
     ) +
     lightKpiTile(
-      String(totalPassed),
+      `${totalPassed} (${passedPct}%)`,
       1,
-      t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"),
+      t("defectManagementPage.sprintReport.statusCard.kpis.passedCount"),
       "16.66%",
     ) +
     lightKpiTile(
@@ -725,22 +724,35 @@ export function buildStatusReportCardEmailBodyHtml(
       "25%",
     ) +
     `</tr></table>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;"><tr>` +
     (includeDsiSource
-      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;"><tr>` +
-        lightKpiTile(
+      ? lightKpiTile(
           String(bugsByUs),
           4,
           t("defectManagementPage.sprintReport.statusCard.kpis.bugsByUs"),
-          "50%",
+          "33%",
         ) +
         lightKpiTile(
           String(bugsByDsi),
           0,
           t("defectManagementPage.sprintReport.statusCard.kpis.bugsByDsi"),
-          "50%",
+          "33%",
         ) +
-        `</tr></table>`
-      : "") +
+        lightKpiTile(
+          String(bugsByBusiness),
+          1,
+          t(
+            "defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness",
+          ),
+          "33%",
+        )
+      : lightKpiTile(
+          String(bugsByBusiness),
+          1,
+          t("defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"),
+          "100%",
+        )) +
+    `</tr></table>` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;"><tr>` +
     lightKpiTile(
       String(openSeverityEntries[0][1]),
@@ -1040,6 +1052,9 @@ function pdfSeverityChipsRow(
 export interface StatusCardKpis {
   totalTestCases: number;
   totalPassed: number;
+  // Passed as a share of all test cases (like executedPct) - not the same
+  // as passRate, which divides by the decided-only total (Total minus N/A).
+  passedPct: number;
   totalNotApplicable: number;
   totalDecided: number;
   totalExecuted: number;
@@ -1057,6 +1072,9 @@ export interface StatusCardKpis {
   avgClosureDays: number;
   bugsByDsi: number;
   bugsByUs: number;
+  // Detected bugs whose Custom.Suite = "Test Business" (origin "Business").
+  // Shown as its own KPI tile even when 0.
+  bugsByBusiness: number;
   criticalCount: number;
 }
 
@@ -1082,6 +1100,9 @@ export function computeStatusCardKpis(
   const totalDecided = totalTestCases - totalNotApplicable;
   const passRate = totalDecided
     ? Math.round((totalPassed / totalDecided) * 100)
+    : 0;
+  const passedPct = totalTestCases
+    ? Math.round((totalPassed / totalTestCases) * 100)
     : 0;
   const notApplicableRate = totalTestCases
     ? Math.round((totalNotApplicable / totalTestCases) * 100)
@@ -1128,7 +1149,11 @@ export function computeStatusCardKpis(
     : 0;
   const avgClosureDays = Math.round(report.mttrDays ?? 0);
   const bugsByDsi = report.byOriginDetected["DSI"] ?? 0;
-  const bugsByUs = report.total - bugsByDsi;
+  const bugsByBusiness = report.byOriginDetected["Business"] ?? 0;
+  // "Everything that's ours": total minus DSI minus Business. Business bugs
+  // get their own tile, so they must not also land in the Test Factory
+  // count. Test Agenti bugs stay folded in here (no separate tile).
+  const bugsByUs = report.total - bugsByDsi - bugsByBusiness;
 
   // Only non-closed bugs count here - a closed critical bug isn't
   // something the reader still needs to act on. Mirrors
@@ -1141,6 +1166,7 @@ export function computeStatusCardKpis(
   return {
     totalTestCases,
     totalPassed,
+    passedPct,
     totalNotApplicable,
     totalDecided,
     totalExecuted,
@@ -1158,6 +1184,7 @@ export function computeStatusCardKpis(
     avgClosureDays,
     bugsByDsi,
     bugsByUs,
+    bugsByBusiness,
     criticalCount,
   };
 }
@@ -1824,7 +1851,7 @@ export function buildStatusReportCardPdfDocument(
         t("defectManagementPage.sprintReport.statusCard.kpis.executedCount"),
         t("defectManagementPage.sprintReport.statusCard.kpis.notApplicable"),
         t("defectManagementPage.sprintReport.statusCard.kpis.notRun"),
-        t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"),
+        t("defectManagementPage.sprintReport.statusCard.kpis.passedCount"),
         t("defectManagementPage.sprintReport.statusCard.kpis.passRate"),
       ],
     ],
@@ -1834,7 +1861,7 @@ export function buildStatusReportCardPdfDocument(
         `${kpis.totalExecuted} (${kpis.executedPct}%)`,
         `${kpis.totalNotApplicable} (${kpis.notApplicableRate}%)`,
         String(kpis.totalNotRun),
-        String(kpis.totalPassed),
+        `${kpis.totalPassed} (${kpis.passedPct}%)`,
         `${kpis.passRate}%`,
       ],
     ],
@@ -2003,7 +2030,7 @@ const KPI_LEGEND_TEST_CASES: KpiLegendEntry[] = [
   { labelKey: "executedCount", helpKey: "executedCount" },
   { labelKey: "notApplicable", helpKey: "notApplicable" },
   { labelKey: "notRun", helpKey: "notRun" },
-  { labelKey: "totalPassed", helpKey: "totalPassed" },
+  { labelKey: "passedCount", helpKey: "passedCount" },
   { labelKey: "passRate", helpKey: "passRate" },
 ];
 
@@ -2012,6 +2039,7 @@ const KPI_LEGEND_BUGS: KpiLegendEntry[] = [
   { labelKey: "outOfScopeBugsDetected", helpKey: "outOfScopeBugsDetected" },
   { labelKey: "bugsByUs", helpKey: "bugsByUs" },
   { labelKey: "bugsByDsi", helpKey: "bugsByDsi" },
+  { labelKey: "bugsByBusiness", helpKey: "bugsByBusiness" },
   { labelKey: "bugsClosedRatio", helpKey: "bugsClosedRatio" },
   { labelKey: "bugsToClose", helpKey: "bugsToClose" },
   { labelKey: "criticalBugs", helpKey: "criticalBugs" },
@@ -2506,8 +2534,8 @@ function buildPptxKpiDefs(
       label: t("defectManagementPage.sprintReport.statusCard.kpis.notRun"),
     },
     {
-      value: String(kpis.totalPassed),
-      label: t("defectManagementPage.sprintReport.statusCard.kpis.totalPassed"),
+      value: `${kpis.totalPassed} (${kpis.passedPct}%)`,
+      label: t("defectManagementPage.sprintReport.statusCard.kpis.passedCount"),
     },
     {
       value: `${kpis.passRate}%`,

@@ -8,12 +8,14 @@ import { GettingStartedGuide } from "./components/GettingStartedGuide";
 import { PatSetup } from "./components/PatSetup";
 import { useAzdoConnection } from "./azdoConnection";
 
-// This branch only ships the Sprint Report - every other page's lazy import
-// is dropped so its chunk is never even referenced, not just deferred, to
-// keep the query/loading footprint minimal (see the branch's reason for
-// being: "sprint-report-only").
+// This branch ships the Sprint Report plus the multi-scope Excel Export page -
+// every other page's lazy import is dropped so its chunk is never even
+// referenced, not just deferred, to keep the query/loading footprint minimal.
 const DynamicSprintReportPage = lazy(() =>
     import("./pages/DynamicSprintReportPage").then((m) => ({ default: m.DynamicSprintReportPage }))
+);
+const ExcelExportPage = lazy(() =>
+    import("./pages/ExcelExportPage").then((m) => ({ default: m.ExcelExportPage }))
 );
 
 function PageFallback() {
@@ -32,6 +34,7 @@ function AppRoutes() {
                     path="/dynamic-sprint-report"
                     element={<DynamicSprintReportPage />}
                 />
+                <Route path="/excel-export" element={<ExcelExportPage />} />
                 <Route
                     path="*"
                     element={<Navigate to="/dynamic-sprint-report" replace />}

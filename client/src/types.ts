@@ -12,12 +12,20 @@ export interface BugInfo {
     title: string;
     state: string;
     priority?: number;
+    // Plain-text extract of the bug's Description / Repro Steps, truncated
+    // server-side (see htmlToPlainText in the server's dashboardData.ts).
+    description?: string;
     url?: string;
     creator?: string;
     assignee?: {
         displayName: string;
         uniqueName: string;
     };
+    // ISO strings from Azure DevOps (created / last changed / closed).
+    // Optional: absent on responses served from an older server cache.
+    createdDate?: string;
+    changedDate?: string;
+    closedDate?: string;
 }
 
 export type MyWorkItemsMode = "assigned" | "mentioned" | "following" | "created";
@@ -253,6 +261,15 @@ export interface SprintDefectReport {
     testAgentiBySuite: Record<string, number>;
     testBusinessBySuite: Record<string, number>;
     effectiveDefects: DefectSummary[];
+    // Every detected DSI-origin bug (see the server's computeSprintDefectReport)
+    // - may be absent on responses served from an older cache.
+    dsiDefects?: DefectSummary[];
+    // Every detected Business-origin bug (Custom.Suite = "Test Business"),
+    // for the Excel export's "Bug Business" sheet - absent on older caches.
+    businessDefects?: DefectSummary[];
+    // Every detected bug created or last changed today (report timezone), for
+    // the Excel export's "Bug Odierni" sheet - absent on older caches.
+    todaysDefects?: DefectSummary[];
     reopenedCount: number;
     mttrDays: number | null;
     withoutResolutionDateCount: number;
@@ -271,6 +288,11 @@ export interface VerificaActivitySummary {
 export interface DefectSummary extends BugInfo {
     severity?: string;
     ageDays?: number;
+    estimatedResolutionDate?: string;
+    // Report origin ("Test Factory" | "Test Agenti" | "Business" | "DSI") and
+    // out-of-scope flag - populated server-side in computeSprintDefectReport.
+    origin?: string;
+    outOfScope?: boolean;
 }
 
 export interface DefectFilterOptions {
@@ -356,6 +378,35 @@ export interface PlanOverviewSuiteDetail {
     bugs: BugInfo[];
 }
 
+// One row per test case in a plan - drives the Excel "Casi di Test" sheet.
+export interface PlanOverviewTestCase {
+    suiteId: number;
+    suiteName: string;
+    testCaseId: number;
+    title: string;
+    url?: string;
+    state?: string;
+    priority: number;
+    outcome: Outcome;
+    executed: boolean;
+    notRun: boolean;
+    needsRetest: boolean;
+    automationStatus?: string;
+    assignedTo?: string;
+    tester?: string;
+    lastRunBy?: string;
+    lastRunAt?: string;
+    daysSinceLastRun?: number;
+    configuration?: string;
+    tags: string[];
+    bugCount: number;
+    hasOpenBugs: boolean;
+    bugIds: number[];
+    areaPath?: string;
+    lastRunId?: number;
+    lastRunUrl?: string;
+}
+
 export interface PlanOverviewResponse {
     planId: number;
     planName: string;
@@ -368,6 +419,8 @@ export interface PlanOverviewResponse {
     bugsByState: PlanOverviewBugStateCount[];
     bugs: BugInfo[];
     suites: PlanOverviewSuiteDetail[];
+    // May be absent on responses served from an older server cache.
+    testCases?: PlanOverviewTestCase[];
 }
 
 export interface TestPlanProgressCounts {

@@ -1,7 +1,20 @@
 import { useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Text, makeStyles, tokens } from "@fluentui/react-components";
+import {
+    Button,
+    Dialog,
+    DialogActions,
+    DialogBody,
+    DialogContent,
+    DialogSurface,
+    DialogTitle,
+    Spinner,
+    Text,
+    makeStyles,
+    tokens,
+} from "@fluentui/react-components";
+import { ArrowDownloadRegular, DocumentTableRegular } from "@fluentui/react-icons";
 import { PageLayout } from "../components/PageLayout";
 import { ReportSidebar } from "../components/ReportSidebar";
 import { LoadingCardGrid } from "../components/LoadingState";
@@ -9,6 +22,7 @@ import { ErrorState } from "../components/ErrorState";
 import { DefectFilterBar } from "../components/DefectFilterBar";
 import { SprintDefectReportTab } from "../components/SprintDefectReportTab";
 import type { SuiteGroupDef } from "../components/SprintDefectReportTab";
+import { ExcelReportPreview } from "../components/ExcelReportPreview";
 import {
     fetchPlans,
     fetchPlanOverview,
@@ -16,7 +30,18 @@ import {
 } from "../api/client";
 import { useScope } from "../hooks/useScope";
 import { useCheckedTestPlans } from "../hooks/useCheckedTestPlans";
-import type { DefectFilterOptions, DefectFilters } from "../types";
+import { buildStatusReportCardFilename } from "../utils/export";
+import {
+    buildReportPreview,
+    exportDynamicSprintReportToExcel,
+    type DynamicSprintReportExcelData,
+    type DynamicSprintReportPlan,
+} from "../utils/excelReport";
+import type {
+    DefectFilterOptions,
+    DefectFilters,
+    PlanOverviewResponse,
+} from "../types";
 
 const useStyles = makeStyles({
     hint: {
@@ -33,6 +58,28 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalL,
+    },
+    toolbar: {
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: tokens.spacingHorizontalS,
+    },
+    previewSurface: {
+        maxWidth: "1200px",
+        width: "95vw",
+    },
+    previewContent: {
+        maxHeight: "72vh",
+        overflowY: "auto",
+    },
+    previewIntro: {
+        color: tokens.colorNeutralForeground3,
+        marginBottom: tokens.spacingVerticalM,
+    },
+    previewLoading: {
+        display: "flex",
+        justifyContent: "center",
+        padding: tokens.spacingVerticalXXL,
     },
 });
 
@@ -189,6 +236,92 @@ export function DynamicSprintReportPage() {
             ? selectedPlanNames.join(", ")
             : t("dynamicSprintReportPage.defaultHeaderTitle");
 
+    const [isPreparingReport, setIsPreparingReport] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [previewOpen, setPreviewOpen] = useState(false);
+    const [reportData, setReportData] = useState<DynamicSprintReportExcelData | null>(
+        null
+    );
+
+    // Re-fetches the defect report and every selected plan's overview from
+    // Azure DevOps first (rather than using whatever React Query happens to
+    // have cached), so both the on-screen preview and the downloaded workbook
+    // reflect the live state at the moment the button was clicked.
+    const buildReportData =
+        async (): Promise<DynamicSprintReportExcelData | null> => {
+            const [defectsResult, overviewResults] = await Promise.all([
+                refetch(),
+                Promise.all(planOverviewQueries.map((query) => query.refetch())),
+            ]);
+
+            const freshStats = defectsResult.data?.stats ?? data?.stats;
+
+            if (!freshStats) {
+                return null;
+            }
+
+            const exportPlans: DynamicSprintReportPlan[] = selectedPlanIds.map(
+                (planId, index) => {
+                    const plan = plans?.find((candidate) => candidate.id === planId);
+
+                    return {
+                        id: planId,
+                        name: plan?.name ?? String(planId),
+                        url: plan?.url,
+                        overview: overviewResults[index]?.data as
+                            | PlanOverviewResponse
+                            | undefined,
+                    };
+                }
+            );
+
+            return {
+                meta: {
+                    title: defaultHeaderTitle,
+                    project: scope.project,
+                    areaPath: scope.areaPath,
+                    sprint: scope.sprint,
+                    generatedAt: new Date(),
+                },
+                stats: freshStats,
+                plans: exportPlans,
+            };
+        };
+
+    const handleOpenPreview = async () => {
+        setIsPreparingReport(true);
+        setPreviewOpen(true);
+
+        try {
+            setReportData(await buildReportData());
+        } finally {
+            setIsPreparingReport(false);
+        }
+    };
+
+    const handleDownload = async () => {
+        if (!reportData) {
+            return;
+        }
+
+        setIsDownloading(true);
+
+        try {
+            await exportDynamicSprintReportToExcel(
+                buildStatusReportCardFilename(reportData.meta.title, "xlsx"),
+                reportData,
+                t
+            );
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    const previewSheets = useMemo(
+        () => (reportData ? buildReportPreview(reportData, t) : []),
+        [reportData, t]
+    );
+
     return (
         <PageLayout
             title={t("dynamicSprintReportPage.title")}
@@ -237,6 +370,19 @@ export function DynamicSprintReportPage() {
 
                         {data && scope.sprint && (
                             <>
+                                <div className={styles.toolbar}>
+                                    <Button
+                                        appearance="primary"
+                                        icon={<DocumentTableRegular />}
+                                        disabled={isPreparingReport}
+                                        onClick={handleOpenPreview}
+                                    >
+                                        {isPreparingReport
+                                            ? t("dynamicSprintReportPage.excel.preparing")
+                                            : t("dynamicSprintReportPage.excel.previewButton")}
+                                    </Button>
+                                </div>
+
                                 <DefectFilterBar
                                     availableFilters={scopeAvailableFilters(
                                         data.stats.availableFilters
@@ -264,6 +410,74 @@ export function DynamicSprintReportPage() {
                     </div>
                 </div>
             )}
+
+            <Dialog
+                open={previewOpen}
+                onOpenChange={(_, dialogData) => setPreviewOpen(dialogData.open)}
+            >
+                <DialogSurface className={styles.previewSurface}>
+                    <DialogBody>
+                        <DialogTitle>
+                            {t("dynamicSprintReportPage.excel.previewTitle")}
+                        </DialogTitle>
+                        <DialogContent className={styles.previewContent}>
+                            <Text as="p" className={styles.previewIntro}>
+                                {t("dynamicSprintReportPage.excel.previewIntro")}
+                            </Text>
+
+                            {isPreparingReport && (
+                                <div className={styles.previewLoading}>
+                                    <Spinner
+                                        label={t(
+                                            "dynamicSprintReportPage.excel.preparing"
+                                        )}
+                                    />
+                                </div>
+                            )}
+
+                            {!isPreparingReport && previewSheets.length > 0 && (
+                                <ExcelReportPreview
+                                    sheets={previewSheets}
+                                    hiddenRowsNote={(count) =>
+                                        t(
+                                            "dynamicSprintReportPage.excel.previewHiddenRows",
+                                            { count }
+                                        )
+                                    }
+                                />
+                            )}
+
+                            {!isPreparingReport && previewSheets.length === 0 && (
+                                <Text>
+                                    {t("dynamicSprintReportPage.excel.previewEmpty")}
+                                </Text>
+                            )}
+                        </DialogContent>
+                        <DialogActions>
+                            <Button
+                                appearance="secondary"
+                                onClick={() => setPreviewOpen(false)}
+                            >
+                                {t("dynamicSprintReportPage.excel.close")}
+                            </Button>
+                            <Button
+                                appearance="primary"
+                                icon={<ArrowDownloadRegular />}
+                                disabled={
+                                    isPreparingReport ||
+                                    isDownloading ||
+                                    previewSheets.length === 0
+                                }
+                                onClick={handleDownload}
+                            >
+                                {isDownloading
+                                    ? t("dynamicSprintReportPage.excel.exporting")
+                                    : t("dynamicSprintReportPage.excel.downloadButton")}
+                            </Button>
+                        </DialogActions>
+                    </DialogBody>
+                </DialogSurface>
+            </Dialog>
         </PageLayout>
     );
 }

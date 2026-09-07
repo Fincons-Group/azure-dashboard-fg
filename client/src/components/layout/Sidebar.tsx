@@ -9,6 +9,7 @@ import {
 } from "@fluentui/react-components";
 import {
     DocumentTextRegular,
+    DocumentTableRegular,
     ChevronLeftRegular,
     ChevronRightRegular,
     type FluentIcon,
@@ -161,16 +162,24 @@ type NavItem = {
     icon: FluentIcon;
 };
 
-// This branch ships only the Sprint Report, so the sidebar has exactly one
-// destination - no per-user visibility toggle, no automation group, no
-// badge query (that queried defect counts, which have no page to link to
+// This branch ships two destinations - the Sprint Report and the multi-scope
+// Excel Export page - so no per-user visibility toggle, no automation group,
+// no badge query (that queried defect counts, which have no page to link to
 // here).
-const SPRINT_REPORT_ITEM: NavItem = {
-    key: "dynamic-sprint-report",
-    labelKey: "nav.dynamicSprintReport",
-    to: "/dynamic-sprint-report",
-    icon: DocumentTextRegular,
-};
+const NAV_ITEMS: NavItem[] = [
+    {
+        key: "dynamic-sprint-report",
+        labelKey: "nav.dynamicSprintReport",
+        to: "/dynamic-sprint-report",
+        icon: DocumentTextRegular,
+    },
+    {
+        key: "excel-export",
+        labelKey: "nav.excelExport",
+        to: "/excel-export",
+        icon: DocumentTableRegular,
+    },
+];
 
 function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
     const styles = useStyles();
@@ -262,7 +271,9 @@ export function Sidebar({
             </NavLink>
 
             <div className={styles.nav}>
-                <NavRow item={SPRINT_REPORT_ITEM} collapsed={collapsed} />
+                {NAV_ITEMS.map((item) => (
+                    <NavRow key={item.key} item={item} collapsed={collapsed} />
+                ))}
             </div>
 
             <div className={styles.footer}>

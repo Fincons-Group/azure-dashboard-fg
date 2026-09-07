@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Anteprima Report — Front Office Auto Sprint 2 (KPI Velocity)</title>
+<style>
+  :root {
+    --page:#eceef1; --card:#ffffff; --rule:#e3e7ee; --ink:#262626; --muted:#5a6a85;
+    --header:#1f3864; --header-sub:#c3c9d9;
+    --alert-bg:#fdecea; --alert-bd:#c62828; --alert-tx:#7a1f1f;
+    --ok:#2e7d32; --warn:#b45309; --bad:#c62828;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--page); color:var(--ink);
+    font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Arial,sans-serif;
+    padding:24px 12px; line-height:1.45;
+  }
+  .mockup-tag {
+    max-width:980px; margin:0 auto 12px; background:#fff3cd; border:1px solid #ffe08a;
+    color:#7a5a00; font-size:12px; padding:8px 12px; border-radius:6px;
+  }
+  .mockup-tag b { color:#5a4400; }
+
+  /* ---- finestra "client di posta" ---- */
+  .mail {
+    max-width:980px; margin:0 auto; background:#fff; border:1px solid #d8dce3;
+    border-radius:10px; overflow:hidden; box-shadow:0 6px 24px rgba(20,30,60,.12);
+  }
+  .mail-toolbar { display:flex; gap:6px; align-items:center; padding:10px 14px; background:#f6f7f9; border-bottom:1px solid var(--rule); }
+  .dot { width:11px; height:11px; border-radius:50%; }
+  .dot.r{background:#ff5f57;} .dot.y{background:#febc2e;} .dot.g{background:#28c840;}
+  .mail-toolbar .app { margin-left:8px; font-size:12px; color:var(--muted); }
+  .mail-head { padding:14px 18px; border-bottom:1px solid var(--rule); font-size:13px; }
+  .mail-head .subj { font-size:16px; font-weight:700; margin-bottom:8px; }
+  .mail-head .row { margin:2px 0; }
+  .mail-head .row .k { display:inline-block; width:64px; color:var(--muted); }
+  .mail-body { background:#f4f5f7; padding:18px; }
+
+  /* ---- scheda stato (identica per struttura a quella attuale) ---- */
+  .card { max-width:900px; margin:0 auto; background:var(--card); border:1px solid var(--rule); border-radius:8px; overflow:hidden; }
+  .card-header {
+    background:var(--header); color:#fff; padding:16px 20px;
+    display:flex; justify-content:space-between; gap:12px; align-items:flex-start;
+  }
+  .card-header .t { font-size:17px; font-weight:700; }
+  .card-header .s { font-size:12px; color:var(--header-sub); margin-top:3px; }
+  .card-header .ts { font-size:11px; color:var(--header-sub); white-space:nowrap; }
+  .card-inner { padding:18px 20px; }
+
+  .alert {
+    background:var(--alert-bg); border-left:4px solid var(--alert-bd); color:var(--alert-tx);
+    border-radius:6px; padding:11px 13px; font-size:13px; line-height:1.5;
+  }
+  .alert b { display:block; margin-bottom:4px; font-size:13px; }
+  .alert ul { margin:4px 0 0; padding-left:18px; }
+  .alert li { margin:2px 0; }
+
+  .sect-label {
+    font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); border-bottom:1px solid var(--rule); padding:6px 2px 3px; margin-top:18px;
+  }
+  .sect-title { font-size:14px; font-weight:600; margin:18px 0 8px; }
+  .sect-sub { font-size:11px; color:var(--muted); margin:-4px 0 8px; }
+
+  .tiles { display:grid; gap:8px; margin-top:8px; }
+  .g5 { grid-template-columns:repeat(5,1fr); }
+  .g4 { grid-template-columns:repeat(4,1fr); }
+  .g3 { grid-template-columns:repeat(3,1fr); }
+  .g2 { grid-template-columns:repeat(2,1fr); }
+  .tile { border-radius:6px; padding:10px 6px; text-align:center; background:#f4f6fa; border-top:3px solid #1f3864; }
+  .tile .v { font-size:18px; font-weight:700; line-height:1.2; color:#1f3864; }
+  .tile .l { font-size:10px; text-transform:uppercase; letter-spacing:.02em; color:var(--muted); margin-top:4px; }
+  .tile.green  { background:#f1f8f2; border-top-color:#2e7d32; } .tile.green .v{color:#2e7d32;}
+  .tile.amber  { background:#fdf6e7; border-top-color:#b45309; } .tile.amber .v{color:#b45309;}
+  .tile.red    { background:#fdecea; border-top-color:#c62828; } .tile.red .v{color:#c62828;}
+  .tile.grey   { background:#f3f4f6; border-top-color:#5f6b7a; } .tile.grey .v{color:#5f6b7a;}
+  .tile.purple { background:#f6effa; border-top-color:#6b3fa0; } .tile.purple .v{color:#6b3fa0;}
+  .tile.teal   { background:#eef7f6; border-top-color:#0e7c72; } .tile.teal .v{color:#0e7c72;}
+
+  /* ---- NUOVA sezione: Velocity & Avanzamento vs Piano ---- */
+  .velocity-wrap { border:1px solid #d5deec; background:#f7f9fc; border-radius:8px; padding:14px 14px 12px; margin-top:8px; }
+  .timeline { margin:4px 0 16px; }
+  .tl-bar { display:flex; height:8px; border-radius:4px; overflow:hidden; background:#e5e9f0; }
+  .tl-seg { height:100%; }
+  .tl-legend { display:flex; justify-content:space-between; font-size:10.5px; color:var(--muted); margin-top:6px; }
+  .tl-today { text-align:center; font-size:10.5px; font-weight:700; color:#c62828; margin-top:2px; }
+
+  .vel-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .vel-panel { border:1px solid var(--rule); background:#fff; border-radius:8px; padding:12px 13px; }
+  .vel-panel h4 { margin:0; font-size:13px; }
+  .vel-panel .win { font-size:11px; color:var(--muted); margin:2px 0 10px; }
+  .vel-cmp { display:flex; flex-direction:column; gap:7px; margin:6px 0 4px; }
+  .vel-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+  .vel-row .cap { width:132px; color:var(--muted); flex-shrink:0; }
+  .vel-track { flex:1; height:14px; background:#eef1f5; border-radius:7px; overflow:hidden; }
+  .vel-fill { height:100%; border-radius:7px; }
+  .vel-row .num { width:86px; text-align:right; font-weight:700; flex-shrink:0; }
+  .vel-kv { display:grid; grid-template-columns:1fr auto; gap:3px 12px; font-size:12px; margin-top:10px; padding-top:8px; border-top:1px dashed var(--rule); }
+  .vel-kv .k { color:var(--muted); }
+  .vel-kv .val { text-align:right; font-weight:600; }
+  .pill { display:inline-block; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; }
+  .pill.bad { background:#fdecea; color:#c62828; }
+  .pill.warn { background:#fdf6e7; color:#b45309; }
+  .pill.ok { background:#f1f8f2; color:#2e7d32; }
+  .vel-note { font-size:12px; margin-top:10px; line-height:1.5; }
+  .vel-note.callout { background:#fdecea; border-left:3px solid #c62828; color:#7a1f1f; padding:8px 10px; border-radius:5px; }
+  .method { font-size:11px; color:var(--muted); margin-top:10px; line-height:1.5; }
+  .method b { color:var(--ink); }
+
+  /* ---- burn-up: storico giornaliero dell'esecuzione ---- */
+  .burnup { border:1px solid var(--rule); background:#fff; border-radius:8px; padding:12px 13px; margin-top:12px; }
+  .burnup h4 { margin:0 0 2px; font-size:13px; }
+  .burnup .win { font-size:11px; color:var(--muted); margin-bottom:6px; }
+  .burnup svg { width:100%; height:auto; display:block; }
+  .burnup-legend { display:flex; flex-wrap:wrap; gap:14px; font-size:11px; color:var(--muted); margin-top:6px; }
+  .burnup-legend i { font-style:normal; }
+  .daybars { display:flex; align-items:flex-end; gap:4px; height:48px; margin-top:12px; }
+  .daybars .db { flex:1; border-radius:2px 2px 0 0; background:#2e7d32; min-height:2px; }
+  .daybars .db.a { background:#f0a500; }
+  .daybars .db.r { background:#e53935; }
+  .daybars-x { display:flex; gap:4px; font-size:9px; color:var(--muted); margin-top:3px; }
+  .daybars-x span { flex:1; text-align:center; }
+  .db-caption { font-size:11px; color:var(--muted); margin-top:8px; }
+
+  /* ---- azioni ---- */
+  .actions-box { border-left:4px solid; border-radius:6px; padding:10px 12px; font-size:13px; line-height:1.45; margin-top:8px; white-space:pre-line; }
+  .actions-box.a1 { background:#fff8e6; border-color:#f0a500; }
+  .actions-box.a2 { background:#eef3fb; border-color:#1f3864; }
+  .actions-box.a3 { background:#fdecea; border-color:#c62828; }
+  .actions-box b { font-weight:700; }
+
+  /* ---- suite progress ---- */
+  .suite { margin-top:12px; }
+  .suite-head { display:flex; justify-content:space-between; font-size:12.5px; }
+  .suite-head .name { font-weight:600; }
+  .suite-head .exec { font-weight:700; }
+  .bar { display:flex; height:9px; border-radius:5px; overflow:hidden; background:#e3e7ee; margin-top:4px; }
+  .bar > span { height:100%; display:block; }
+  .legend { font-size:11.5px; color:var(--muted); margin-top:4px; }
+  .sw { display:inline-block; margin:0 3px 0 6px; }
+  .sw:first-child { margin-left:0; }
+
+  /* ---- bug status ---- */
+  .bug-summary { display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; margin-top:8px; gap:8px; flex-wrap:wrap; }
+  .bug-still-open { font-weight:700; color:#c62828; }
+  .chips { display:flex; gap:8px; margin-top:10px; }
+  .chip { flex:1; border:1px solid; border-radius:6px; padding:7px 4px; text-align:center; }
+  .chip .c { font-size:17px; font-weight:700; }
+  .chip .p { font-size:10px; opacity:.85; }
+  .chip .n { font-size:11px; }
+  .chip.crit { background:#fdecea; border-color:#f0c7c3; color:#7a1f1f; }
+  .chip.high { background:#fff8e6; border-color:#efd9a5; color:#7a5308; }
+  .chip.med  { background:#eef3fb; border-color:#c6d4ea; color:#1f3864; }
+  .chip.low  { background:#eef1f2; border-color:#d5dade; color:#5f6b7a; }
+  .cap-center { font-size:11px; color:var(--muted); text-align:center; margin-top:4px; }
+
+  .btn-dash { display:inline-block; background:#1f3864; color:#fff; text-decoration:none; font-size:13px; font-weight:600; padding:9px 18px; border-radius:6px; margin-top:14px; }
+
+  .foot { max-width:980px; margin:12px auto 0; font-size:11px; color:var(--muted); text-align:center; }
+
+  @media (max-width:720px) {
+    .g5,.g4,.g3 { grid-template-columns:repeat(2,1fr); }
+    .vel-grid { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-tag">
+  <b>ANTEPRIMA / MOCKUP</b> — layout proposto con i nuovi KPI di velocity + lo storico giornaliero dell'esecuzione
+  (burn-up) inseriti nella scheda stato esistente. I valori numerici sono <b>di esempio</b> (coerenti tra loro e con il
+  ~53% citato nel thread), non estratti da Azure DevOps.
+</div>
+
+<div class="mail">
+  <div class="mail-toolbar">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="app">Posta — Report giornaliero QA</span>
+  </div>
+
+  <div class="mail-head">
+    <div class="subj">[Report Giornaliero] Front Office Auto – Sprint 2 – Stato avanzamento test funzionali / UAT</div>
+    <div class="row"><span class="k">Da:</span> QA Dashboard &lt;noreply@qa-dashboard.local&gt;</div>
+    <div class="row"><span class="k">A:</span> Team Test Funzionali; PMO; System Integrator</div>
+    <div class="row"><span class="k">Cc:</span> Test Management; DSI</div>
+    <div class="row"><span class="k">Data:</span> mercoledì 02/09/2026 08:00</div>
+  </div>
+
+  <div class="mail-body">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="t">Front Office Auto – Sprint 2</div>
+          <div class="s">Stato avanzamento test funzionali / UAT – Progetto Nuova Frontiera</div>
+        </div>
+        <div class="ts">Aggiornato il 02/09 · 08:00</div>
+      </div>
+
+      <div class="card-inner">
+
+        <!-- BANNER EARLY WARNING (posizione dell'alert attuale, esteso) -->
+        <div class="alert">
+          <b>⚠️ 2 early warning attivi · Finestra test funzionali in chiusura 08/09 (4 giorni lavorativi rimanenti)</b>
+          <ul>
+            <li><b>Esecuzione test:</b> ritmo in calo — ultime sedute ~11 test/gg contro una media di ~14 — proiezione <b>~66%</b> entro l'08/09. Per chiudere al 100% servono <b>~36 test/gg</b>.</li>
+            <li><b>Chiusura difetti:</b> ritmo effettivo <b>1,8 bug/gg</b> contro i <b>~2,9 bug/gg</b> necessari sul backlog attuale (fino a ~5/gg considerando i nuovi difetti attesi).</li>
+          </ul>
+        </div>
+
+        <!-- KPI CASI DI TEST (invariati) -->
+        <div class="sect-label">🧪 Stato casi di test</div>
+        <div class="tiles g5">
+          <div class="tile"><div class="v">325</div><div class="l">Test case totali</div></div>
+          <div class="tile amber"><div class="v">172 (53%)</div><div class="l">Eseguiti</div></div>
+          <div class="tile grey"><div class="v">8 (2%)</div><div class="l">Non applicabili</div></div>
+          <div class="tile amber"><div class="v">145</div><div class="l">Non eseguiti</div></div>
+          <div class="tile amber"><div class="v">44%</div><div class="l">Pass rate</div></div>
+        </div>
+
+        <!-- KPI BUG (invariati) -->
+        <div class="sect-label">🐛 Stato bug</div>
+        <div class="tiles g3">
+          <div class="tile purple"><div class="v">41/48</div><div class="l">Bug effettivi / rilevati</div></div>
+          <div class="tile grey"><div class="v">7</div><div class="l">Fuori ambito</div></div>
+          <div class="tile amber"><div class="v">22/48 (46%)</div><div class="l">Bug chiusi</div></div>
+        </div>
+        <div class="tiles g3" style="margin-top:8px;">
+          <div class="tile green"><div class="v">33</div><div class="l">Rilevati da noi</div></div>
+          <div class="tile"><div class="v">12</div><div class="l">Rilevati da DSI</div></div>
+          <div class="tile amber"><div class="v">3</div><div class="l">Rilevati da Test Business</div></div>
+        </div>
+        <div class="tiles g4" style="margin-top:8px;">
+          <div class="tile red"><div class="v">2</div><div class="l">Bug critici aperti</div></div>
+          <div class="tile"><div class="v">4 (8,3%)</div><div class="l">Bug riaperti</div></div>
+          <div class="tile green"><div class="v">6 gg</div><div class="l">Tempo medio di chiusura</div></div>
+          <div class="tile grey"><div class="v">6</div><div class="l">Senza data di risoluzione</div></div>
+        </div>
+
+        <!-- ===== NUOVA SEZIONE ===== -->
+        <div class="sect-title">🏁 Velocity &amp; avanzamento vs piano</div>
+        <div class="sect-sub">Confronto tra il ritmo necessario per rispettare le deadline e quello effettivo.</div>
+
+        <div class="velocity-wrap">
+
+          <!-- timeline finestre -->
+          <div class="timeline">
+            <div class="tl-bar">
+              <span class="tl-seg" style="width:55%;background:#3aa0f3;"></span>
+              <span class="tl-seg" style="width:18%;background:#8fbfe6;"></span>
+              <span class="tl-seg" style="width:27%;background:#f0a500;"></span>
+            </div>
+            <div class="tl-legend">
+              <span>Esecuzione test&nbsp;· 18/08</span>
+              <span>08/09</span>
+              <span>Re-test&nbsp;· 09/09 → 15/09</span>
+            </div>
+            <div class="tl-today">▲ oggi 02/09 · esecuzione 12 gg lavorativi trascorsi, 4 rimanenti</div>
+          </div>
+
+          <div class="vel-grid">
+
+            <!-- Esecuzione test -->
+            <div class="vel-panel">
+              <h4>Esecuzione test funzionali <span class="pill bad">A rischio · trend ↓</span></h4>
+              <div class="win">Finestra 18/08 → 08/09 · 145 test ancora da eseguire</div>
+
+              <div class="vel-cmp">
+                <div class="vel-row">
+                  <span class="cap">Velocity necessaria</span>
+                  <span class="vel-track"><span class="vel-fill" style="width:100%;background:#c62828;"></span></span>
+                  <span class="num">36,3 /gg</span>
+                </div>
+                <div class="vel-row">
+                  <span class="cap">Effettiva · media finestra</span>
+                  <span class="vel-track"><span class="vel-fill" style="width:39%;background:#b45309;"></span></span>
+                  <span class="num">14,3 /gg</span>
+                </div>
+                <div class="vel-row">
+                  <span class="cap">Effettiva · ultimi 5 gg</span>
+                  <span class="vel-track"><span class="vel-fill" style="width:29%;background:#c62828;"></span></span>
+                  <span class="num">10,6 /gg ↓</span>
+                </div>
+              </div>
+
+              <div class="vel-kv">
+                <span class="k">Eseguiti ad oggi</span><span class="val">172 / 325 (53%)</span>
+                <span class="k">Giorni lavorativi rimanenti</span><span class="val">4</span>
+                <span class="k">Proiezione all'08/09 (ritmo recente)</span><span class="val" style="color:#c62828;">~214 / 325 (~66%)</span>
+                <span class="k">Deficit atteso a fine finestra</span><span class="val" style="color:#c62828;">~111 test</span>
+              </div>
+
+              <div class="vel-note callout">
+                Il ritmo è in calo nelle ultime sedute (vedi burn-up sotto): servirebbe più che triplicare la velocity
+                recente, oppure estendere la finestra / ripianificare lo scope.
+              </div>
+            </div>
+
+            <!-- Chiusura difetti -->
+            <div class="vel-panel">
+              <h4>Chiusura difetti <span class="pill warn">Sotto ritmo</span></h4>
+              <div class="win">Deadline di piano 15/09 · backlog 26 bug da chiudere</div>
+
+              <div class="vel-cmp">
+                <div class="vel-row">
+                  <span class="cap">Necessaria (con nuovi difetti attesi)</span>
+                  <span class="vel-track"><span class="vel-fill" style="width:100%;background:#c62828;"></span></span>
+                  <span class="num">~5,1 /gg</span>
+                </div>
+                <div class="vel-row">
+                  <span class="cap">Necessaria (solo backlog)</span>
+                  <span class="vel-track"><span class="vel-fill" style="width:57%;background:#b45309;"></span></span>
+                  <span class="num">2,9 /gg</span>
+                </div>
+                <div class="vel-row">
+                  <span class="cap">Velocity effettiva</span>
+                  <span class="vel-track"><span class="vel-fill" style="width:35%;background:#2e7d32;"></span></span>
+                  <span class="num">1,8 /gg</span>
+                </div>
+              </div>
+
+              <div class="vel-kv">
+                <span class="k">Difettosità media</span><span class="val">0,28 bug / test eseguito</span>
+                <span class="k">Nuovi difetti attesi (145 test residui)</span><span class="val">~+18÷40</span>
+                <span class="k">Giorni lavorativi rimanenti</span><span class="val">9</span>
+                <span class="k">Ritmo verifica bug (oggi)</span><span class="val">3 verificati · 2 chiusi</span>
+              </div>
+
+              <div class="vel-note">
+                Con il ritmo attuale il backlog si esaurirebbe in ~15 giorni lavorativi contro i 9 disponibili;
+                l'ingresso di nuovi difetti dai test ancora da eseguire amplia ulteriormente il gap.
+              </div>
+            </div>
+
+          </div><!-- /vel-grid -->
+
+          <!-- NUOVO: storico giornaliero dell'esecuzione (burn-up) -->
+          <div class="burnup">
+            <h4>📉 Storico giornaliero dell'esecuzione (burn-up)</h4>
+            <div class="win">Test eseguiti cumulati per giorno lavorativo vs curva di piano · finestra 18/08 → 08/09</div>
+
+            <svg viewBox="0 0 600 224" role="img" aria-label="Burn-up esecuzione test">
+              <g stroke="#e9edf3" stroke-width="1">
+                <line x1="45" y1="12" x2="580" y2="12" />
+                <line x1="45" y1="58.9" x2="580" y2="58.9" />
+                <line x1="45" y1="105.7" x2="580" y2="105.7" />
+                <line x1="45" y1="153.1" x2="580" y2="153.1" />
+                <line x1="45" y1="200" x2="580" y2="200" />
+              </g>
+              <g font-size="9" fill="#8a94a6" text-anchor="end">
+                <text x="41" y="15">325 · 100%</text>
+                <text x="41" y="62">244 · 75%</text>
+                <text x="41" y="109">163 · 50%</text>
+                <text x="41" y="156">81 · 25%</text>
+                <text x="41" y="203">0</text>
+              </g>
+
+              <line x1="437.3" y1="12" x2="437.3" y2="200" stroke="#c62828" stroke-width="1" stroke-dasharray="2 2" />
+              <text x="437.3" y="10" font-size="9" fill="#c62828" text-anchor="middle">oggi 02/09</text>
+
+              <polyline points="45,200 580,12" fill="none" stroke="#9aa4b4" stroke-width="1.5" stroke-dasharray="5 4" />
+              <circle cx="580" cy="12" r="3" fill="#9aa4b4" />
+
+              <polyline points="45,194.2 80.7,186.1 116.3,176.9 152,166.5 187.7,154.9 223.3,142.2 259,131.2 294.7,121.9 330.3,113.8 366,108.6 401.7,104 437.3,100.5"
+                        fill="none" stroke="#1565c0" stroke-width="2.5" />
+              <circle cx="437.3" cy="100.5" r="3.5" fill="#1565c0" />
+
+              <polyline points="437.3,100.5 580,76.2" fill="none" stroke="#e53935" stroke-width="2" stroke-dasharray="5 4" />
+              <circle cx="580" cy="76.2" r="3" fill="#e53935" />
+              <text x="576" y="72" font-size="9" fill="#e53935" text-anchor="end">~66%</text>
+
+              <line x1="45" y1="200" x2="580" y2="200" stroke="#c9d0da" stroke-width="1" />
+              <g font-size="9" fill="#8a94a6" text-anchor="middle">
+                <text x="45" y="214">18/08</text>
+                <text x="152" y="214">21/08</text>
+                <text x="259" y="214">26/08</text>
+                <text x="366" y="214">31/08</text>
+                <text x="437.3" y="214">02/09</text>
+                <text x="508.7" y="214">04/09</text>
+                <text x="580" y="214">08/09</text>
+              </g>
+            </svg>
+
+            <div class="burnup-legend">
+              <i><span style="color:#1565c0;">■</span> Eseguito (effettivo)</i>
+              <i><span style="color:#9aa4b4;">▬ ▬</span> Piano ideale (100% l'08/09)</i>
+              <i><span style="color:#e53935;">▬ ▬</span> Proiezione a ritmo recente (~66%)</i>
+            </div>
+
+            <div class="daybars">
+              <div class="db a" style="height:21px;" title="18/08 · 10 eseguiti"></div>
+              <div class="db a" style="height:29px;" title="19/08 · 14 eseguiti"></div>
+              <div class="db" style="height:33px;" title="20/08 · 16 eseguiti"></div>
+              <div class="db" style="height:38px;" title="21/08 · 18 eseguiti"></div>
+              <div class="db" style="height:42px;" title="24/08 · 20 eseguiti"></div>
+              <div class="db" style="height:46px;" title="25/08 · 22 eseguiti"></div>
+              <div class="db" style="height:40px;" title="26/08 · 19 eseguiti"></div>
+              <div class="db" style="height:33px;" title="27/08 · 16 eseguiti"></div>
+              <div class="db a" style="height:29px;" title="28/08 · 14 eseguiti"></div>
+              <div class="db r" style="height:19px;" title="31/08 · 9 eseguiti"></div>
+              <div class="db r" style="height:17px;" title="01/09 · 8 eseguiti"></div>
+              <div class="db r" style="height:13px;" title="02/09 · 6 eseguiti"></div>
+            </div>
+            <div class="daybars-x">
+              <span>18</span><span>19</span><span>20</span><span>21</span><span>24</span><span>25</span>
+              <span>26</span><span>27</span><span>28</span><span>31</span><span>01</span><span>02</span>
+            </div>
+            <div class="db-caption">Test eseguiti per giorno lavorativo — dai 20÷22/gg della 2ª settimana ai 6÷9/gg delle ultime 3 sedute.</div>
+          </div>
+
+          <div class="vel-note" style="margin-top:12px;">
+            <b>Re-test (finestra 09/09 → 15/09, 5 gg lavorativi):</b> 24 test falliti + 10 bug in fase di verifica da rilavorare
+            → ~6,8 item/giorno necessari. Con lo storico giornaliero è possibile isolare anche le ri-esecuzioni
+            (test che cambiano esito dopo un fallimento) e stimarne la velocity, da affiancare al ritmo di verifica bug.
+          </div>
+
+          <div class="method">
+            <b>Metodo.</b> Velocity necessaria = lavoro residuo ÷ giorni lavorativi rimanenti alla deadline.
+            <b>*</b> Velocity effettiva di esecuzione: lo storico giornaliero (snapshot per data del feed Analytics) fornisce
+            sia la media della finestra (14,3/gg) sia il ritmo recente (media ultimi 5 gg lavorativi = 10,6/gg) e la curva di
+            burn-up; la proiezione usa il ritmo recente. Velocity effettiva di chiusura difetti = media chiusure/giorno
+            (dalle transizioni di stato dei bug). Difettosità media = bug rilevati ÷ test eseguiti.
+          </div>
+
+        </div><!-- /velocity-wrap -->
+
+        <!-- AZIONI -->
+        <div class="sect-title">📌 Azioni</div>
+        <div class="actions-box a1"><b>System Integrator:</b> prendere in carico i 6 nuovi bug e impostarne la data di risoluzione prevista entro domani.</div>
+        <div class="actions-box a2"><b>Test Management:</b> Test Factory ha verificato 3 bug oggi, di cui 2 chiusi; restano ancora 10 bug in fase di verifica.
+<b>DSI:</b> ci sono 4 bug ancora in fase di verifica.
+<b>System Integrator:</b> ci sono 2 bug ancora in fase di verifica.</div>
+        <div class="actions-box a3"><b>Avanzamento vs piano:</b> ritmo di esecuzione in calo (ultime sedute ~11 test/gg); a questo passo la finestra si chiuderebbe al ~66%. Concordare con il SI il recupero (target ~36 test/gg) o una revisione della finestra; portare la chiusura difetti ad almeno ~3 bug/gg.</div>
+
+        <a class="btn-dash" href="#">Apri la dashboard di monitoraggio</a>
+
+        <!-- SUITE PROGRESS -->
+        <div class="sect-title">📈 Avanzamento per suite</div>
+
+        <div class="suite">
+          <div class="suite-head"><span class="name">Test Factory – 260 casi</span><span class="exec" style="color:#b45309;">58% eseguito</span></div>
+          <div class="bar">
+            <span style="width:44.6%;background:#2e7d32;"></span>
+            <span style="width:7.7%;background:#e53935;"></span>
+            <span style="width:3.1%;background:#f0a500;"></span>
+            <span style="width:2.3%;background:#9e9e9e;"></span>
+            <span style="width:42.3%;background:#d9dee7;"></span>
+          </div>
+          <div class="legend">
+            <span class="sw" style="color:#2e7d32;">■</span>116 Passati
+            <span class="sw" style="color:#e53935;">■</span>20 Falliti
+            <span class="sw" style="color:#f0a500;">■</span>8 Bloccati
+            <span class="sw" style="color:#9e9e9e;">■</span>6 N/A
+            <span class="sw" style="color:#c9ced8;">■</span>110 Non eseguiti &nbsp;|&nbsp; <b>Pass rate: 46%</b>
+          </div>
+        </div>
+
+        <div class="suite">
+          <div class="suite-head"><span class="name">Test Business – 42 casi</span><span class="exec" style="color:#b45309;">52% eseguito</span></div>
+          <div class="bar">
+            <span style="width:42.9%;background:#2e7d32;"></span>
+            <span style="width:7.1%;background:#e53935;"></span>
+            <span style="width:2.4%;background:#f0a500;"></span>
+            <span style="width:47.6%;background:#d9dee7;"></span>
+          </div>
+          <div class="legend">
+            <span class="sw" style="color:#2e7d32;">■</span>18 Passati
+            <span class="sw" style="color:#e53935;">■</span>3 Falliti
+            <span class="sw" style="color:#f0a500;">■</span>1 Bloccato
+            <span class="sw" style="color:#c9ced8;">■</span>20 Non eseguiti &nbsp;|&nbsp; <b>Pass rate: 43%</b>
+          </div>
+        </div>
+
+        <div class="suite">
+          <div class="suite-head"><span class="name">Test Agenti – 23 casi</span><span class="exec" style="color:#c62828;">35% eseguito</span></div>
+          <div class="bar">
+            <span style="width:21.7%;background:#2e7d32;"></span>
+            <span style="width:4.3%;background:#e53935;"></span>
+            <span style="width:8.7%;background:#9e9e9e;"></span>
+            <span style="width:65.3%;background:#d9dee7;"></span>
+          </div>
+          <div class="legend">
+            <span class="sw" style="color:#2e7d32;">■</span>5 Passati
+            <span class="sw" style="color:#e53935;">■</span>1 Fallito
+            <span class="sw" style="color:#9e9e9e;">■</span>2 N/A
+            <span class="sw" style="color:#c9ced8;">■</span>15 Non eseguiti &nbsp;|&nbsp; <b>Pass rate: 24%</b>
+          </div>
+        </div>
+
+        <!-- BUG STATUS -->
+        <div class="sect-title">🐛 Stato bug</div>
+        <div class="sect-sub">(rilevati da Test Factory, Test Business, Test Agenti, DSI)</div>
+
+        <div class="bug-summary">
+          <span><b>48 bug rilevati</b> – 41 effettivi · 7 fuori ambito</span>
+          <span class="bug-still-open">24 ancora aperti</span>
+        </div>
+        <div class="bar" style="height:10px;">
+          <span style="width:45.8%;background:#2e7d32;"></span>
+          <span style="width:12.5%;background:#1565c0;"></span>
+          <span style="width:8.3%;background:#0099a8;"></span>
+          <span style="width:16.7%;background:#f0a500;"></span>
+          <span style="width:10.4%;background:#e53935;"></span>
+          <span style="width:2.1%;background:#ad1457;"></span>
+        </div>
+        <div class="legend">
+          <span class="sw" style="color:#2e7d32;">■</span>22 Chiusi (di cui 5 fuori ambito)
+          <span class="sw" style="color:#1565c0;">■</span>6 Da verificare
+          <span class="sw" style="color:#0099a8;">■</span>4 In verifica
+          <span class="sw" style="color:#f0a500;">■</span>8 In lavorazione
+          <span class="sw" style="color:#e53935;">■</span>5 Nuovi
+          <span class="sw" style="color:#ad1457;">■</span>1 Riaperto
+        </div>
+
+        <div class="chips">
+          <div class="chip crit"><div class="c">2</div><div class="p">5%</div><div class="n">Critical</div></div>
+          <div class="chip high"><div class="c">9</div><div class="p">22%</div><div class="n">High</div></div>
+          <div class="chip med"><div class="c">21</div><div class="p">51%</div><div class="n">Medium</div></div>
+          <div class="chip low"><div class="c">9</div><div class="p">22%</div><div class="n">Low</div></div>
+        </div>
+        <div class="cap-center">Severità sui 41 bug effettivi</div>
+
+        <div class="chips" style="margin-top:12px;">
+          <div class="chip crit"><div class="c">2</div><div class="p">8%</div><div class="n">Critical</div></div>
+          <div class="chip high"><div class="c">6</div><div class="p">25%</div><div class="n">High</div></div>
+          <div class="chip med"><div class="c">12</div><div class="p">50%</div><div class="n">Medium</div></div>
+          <div class="chip low"><div class="c">4</div><div class="p">17%</div><div class="n">Low</div></div>
+        </div>
+        <div class="cap-center">Severità sui 24 bug ancora aperti</div>
+
+      </div><!-- /card-inner -->
+    </div><!-- /card -->
+  </div><!-- /mail-body -->
+</div><!-- /mail -->
+
+<div class="foot">
+  Anteprima statica generata per revisione interna · struttura scheda = quella attuale (StatusReportCard) con l'aggiunta della sezione “Velocity &amp; avanzamento vs piano”.
+</div>
+
+</body>
+</html>
