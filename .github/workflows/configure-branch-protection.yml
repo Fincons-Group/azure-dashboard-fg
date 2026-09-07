@@ -4,6 +4,10 @@ name: Configure Branch Protection
 #   Rule 1 – No direct pushes: all changes must go through a pull request.
 #   Rule 2 – Required checks: Lint must pass before merging.
 #
+# Both rulesets let repository admins bypass them (BYPASS_ACTORS below), so
+# release automation run by an admin can still push/tag main directly - see
+# scripts/release.js.
+#
 # Trivy was previously also required here, but its workflow was removed from
 # the repo (see "Remove Trivy security scan workflow") - a required check
 # that never reports would make main permanently unmergeable, so it's
@@ -52,6 +56,12 @@ jobs:
               }
             }
 
+            // Repository-admin role (built-in RepositoryRole actor_id 5) always
+            // bypasses both rulesets below.
+            const BYPASS_ACTORS = [
+              { actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }
+            ];
+
             // ── Rule 1: No direct pushes – all changes must go through a pull request ──
             await deleteIfExists('Require pull request on main');
             await github.rest.repos.createRepoRuleset({
@@ -60,6 +70,7 @@ jobs:
               name: 'Require pull request on main',
               target: 'branch',
               enforcement: 'active',
+              bypass_actors: BYPASS_ACTORS,
               conditions: {
                 ref_name: { include: ['refs/heads/main'], exclude: [] }
               },
@@ -91,6 +102,7 @@ jobs:
               name: 'Require status checks on main',
               target: 'branch',
               enforcement: 'active',
+              bypass_actors: BYPASS_ACTORS,
               conditions: {
                 ref_name: { include: ['refs/heads/main'], exclude: [] }
               },
