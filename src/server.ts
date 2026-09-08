@@ -4,6 +4,8 @@ import cors from "cors";
 import {
     AzdoAuthError,
     AzdoConfigError,
+    AzdoDomainError,
+    assertAllowedDomain,
     getIterations,
     getAreaPaths,
     getProjects,
@@ -37,14 +39,21 @@ const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:3000")
 
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: "15mb" }));
-app.use((req, _, next) => {
+app.use((req, res, next) => {
     runWithAzdoConfig(
         {
             pat: req.header("x-ado-pat") ?? undefined,
             org: req.header("x-ado-org") ?? undefined,
             project: req.header("x-ado-project") ?? undefined,
         },
-        next
+        () => {
+            // Gate every route behind the PAT's owner, not just the ones
+            // that happen to call azdo.ts - a request must resolve to an
+            // allowed account before it can reach any handler below.
+            assertAllowedDomain()
+                .then(next)
+                .catch((error) => sendApiError(res, error));
+        }
     );
 });
 
@@ -56,6 +65,14 @@ function sendApiError(res: Response, error: any): void {
 
     if (error instanceof AzdoAuthError) {
         res.status(502).json({ message: error.message });
+        return;
+    }
+
+    if (error instanceof AzdoDomainError) {
+        res.status(403).json({
+            message: error.message,
+            code: "domain_not_allowed",
+        });
         return;
     }
 

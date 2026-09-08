@@ -47,6 +47,19 @@ async function apiFetch(
     });
 }
 
+// `code` lets callers (AzdoConnectionError) branch on *why* a request
+// failed without matching on message text - currently only ever
+// "domain_not_allowed" (see the server's AzdoDomainError/sendApiError).
+export class ApiError extends Error {
+    code?: string;
+
+    constructor(message: string, code?: string) {
+        super(message);
+        this.name = "ApiError";
+        this.code = code;
+    }
+}
+
 async function throwForErrorResponse(
     res: Response,
     fallbackMessage: string
@@ -54,7 +67,7 @@ async function throwForErrorResponse(
     const body = await res.json().catch(() => null);
 
     if (body?.message) {
-        throw new Error(body.message);
+        throw new ApiError(body.message, body.code);
     }
 
     // 502/503 without a JSON body means something in front of our API (the

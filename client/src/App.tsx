@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Spinner } from "@fluentui/react-components";
-import { fetchProjects } from "./api/client";
+import { fetchProjects, type ApiError } from "./api/client";
 import { AzdoConnectionError } from "./components/AzdoConnectionError";
 import { GettingStartedGuide } from "./components/GettingStartedGuide";
 import { PatSetup } from "./components/PatSetup";
@@ -56,7 +56,7 @@ const SCOPE_STORAGE_KEY = "azureDashboardScope";
 function App() {
     const queryClient = useQueryClient();
     const { connection, saveConnection, clearConnection } = useAzdoConnection();
-    const { isLoading, isError, refetch } = useQuery({
+    const { isLoading, isError, error, refetch } = useQuery({
         queryKey: ["projects", connection?.org],
         queryFn: fetchProjects,
         enabled: connection != null,
@@ -96,8 +96,12 @@ function App() {
     }
 
     if (isError) {
+        const apiError = error as ApiError | null;
+
         return (
             <AzdoConnectionError
+                message={apiError?.message}
+                restricted={apiError?.code === "domain_not_allowed"}
                 onRetry={() => void refetch()}
                 onChangeConnection={() => {
                     clearConnection();

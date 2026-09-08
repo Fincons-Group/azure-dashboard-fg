@@ -50,6 +50,7 @@
   "azdoConnectionError": {
     "title": "Can't reach Azure DevOps",
     "message": "The dashboard could not load data from Azure DevOps. The saved organization or PAT is usually missing, expired, or invalid.",
+    "restrictedTitle": "Access restricted",
     "retry": "Retry",
     "changePat": "Change PAT"
   },

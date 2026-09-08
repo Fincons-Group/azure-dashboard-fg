@@ -38,10 +38,18 @@ const useStyles = makeStyles({
 // Rendered in place of the whole app when the initial Azure DevOps probe fails
 // (see App.tsx). In local CLI mode that usually means the saved PAT/org is
 // missing or invalid; in legacy server mode it can still be the server's env.
+// `restricted` is the one case that isn't a setup problem - the PAT works
+// fine, it just doesn't belong to an allowed account - so the PAT-creation
+// how-to (irrelevant, and actively misleading there) is skipped in favor of
+// the server's specific message.
 export function AzdoConnectionError({
+    message,
+    restricted = false,
     onRetry,
     onChangeConnection,
 }: {
+    message?: string;
+    restricted?: boolean;
     onRetry: () => void;
     onChangeConnection: () => void;
 }) {
@@ -53,12 +61,22 @@ export function AzdoConnectionError({
             <Card className={styles.card}>
                 <div className={styles.heading}>
                     <ErrorCircleRegular className={styles.icon} />
-                    <Title2 as="h1">{t("azdoConnectionError.title")}</Title2>
+                    <Title2 as="h1">
+                        {t(
+                            restricted
+                                ? "azdoConnectionError.restrictedTitle"
+                                : "azdoConnectionError.title"
+                        )}
+                    </Title2>
                 </div>
 
-                <Text block>{t("azdoConnectionError.message")}</Text>
+                <Text block>
+                    {restricted && message
+                        ? message
+                        : t("azdoConnectionError.message")}
+                </Text>
 
-                <AzdoPatSteps />
+                {!restricted && <AzdoPatSteps />}
 
                 <div style={{ display: "flex", gap: tokens.spacingHorizontalS }}>
                     <Button
