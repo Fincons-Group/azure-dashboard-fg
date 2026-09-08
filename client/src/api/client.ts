@@ -6,6 +6,7 @@ import type {
     IterationNode,
     ProjectSummary,
     AreaPathNode,
+    CoverageArea,
 } from "../types";
 import i18n from "../i18n";
 import { loadStoredAzdoConnection } from "../azdoConnection";
@@ -131,6 +132,12 @@ export function fetchPlanOverview(
     const qs = project ? `?project=${encodeURIComponent(project)}` : "";
 
     return getJson(`/api/plans/${planId}/overview${qs}`);
+}
+
+export function fetchCoverage(project?: string): Promise<CoverageArea[]> {
+    const qs = project ? `?project=${encodeURIComponent(project)}` : "";
+
+    return getJson(`/api/coverage${qs}`);
 }
 
 export function fetchDefects(

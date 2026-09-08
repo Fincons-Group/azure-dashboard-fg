@@ -17,6 +17,9 @@ const DynamicSprintReportPage = lazy(() =>
 const ExcelExportPage = lazy(() =>
     import("./pages/ExcelExportPage").then((m) => ({ default: m.ExcelExportPage }))
 );
+const CoverageRoadmapPage = lazy(() =>
+    import("./pages/CoverageRoadmapPage").then((m) => ({ default: m.CoverageRoadmapPage }))
+);
 
 function PageFallback() {
     return (
@@ -35,6 +38,10 @@ function AppRoutes() {
                     element={<DynamicSprintReportPage />}
                 />
                 <Route path="/excel-export" element={<ExcelExportPage />} />
+                <Route
+                    path="/coverage-roadmap"
+                    element={<CoverageRoadmapPage />}
+                />
                 <Route
                     path="*"
                     element={<Navigate to="/dynamic-sprint-report" replace />}

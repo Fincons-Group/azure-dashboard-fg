@@ -29,6 +29,10 @@ import {
     computePlanOverview,
     clearPlanOverviewCache,
 } from "./planOverviewData.js";
+import {
+    getCoverageRoadmap,
+    clearCoverageCache,
+} from "./coverageData.js";
 
 const app = express();
 
@@ -148,6 +152,18 @@ app.get("/api/plans/:planId/overview", async (req, res) => {
     }
 });
 
+app.get("/api/coverage", async (req, res) => {
+    try {
+        res.json(
+            await getCoverageRoadmap(
+                req.query.project as string | undefined
+            )
+        );
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
 app.get("/api/defects", async (req, res) => {
     try {
         const project = req.query.project as string | undefined;
@@ -225,6 +241,7 @@ app.post("/api/refresh", (_, res) => {
     clearDashboardCache();
     clearDefectCache();
     clearPlanOverviewCache();
+    clearCoverageCache();
 
     res.status(200).json({ refreshed: true });
 });

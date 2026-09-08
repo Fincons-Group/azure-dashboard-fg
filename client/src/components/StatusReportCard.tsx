@@ -518,12 +518,14 @@ function KpiTile({
   labelKey,
   label,
   helpKey,
+  borderColor,
 }: {
   value: ReactNode;
   color: string;
   labelKey?: string;
   label?: string;
   helpKey: string;
+  borderColor?: string;
 }) {
   const { t } = useTranslation();
   const styles = useStyles();
@@ -532,9 +534,13 @@ function KpiTile({
   // lookup - used when the label needs conditional wording that a single
   // translation key can't express (e.g. bugsClosedLabel/bugsToCloseLabel).
   const resolvedLabel = label ?? t(labelKey ?? "");
+  const topBorderColor = borderColor ?? color;
 
   return (
-    <div className={styles.kpiTile}>
+    <div
+      className={styles.kpiTile}
+      style={{ borderTop: `3px solid ${topBorderColor}` }}
+    >
       <span className={styles.kpiValue} style={{ color }}>
         {value}
       </span>
@@ -709,37 +715,43 @@ export const StatusReportCard = forwardRef<
             <div className={styles.kpiGrid6}>
               <KpiTile
                 value={totalTestCases}
-                color="#3aa0f3"
+                color="#c8c6c4"
+                borderColor="#605e5c"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.totalTestCases"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.totalTestCases"
               />
               <KpiTile
                 value={`${totalExecuted} (${executedPct}%)`}
                 color="#6bcf6b"
+                borderColor="#6bcf6b"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.executedCount"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.executedCount"
               />
               <KpiTile
                 value={`${totalNotApplicable} (${notApplicableRate}%)`}
-                color="#8a8886"
+                color="#b180d7"
+                borderColor="#b180d7"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.notApplicable"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.notApplicable"
               />
               <KpiTile
                 value={totalNotRun}
-                color="#f2b134"
+                color="#eda100"
+                borderColor="#eda100"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.notRun"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.notRun"
               />
               <KpiTile
                 value={`${totalPassed} (${passedPct}%)`}
-                color="#3fb950"
+                color="#6bcf6b"
+                borderColor="#6bcf6b"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.passedCount"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.passedCount"
               />
               <KpiTile
                 value={`${passRate}%`}
-                color="#6bcf6b"
+                color="#4ec9b0"
+                borderColor="#4ec9b0"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.passRate"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.passRate"
               />
@@ -758,59 +770,77 @@ export const StatusReportCard = forwardRef<
               <KpiTile
                 value={`${report.effectiveCount}/${report.total}`}
                 color="#b180d7"
+                borderColor="#b180d7"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.effectiveBugsDetected"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.effectiveBugsDetected"
               />
               <KpiTile
                 value={report.outOfScopeCount}
                 color="#9e9e9e"
+                borderColor="#605e5c"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.outOfScopeBugsDetected"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.outOfScopeBugsDetected"
               />
-              {includeDsiSource && (
+              <KpiTile
+                value={`${bugsClosed}/${report.total} (${bugsClosedPct}%)`}
+                color="#eda100"
+                borderColor="#eda100"
+                label={bugsClosedLabel(t, closedOutOfScopeCount)}
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsClosedRatio"
+              />
+              <KpiTile
+                value={`${bugsToClose}/${report.total} (${toClosePct}%)`}
+                color="#b180d7"
+                borderColor="#b180d7"
+                label={bugsToCloseLabel(t, toCloseOutOfScopeCount)}
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsToClose"
+              />
+
+              {includeDsiSource ? (
                 <>
                   <KpiTile
                     value={bugsByUs}
                     color="#6bcf6b"
+                    borderColor="#6bcf6b"
                     labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByUs"
                     helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByUs"
                   />
                   <KpiTile
                     value={bugsByDsi}
                     color="#3aa0f3"
+                    borderColor="#3aa0f3"
                     labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByDsi"
                     helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByDsi"
                   />
+                  <KpiTile
+                    value={bugsByBusiness}
+                    color="#6bcf6b"
+                    borderColor="#6bcf6b"
+                    labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"
+                    helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByBusiness"
+                  />
                 </>
+              ) : (
+                <KpiTile
+                  value={bugsByBusiness}
+                  color="#6bcf6b"
+                  borderColor="#6bcf6b"
+                  labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"
+                  helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByBusiness"
+                />
               )}
-              {/* Always shown - see "anche se ad ora sono 0" */}
-              <KpiTile
-                value={bugsByBusiness}
-                color="#f2b134"
-                labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByBusiness"
-              />
-              <KpiTile
-                value={`${bugsClosed}/${report.total} (${bugsClosedPct}%)`}
-                color="#f2b134"
-                label={bugsClosedLabel(t, closedOutOfScopeCount)}
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsClosedRatio"
-              />
-              <KpiTile
-                value={`${bugsToClose}/${report.total} (${toClosePct}%)`}
-                color="#eda100"
-                label={bugsToCloseLabel(t, toCloseOutOfScopeCount)}
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsToClose"
-              />
+
               <KpiTile
                 value={criticalCount}
                 color="#ff6b6b"
+                borderColor="#d13438"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.criticalBugs"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.criticalBugs"
               />
               <KpiTile
                 value={`${report.reopenedCount} (${reopenedPct}%)`}
-                color="#3aa0f3"
+                color="#4ec9b0"
+                borderColor="#00b7c3"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.reopenedBugs"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.reopenedBugs"
               />
@@ -819,12 +849,14 @@ export const StatusReportCard = forwardRef<
                   value: avgClosureDays,
                 })}
                 color="#6bcf6b"
+                borderColor="#605e5c"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgClosureTime"
               />
               <KpiTile
                 value={report.withoutResolutionDateCount}
-                color="#8a8886"
+                color="#c8c6c4"
+                borderColor="#605e5c"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.withoutResolutionDate"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.withoutResolutionDate"
               />
