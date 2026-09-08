@@ -1,4 +1,6 @@
+import axios from "axios";
 import {
+    AzdoConfigError,
     getTestPlan,
     getSuites,
     getTestCases,
@@ -63,6 +65,28 @@ const CACHE_DURATION_MS = 5 * 60 * 1000;
 
 export function clearPlanOverviewCache(): void {
     cache.clear();
+}
+
+// getTestPlan() lets a 404 (plan ID doesn't exist in this project - a stale
+// checked-plan ID from local storage, a typo, a plan deleted since) bubble
+// up as a raw AxiosError, which server.ts's generic handler would otherwise
+// turn into an opaque 500. Surfacing it as a 404 with the plan/project in
+// the message is what actually explains what went wrong.
+async function getTestPlanOrThrow(planId: number, project?: string) {
+    try {
+        return await getTestPlan(planId, project);
+    } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+            throw new AzdoConfigError(
+                `Test plan ${planId} was not found in ${
+                    project ?? "the configured project"
+                }.`,
+                404
+            );
+        }
+
+        throw error;
+    }
 }
 
 async function buildPlanRows(
@@ -180,7 +204,7 @@ export async function computePlanOverview(
             return fresh.data;
         }
 
-        const plan = await getTestPlan(planId, project);
+        const plan = await getTestPlanOrThrow(planId, project);
         const planName = plan?.name ?? String(planId);
         const reportUrl = extractReportUrlFromDescription(plan?.description);
 
@@ -211,7 +235,7 @@ export async function computePlanOverviewReference(
     planId: number,
     project?: string
 ): Promise<PlanOverviewResponse> {
-    const plan = await getTestPlan(planId, project);
+    const plan = await getTestPlanOrThrow(planId, project);
     const planName = plan?.name ?? String(planId);
     const reportUrl = extractReportUrlFromDescription(plan?.description);
     const rows = await buildPlanRows(planId, planName, project);

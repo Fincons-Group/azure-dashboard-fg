@@ -223,6 +223,122 @@ function createAzdoClient(
     return instance;
 }
 
+// Access gate: whoever a PAT belongs to must have an @ALLOWED_EMAIL_DOMAIN
+// account, regardless of which Azure DevOps org/project it's scoped to.
+// Deliberately a fixed constant, not an env var - this is a security policy
+// for this specific dashboard, not something a deployment should be able to
+// loosen (or accidentally disable) just by omitting a config value.
+const ALLOWED_EMAIL_DOMAIN = "finconsgroup.com";
+
+export class AzdoDomainError extends Error {
+    constructor(email: string | null) {
+        super(
+            email
+                ? `This dashboard is restricted to @${ALLOWED_EMAIL_DOMAIN} accounts. ` +
+                      `The supplied PAT belongs to ${email}.`
+                : `This dashboard is restricted to @${ALLOWED_EMAIL_DOMAIN} accounts, and the ` +
+                      "supplied PAT's owner could not be verified with Azure DevOps. Check the " +
+                      "server log for the underlying error."
+        );
+        this.name = "AzdoDomainError";
+    }
+}
+
+// Deliberately dev.azure.com/{org}/_apis (the same host+auth path every other
+// call in this file already uses successfully), not the vssps profile API -
+// several AAD-backed orgs (this one included, empirically: a full-access PAT
+// still got 401/403 here) apply Conditional Access policies that block PAT/
+// Basic auth specifically against the account-level vssps identity service,
+// while leaving org-scoped dev.azure.com calls untouched. connectionData is
+// the org-scoped "who am I" equivalent - same auth path as getProjects() etc.
+const connectionDataClients = new Map<string, AxiosInstance>();
+
+function connectionDataClient(org: string, pat: string): AxiosInstance {
+    const cacheKey = `${org}|${pat}`;
+    let instance = connectionDataClients.get(cacheKey);
+
+    if (!instance) {
+        instance = createAzdoClient(
+            `https://dev.azure.com/${org}/_apis`,
+            pat,
+            false
+        );
+        connectionDataClients.set(cacheKey, instance);
+    }
+
+    return instance;
+}
+
+async function fetchAuthenticatedEmail(
+    org: string,
+    pat: string
+): Promise<string | null> {
+    try {
+        // connectionData is still a preview resource - a plain "7.1" gets a
+        // 400 ("under preview, the -preview flag must be supplied").
+        const response = await connectionDataClient(org, pat).get(
+            "/connectionData?api-version=7.1-preview.1"
+        );
+
+        // AAD-backed identities carry the UPN/email under
+        // authenticatedUser.properties.Account rather than any top-level
+        // field - there's no dedicated "email" property on this response.
+        const email: string | undefined =
+            response.data?.authenticatedUser?.properties?.Account?.$value;
+
+        return email ? email.trim().toLowerCase() : null;
+    } catch (error) {
+        console.error(
+            "Failed to resolve the calling PAT's Azure DevOps identity " +
+                `(needed for the @${ALLOWED_EMAIL_DOMAIN} access check), org="${org}":`,
+            axios.isAxiosError(error)
+                ? {
+                      status: error.response?.status,
+                      data: error.response?.data,
+                      url: error.config?.baseURL + (error.config?.url ?? ""),
+                  }
+                : error
+        );
+
+        return null;
+    }
+}
+
+// Keyed by PAT (not by request) so the same PAT reused across many requests
+// only hits connectionData once per TTL - same shape as the dashboard caches
+// elsewhere (dashboardData.ts etc.), just keyed differently.
+const domainCheckCache = new Map<
+    string,
+    { allowed: boolean; email: string | null; timestamp: number }
+>();
+const DOMAIN_CHECK_CACHE_MS = 10 * 60 * 1000;
+
+// Throws AzdoDomainError when the current request's PAT doesn't belong to an
+// @ALLOWED_EMAIL_DOMAIN account. Called once per request, before any real
+// Azure DevOps data call - see the gating middleware in server.ts.
+export async function assertAllowedDomain(): Promise<void> {
+    const pat = requirePat();
+    const org = requireOrg();
+    const cached = domainCheckCache.get(pat);
+
+    if (cached && Date.now() - cached.timestamp < DOMAIN_CHECK_CACHE_MS) {
+        if (!cached.allowed) {
+            throw new AzdoDomainError(cached.email);
+        }
+
+        return;
+    }
+
+    const email = await fetchAuthenticatedEmail(org, pat);
+    const allowed = !!email && email.endsWith(`@${ALLOWED_EMAIL_DOMAIN}`);
+
+    domainCheckCache.set(pat, { allowed, email, timestamp: Date.now() });
+
+    if (!allowed) {
+        throw new AzdoDomainError(email);
+    }
+}
+
 const projectClients = new Map<string, AxiosInstance>();
 const odataProjectClients = new Map<string, AxiosInstance>();
 const orgClients = new Map<string, AxiosInstance>();

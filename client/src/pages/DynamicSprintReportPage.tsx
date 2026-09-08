@@ -24,6 +24,8 @@ import { SprintDefectReportTab } from "../components/SprintDefectReportTab";
 import type { SuiteGroupDef } from "../components/SprintDefectReportTab";
 import { ExcelReportPreview } from "../components/ExcelReportPreview";
 import {
+    fetchAreaPaths,
+    fetchIterations,
     fetchPlans,
     fetchPlanOverview,
     fetchDefects,
@@ -102,15 +104,39 @@ export function DynamicSprintReportPage() {
         area: scope.areaPath,
     };
 
-    // Hard-filtered server-side to the selected area path + sprint (see
-    // ReportSidebar) - this is the whole point of the sidebar, so unlike
-    // the old project-wide dropdown there's no soft-match fallback: a plan
-    // whose own areaPath/iteration metadata is missing or wrong in Azure
-    // DevOps simply won't appear under any area+sprint combo here.
+    // Same-keyed queries ReportSidebar runs internally - React Query dedupes
+    // each pair into one request/cache entry. Test Factory (confirmed) has
+    // neither real Area Paths nor real Iterations below the project root;
+    // this page needs to know that too, to stop requiring either before
+    // it'll load plans/prompt the user.
+    const { data: areaPaths } = useQuery({
+        queryKey: ["areas", scope.project],
+        queryFn: () => fetchAreaPaths(scope.project),
+        enabled: scope.isComplete,
+    });
+    const hasAreaPaths = (areaPaths?.length ?? 0) > 0;
+
+    const { data: iterations } = useQuery({
+        queryKey: ["iterations", scope.project],
+        queryFn: () => fetchIterations(scope.project),
+        enabled: scope.isComplete,
+    });
+    const hasIterations = (iterations?.length ?? 0) > 0;
+
+    // Hard-filtered server-side to the selected sprint/area path, for
+    // projects that have them (see ReportSidebar) - this is the whole point
+    // of the sidebar, so unlike the old project-wide dropdown there's no
+    // soft-match fallback: a plan whose own areaPath/iteration metadata is
+    // missing or wrong in Azure DevOps simply won't appear under any
+    // area+sprint combo here. A project with neither (Test Factory) loads
+    // every plan as soon as the project itself is selected.
     const { data: plans, isLoading: plansLoading } = useQuery({
         queryKey: ["plans", scope.project, scope.areaPath, scope.sprint],
         queryFn: () => fetchPlans(scope.project, scope.areaPath, scope.sprint),
-        enabled: scope.isComplete && !!scope.areaPath && !!scope.sprint,
+        enabled:
+            scope.isComplete &&
+            (hasAreaPaths ? !!scope.areaPath : true) &&
+            (hasIterations ? !!scope.sprint : true),
     });
 
     const sortedPlans = useMemo(() => {
@@ -189,7 +215,7 @@ export function DynamicSprintReportPage() {
     const { data, isLoading, isError, error, refetch } = useQuery({
         queryKey: ["defects", filters, scope.project],
         queryFn: () => fetchDefects(filters, scope.project),
-        enabled: scope.isComplete && !!scope.sprint,
+        enabled: scope.isComplete && (hasIterations ? !!scope.sprint : true),
     });
 
     // The suite dropdown normally lists every suite name that appears on a
@@ -350,17 +376,19 @@ export function DynamicSprintReportPage() {
                     />
 
                     <div className={styles.main}>
-                        {!scope.areaPath && (
+                        {hasAreaPaths && !scope.areaPath && (
                             <Text className={styles.hint}>
                                 {t("dynamicSprintReportPage.selectAreaPathPrompt")}
                             </Text>
                         )}
 
-                        {scope.areaPath && !scope.sprint && (
-                            <Text className={styles.hint}>
-                                {t("dynamicSprintReportPage.selectSprintPrompt")}
-                            </Text>
-                        )}
+                        {(!hasAreaPaths || scope.areaPath) &&
+                            hasIterations &&
+                            !scope.sprint && (
+                                <Text className={styles.hint}>
+                                    {t("dynamicSprintReportPage.selectSprintPrompt")}
+                                </Text>
+                            )}
 
                         {isLoading && <LoadingCardGrid />}
 
@@ -368,7 +396,7 @@ export function DynamicSprintReportPage() {
                             <ErrorState message={error.message} onRetry={refetch} />
                         )}
 
-                        {data && scope.sprint && (
+                        {data && (!hasIterations || scope.sprint) && (
                             <>
                                 <div className={styles.toolbar}>
                                     <Button

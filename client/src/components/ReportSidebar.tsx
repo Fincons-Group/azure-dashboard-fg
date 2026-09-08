@@ -89,6 +89,120 @@ interface ReportSidebarProps {
     newPlanIds: Set<number>;
 }
 
+interface Iteration {
+    id: string;
+    name: string;
+    path: string;
+}
+
+// The plan checkbox list shown under whichever sprint is currently expanded -
+// identical in both the area-grouped and flat (no-area-paths) layouts below,
+// so it's factored out rather than duplicated.
+function PlanChecklist({
+    plans,
+    plansLoading,
+    checkedPlanIds,
+    onTogglePlan,
+    newPlanIds,
+}: {
+    plans: TestPlanSummary[];
+    plansLoading: boolean;
+    checkedPlanIds: number[];
+    onTogglePlan: (planId: number, checked: boolean) => void;
+    newPlanIds: Set<number>;
+}) {
+    const styles = useStyles();
+    const { t } = useTranslation();
+
+    if (plansLoading) {
+        return (
+            <Text className={styles.hint}>
+                {t("reportSidebar.loadingPlans")}
+            </Text>
+        );
+    }
+
+    if (plans.length === 0) {
+        return (
+            <Text className={styles.hint}>{t("reportSidebar.noPlans")}</Text>
+        );
+    }
+
+    return (
+        <>
+            {plans.map((plan) => (
+                <Checkbox
+                    key={plan.id}
+                    label={
+                        <>
+                            {plan.name}
+                            {newPlanIds.has(plan.id) && (
+                                <span className={styles.newBadge}>
+                                    {t("reportSidebar.newPlanBadge")}
+                                </span>
+                            )}
+                        </>
+                    }
+                    checked={checkedPlanIds.includes(plan.id)}
+                    onChange={(_, data) => onTogglePlan(plan.id, !!data.checked)}
+                />
+            ))}
+        </>
+    );
+}
+
+// One clickable sprint row, expanding into its PlanChecklist when active -
+// shared by the area-grouped and flat sprint lists below.
+function SprintRow({
+    iteration,
+    active,
+    onSelect,
+    plans,
+    plansLoading,
+    checkedPlanIds,
+    onTogglePlan,
+    newPlanIds,
+}: {
+    iteration: Iteration;
+    active: boolean;
+    onSelect: () => void;
+    plans: TestPlanSummary[];
+    plansLoading: boolean;
+    checkedPlanIds: number[];
+    onTogglePlan: (planId: number, checked: boolean) => void;
+    newPlanIds: Set<number>;
+}) {
+    const styles = useStyles();
+
+    return (
+        <div className={styles.sprintRow}>
+            <button
+                type="button"
+                className={
+                    active
+                        ? `${styles.sprintButton} ${styles.sprintButtonSelected}`
+                        : styles.sprintButton
+                }
+                onClick={onSelect}
+            >
+                {iteration.name}
+            </button>
+
+            {active && (
+                <div className={styles.planList}>
+                    <PlanChecklist
+                        plans={plans}
+                        plansLoading={plansLoading}
+                        checkedPlanIds={checkedPlanIds}
+                        onTogglePlan={onTogglePlan}
+                        newPlanIds={newPlanIds}
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
 // Area Path -> Sprint -> Test Plan checkboxes, replacing the horizontal
 // Area/Sprint fields ScopeBar would otherwise show on this page (see
 // PageLayout's hideAreaSprintScope) with a persistent tree so a whole
@@ -140,6 +254,90 @@ export function ReportSidebar({
         );
     };
 
+    // Test Factory (confirmed) has neither real Area Paths nor real
+    // Iterations below the project root - every work item there just carries
+    // Area/Iteration = "Test Factory" (the root itself, which both endpoints
+    // exclude from their results). With nothing to group by at all, skip
+    // straight to a flat list of every test plan in the project - no area,
+    // no sprint, nothing to pick first.
+    if (
+        areaPaths &&
+        areaPaths.length === 0 &&
+        iterations &&
+        iterations.length === 0
+    ) {
+        return (
+            <nav className={styles.sidebar} aria-label={t("reportSidebar.title")}>
+                <Text weight="semibold">{t("reportSidebar.title")}</Text>
+
+                <div className={styles.planList}>
+                    <PlanChecklist
+                        plans={plans}
+                        plansLoading={plansLoading}
+                        checkedPlanIds={checkedPlanIds}
+                        onTogglePlan={togglePlan}
+                        newPlanIds={newPlanIds}
+                    />
+                </div>
+            </nav>
+        );
+    }
+
+    // Some projects don't define any Area Paths at all, but do still have a
+    // real Iteration tree - forcing the Area -> Sprint -> Plans tree there
+    // would leave the Area level permanently empty and nothing pickable.
+    // Falling back to a flat Sprint -> Plans list (no area filtering, since
+    // there's no area to filter by) only kicks in once the query has
+    // actually resolved to zero areas, so projects that do have areas
+    // (ItasMutua) are entirely unaffected - they never see this branch.
+    if (areaPaths && areaPaths.length === 0) {
+        return (
+            <nav className={styles.sidebar} aria-label={t("reportSidebar.title")}>
+                <Text weight="semibold">{t("reportSidebar.title")}</Text>
+
+                {(iterations ?? []).length === 0 && (
+                    <Text className={styles.hint}>
+                        {t("reportSidebar.noSprints")}
+                    </Text>
+                )}
+
+                <div className={styles.sprintList}>
+                    {(iterations ?? []).map((iteration) => (
+                        <SprintRow
+                            key={iteration.id}
+                            iteration={iteration}
+                            active={sprint === iteration.path}
+                            onSelect={() =>
+                                onSprintChange(
+                                    sprint === iteration.path ? "" : iteration.path
+                                )
+                            }
+                            plans={plans}
+                            plansLoading={plansLoading}
+                            checkedPlanIds={checkedPlanIds}
+                            onTogglePlan={togglePlan}
+                            newPlanIds={newPlanIds}
+                        />
+                    ))}
+                </div>
+            </nav>
+        );
+    }
+
+    // Some projects (e.g. Test Factory) don't nest their Iteration tree
+    // under a same-named Area Path subtree at all - the two classification
+    // trees are unrelated there. Detected once, project-wide: if not a
+    // single area has any path-matching sprint, the 1:1 convention below
+    // doesn't apply to this project, so every area falls back to the full
+    // iteration list instead of silently showing "no sprints" everywhere.
+    const anyAreaHasMatchingSprints = (areaPaths ?? []).some((area) =>
+        (iterations ?? []).some(
+            (iteration) =>
+                iteration.path !== area.path &&
+                iteration.path.startsWith(`${area.path}\\`)
+        )
+    );
+
     return (
         <nav className={styles.sidebar} aria-label={t("reportSidebar.title")}>
             <Text weight="semibold">{t("reportSidebar.title")}</Text>
@@ -149,93 +347,57 @@ export function ReportSidebar({
                 onToggle={(_, data) => toggleAreaPath(String(data.value))}
             >
                 {(areaPaths ?? []).map((area) => {
-                    // Azure DevOps' Area and Iteration classification
-                    // trees are separate endpoints, but in this project
-                    // each team's iteration subtree is named to match its
-                    // area path 1:1 - so "Plurifond"'s sprints live under
-                    // an iteration node whose path is
-                    // "<project>\Plurifond\...". Filtering by path prefix
-                    // (excluding the exact match, which is that subtree's
-                    // own root node, not a real sprint) scopes sprints to
-                    // this area instead of showing every team's sprints
-                    // under every area.
-                    const areaSprints = (iterations ?? []).filter(
-                        (iteration) =>
-                            iteration.path !== area.path &&
-                            iteration.path.startsWith(`${area.path}\\`)
-                    );
+                    // Azure DevOps' Area and Iteration classification trees
+                    // are separate endpoints. Where a project names each
+                    // team's iteration subtree to match its area path 1:1
+                    // (e.g. "Plurifond"'s sprints live under an iteration
+                    // node whose path is "<project>\Plurifond\..."),
+                    // filtering by path prefix (excluding the exact match,
+                    // that subtree's own root node, not a real sprint)
+                    // scopes sprints to this area instead of showing every
+                    // team's sprints under every area. Projects that don't
+                    // follow that convention (see anyAreaHasMatchingSprints
+                    // above) fall back to the full iteration list.
+                    const areaSprints = anyAreaHasMatchingSprints
+                        ? (iterations ?? []).filter(
+                              (iteration) =>
+                                  iteration.path !== area.path &&
+                                  iteration.path.startsWith(`${area.path}\\`)
+                          )
+                        : (iterations ?? []);
 
                     return (
-                    <AccordionItem key={area.id} value={area.path}>
-                        <AccordionHeader>{area.name}</AccordionHeader>
-                        <AccordionPanel>
-                            {areaSprints.length === 0 && (
-                                <Text className={styles.hint}>
-                                    {t("reportSidebar.noSprints")}
-                                </Text>
-                            )}
-                            <div className={styles.sprintList}>
-                                {areaSprints.map((iteration) => (
-                                    <div key={iteration.id} className={styles.sprintRow}>
-                                        <button
-                                            type="button"
-                                            className={
-                                                sprint === iteration.path
-                                                    ? `${styles.sprintButton} ${styles.sprintButtonSelected}`
-                                                    : styles.sprintButton
-                                            }
-                                            onClick={() =>
+                        <AccordionItem key={area.id} value={area.path}>
+                            <AccordionHeader>{area.name}</AccordionHeader>
+                            <AccordionPanel>
+                                {areaSprints.length === 0 && (
+                                    <Text className={styles.hint}>
+                                        {t("reportSidebar.noSprints")}
+                                    </Text>
+                                )}
+                                <div className={styles.sprintList}>
+                                    {areaSprints.map((iteration) => (
+                                        <SprintRow
+                                            key={iteration.id}
+                                            iteration={iteration}
+                                            active={sprint === iteration.path}
+                                            onSelect={() =>
                                                 onSprintChange(
                                                     sprint === iteration.path
                                                         ? ""
                                                         : iteration.path
                                                 )
                                             }
-                                        >
-                                            {iteration.name}
-                                        </button>
-
-                                        {sprint === iteration.path && (
-                                            <div className={styles.planList}>
-                                                {plansLoading && (
-                                                    <Text className={styles.hint}>
-                                                        {t("reportSidebar.loadingPlans")}
-                                                    </Text>
-                                                )}
-
-                                                {!plansLoading && plans.length === 0 && (
-                                                    <Text className={styles.hint}>
-                                                        {t("reportSidebar.noPlans")}
-                                                    </Text>
-                                                )}
-
-                                                {!plansLoading &&
-                                                    plans.map((plan) => (
-                                                        <Checkbox
-                                                            key={plan.id}
-                                                            label={
-                                                                <>
-                                                                    {plan.name}
-                                                                    {newPlanIds.has(plan.id) && (
-                                                                        <span className={styles.newBadge}>
-                                                                            {t("reportSidebar.newPlanBadge")}
-                                                                        </span>
-                                                                    )}
-                                                                </>
-                                                            }
-                                                            checked={checkedPlanIds.includes(plan.id)}
-                                                            onChange={(_, data) =>
-                                                                togglePlan(plan.id, !!data.checked)
-                                                            }
-                                                        />
-                                                    ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </AccordionPanel>
-                    </AccordionItem>
+                                            plans={plans}
+                                            plansLoading={plansLoading}
+                                            checkedPlanIds={checkedPlanIds}
+                                            onTogglePlan={togglePlan}
+                                            newPlanIds={newPlanIds}
+                                        />
+                                    ))}
+                                </div>
+                            </AccordionPanel>
+                        </AccordionItem>
                     );
                 })}
             </Accordion>

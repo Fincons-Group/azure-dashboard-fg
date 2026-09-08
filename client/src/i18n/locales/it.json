@@ -50,6 +50,7 @@
   "azdoConnectionError": {
     "title": "Impossibile raggiungere Azure DevOps",
     "message": "La dashboard non è riuscita a caricare i dati da Azure DevOps. Di solito significa che organizzazione o PAT salvati sono assenti, scaduti o non validi.",
+    "restrictedTitle": "Accesso non consentito",
     "retry": "Riprova",
     "changePat": "Cambia PAT"
   },
