@@ -625,6 +625,23 @@ export async function getActiveBugIds(project?: string): Promise<number[]> {
     );
 }
 
+export async function getEpicIds(project?: string): Promise<number[]> {
+    const response = await clientFor(project).post(
+        "/wit/wiql?api-version=7.1",
+        {
+            query: `
+        SELECT [System.Id]
+        FROM WorkItems
+        WHERE [System.WorkItemType] = 'Epic'
+          AND [System.State] <> 'Removed'
+          AND [System.TeamProject] = @project
+      `,
+        }
+    );
+
+    return response.data.workItems.map((w: { id: number }) => w.id);
+}
+
 export async function getWorkItem(id: number, project?: string) {
     const response = await clientFor(project).get(
         `/wit/workitems/${id}?$expand=relations&api-version=7.1`
@@ -1023,6 +1040,31 @@ export function extractWorkItemIds(
             return match
                 ? Number.parseInt(match[1], 10)
                 : null;
+        })
+        .filter(
+            (id): id is number =>
+                id !== null && Number.isInteger(id)
+        );
+}
+
+// Hierarchy-Forward only (an item's own children) - unlike extractWorkItemIds
+// above (used for bug/test-case links, which don't care about relation
+// type), a coverage roll-up must not also sweep up "Related" links or an
+// Epic's own Hierarchy-Reverse parent.
+export function extractChildWorkItemIds(
+    relations: any[] = []
+): number[] {
+    return relations
+        .filter(
+            (r) =>
+                r.rel === "System.LinkTypes.Hierarchy-Forward" &&
+                typeof r.url === "string" &&
+                r.url.includes("/workItems/")
+        )
+        .map((r) => {
+            const match = r.url.match(/workItems\/(\d+)$/);
+
+            return match ? Number.parseInt(match[1], 10) : null;
         })
         .filter(
             (id): id is number =>

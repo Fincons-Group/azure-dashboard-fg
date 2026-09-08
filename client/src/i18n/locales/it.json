@@ -7,6 +7,7 @@
     "home": "Vai alla home",
     "dynamicSprintReport": "Report Sprint",
     "excelExport": "Export Excel",
+    "coverageRoadmap": "Copertura Automazione",
     "refresh": "Aggiorna Ora",
     "refreshing": "Aggiornamento...",
     "refreshFailed": "Aggiornamento non riuscito: {{message}}",
@@ -43,7 +44,8 @@
     "navSectionTitle": "Cosa trovi nel menu",
     "navSections": {
       "dynamic-sprint-report": "Crea un report filtrato per area path, sprint e piano di test.",
-      "excel-export": "Esporta in Excel più ambiti insieme (Plurifonds, sprint Auto...) con l'opzione \"Tutto\" combinata."
+      "excel-export": "Esporta in Excel più ambiti insieme (Plurifonds, sprint Auto...) con l'opzione \"Tutto\" combinata.",
+      "coverage-roadmap": "Monitora la copertura di automazione per epic del progetto Test Factory, con owner, scadenza e stato."
     },
     "gotIt": "Capito"
   },
@@ -62,6 +64,34 @@
     "Paused": "In Pausa",
     "InProgress": "In Corso",
     "NotRun": "Non Eseguito"
+  },
+  "coverageRoadmapPage": {
+    "title": "Copertura Automazione",
+    "subtitle": "Ogni area è un epic in Test Factory - aprilo per vedere i task di automazione (issue) dietro la %.",
+    "selectProjectPrompt": "Seleziona un progetto per vedere la sua roadmap di copertura.",
+    "noEpics": "Nessun epic trovato per questo progetto.",
+    "unassigned": "Non assegnato",
+    "noTasks": "Nessun task di automazione ancora collegato a questo epic.",
+    "epicMeta": "Epic #{{id}} · {{count}} task di automazione",
+    "coverageOfTarget": "{{done}} di {{total}} task completati — target {{target}}%",
+    "coverageNoTarget": "{{done}} di {{total}} task completati",
+    "columns": {
+      "area": "Area (epic)",
+      "coverage": "Copertura",
+      "owner": "Owner",
+      "due": "Scadenza",
+      "status": "Stato"
+    },
+    "taskColumns": {
+      "task": "Task",
+      "assignee": "Assegnatario",
+      "status": "Stato"
+    },
+    "status": {
+      "done": "Completato",
+      "in-progress": "In corso",
+      "at-risk": "A rischio"
+    }
   },
   "planOverviewPage": {
     "exporting": "Esportazione...",

@@ -684,3 +684,29 @@ export interface ReleaseReadinessResponse {
 export interface NavBadgesResponse {
     openCriticalHighDefects: number;
 }
+
+export type CoverageStatus = "done" | "in-progress" | "at-risk";
+
+export interface CoverageTask {
+    id: number;
+    title: string;
+    url?: string;
+    state: string;
+    isDone: boolean;
+    assignee?: string;
+}
+
+export interface CoverageArea {
+    id: number;
+    title: string;
+    url?: string;
+    owner: string | null;
+    // ISO date string from the Epic's Target Date field, or null if unset.
+    dueDate: string | null;
+    currentPct: number;
+    // Read from AZDO_EPIC_TARGET_FIELD (see coverageData.ts) - null when the
+    // Epic doesn't carry that field.
+    targetPct: number | null;
+    status: CoverageStatus;
+    tasks: CoverageTask[];
+}

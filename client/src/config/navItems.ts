@@ -1,5 +1,9 @@
 import type { FluentIcon } from "@fluentui/react-icons";
-import { DocumentTableRegular, DocumentTextRegular } from "@fluentui/react-icons";
+import {
+    DocumentTableRegular,
+    DocumentTextRegular,
+    TableRegular,
+} from "@fluentui/react-icons";
 
 export interface NavItemConfig {
     key: string;
@@ -23,5 +27,11 @@ export const NAV_ITEMS: NavItemConfig[] = [
         labelKey: "nav.excelExport",
         icon: DocumentTableRegular,
         descriptionKey: "onboardingGuide.navSections.excel-export",
+    },
+    {
+        key: "coverage-roadmap",
+        labelKey: "nav.coverageRoadmap",
+        icon: TableRegular,
+        descriptionKey: "onboardingGuide.navSections.coverage-roadmap",
     },
 ];

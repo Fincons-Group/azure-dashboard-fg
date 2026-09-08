@@ -7,6 +7,7 @@
     "home": "Go to home",
     "dynamicSprintReport": "Sprint Report",
     "excelExport": "Excel Export",
+    "coverageRoadmap": "Coverage Roadmap",
     "refresh": "Refresh Now",
     "refreshing": "Refreshing...",
     "refreshFailed": "Refresh failed: {{message}}",
@@ -43,7 +44,8 @@
     "navSectionTitle": "What's in the menu",
     "navSections": {
       "dynamic-sprint-report": "Build a report scoped to an area path, sprint, and test plan.",
-      "excel-export": "Export several scopes to Excel at once (Plurifonds, Auto sprints...) with a combined \"All\" option."
+      "excel-export": "Export several scopes to Excel at once (Plurifonds, Auto sprints...) with a combined \"All\" option.",
+      "coverage-roadmap": "Track automation coverage per epic for the Test Factory project, with owner, due date, and status."
     },
     "gotIt": "Got it"
   },
@@ -62,6 +64,34 @@
     "Paused": "Paused",
     "InProgress": "In Progress",
     "NotRun": "Not Run"
+  },
+  "coverageRoadmapPage": {
+    "title": "Coverage Roadmap",
+    "subtitle": "Each area is an epic in Test Factory - open one to see the automation tasks (issues) behind the %.",
+    "selectProjectPrompt": "Select a project to see its coverage roadmap.",
+    "noEpics": "No epics found for this project.",
+    "unassigned": "Unassigned",
+    "noTasks": "No automation tasks linked to this epic yet.",
+    "epicMeta": "Epic #{{id}} · {{count}} automation tasks",
+    "coverageOfTarget": "{{done}} of {{total}} tasks done — target {{target}}%",
+    "coverageNoTarget": "{{done}} of {{total}} tasks done",
+    "columns": {
+      "area": "Area (epic)",
+      "coverage": "Coverage",
+      "owner": "Owner",
+      "due": "Due",
+      "status": "Status"
+    },
+    "taskColumns": {
+      "task": "Task",
+      "assignee": "Assignee",
+      "status": "Status"
+    },
+    "status": {
+      "done": "Done",
+      "in-progress": "In progress",
+      "at-risk": "At risk"
+    }
   },
   "planOverviewPage": {
     "exporting": "Exporting...",

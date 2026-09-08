@@ -10,6 +10,7 @@ import {
 import {
     DocumentTextRegular,
     DocumentTableRegular,
+    TableRegular,
     ChevronLeftRegular,
     ChevronRightRegular,
     type FluentIcon,
@@ -162,10 +163,10 @@ type NavItem = {
     icon: FluentIcon;
 };
 
-// This branch ships two destinations - the Sprint Report and the multi-scope
-// Excel Export page - so no per-user visibility toggle, no automation group,
-// no badge query (that queried defect counts, which have no page to link to
-// here).
+// This branch ships three destinations - the Sprint Report, the multi-scope
+// Excel Export page, and the Test Factory Coverage Roadmap - so no per-user
+// visibility toggle, no automation group, no badge query (that queried
+// defect counts, which have no page to link to here).
 const NAV_ITEMS: NavItem[] = [
     {
         key: "dynamic-sprint-report",
@@ -178,6 +179,12 @@ const NAV_ITEMS: NavItem[] = [
         labelKey: "nav.excelExport",
         to: "/excel-export",
         icon: DocumentTableRegular,
+    },
+    {
+        key: "coverage-roadmap",
+        labelKey: "nav.coverageRoadmap",
+        to: "/coverage-roadmap",
+        icon: TableRegular,
     },
 ];
 
