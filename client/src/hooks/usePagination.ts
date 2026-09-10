@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 // Client-side pagination over an already-fetched array - "lazy loading" here
 // just means only the current page's rows ever mount, not a real fetch-more
@@ -9,21 +9,19 @@ export function usePagination<T>(items: T[], pageSize: number) {
     const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
 
     // Falling back to a shorter list (an epic filter, a narrower result)
-    // must not strand the view on a now-empty page past the new last one.
-    useEffect(() => {
-        if (page > pageCount - 1) {
-            setPage(0);
-        }
-    }, [pageCount, page]);
+    // must not strand the view on a now-empty page past the new last one -
+    // clamp during render instead of resetting via an effect, so there's no
+    // extra render pass and no setState-in-effect (react-hooks/set-state-in-effect).
+    const currentPage = Math.min(page, pageCount - 1);
 
     const pageItems = useMemo(() => {
-        const start = page * pageSize;
+        const start = currentPage * pageSize;
 
         return items.slice(start, start + pageSize);
-    }, [items, page, pageSize]);
+    }, [items, currentPage, pageSize]);
 
     return {
-        page,
+        page: currentPage,
         pageCount,
         pageItems,
         setPage,

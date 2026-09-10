@@ -172,9 +172,30 @@
   },
   "e2eHistoryPage": {
     "title": "Storico E2E",
-    "subtitle": "Andamento del success rate ed esecuzioni recenti della suite Playwright tst-e2e, pubblicate su Azure Cosmos DB dopo ogni run CI.",
-    "underConstructionTitle": "In costruzione",
-    "underConstructionBody": "Questa pagina è ancora in fase di sviluppo. Torna presto per l'andamento del success rate e lo storico delle esecuzioni e2e."
+    "subtitle": "Andamento del success rate ed esecuzioni recenti della suite Playwright tst-e2e, pubblicate su Firebase dopo ogni run CI.",
+    "notConfiguredTitle": "Non ancora configurato",
+    "notConfiguredBody": "Impostare FIREBASE_SERVICE_ACCOUNT_JSON sul server per visualizzare qui l'andamento del success rate e lo storico delle esecuzioni e2e.",
+    "noRunsTitle": "Nessuna esecuzione ancora",
+    "noRunsBody": "Firebase è connesso, ma non è stata ancora pubblicata alcuna esecuzione e2e. L'andamento e lo storico appariranno qui dopo la prima esecuzione CI.",
+    "chartTitle": "Andamento success rate",
+    "passRateChartLabel": "Grafico andamento success rate E2E",
+    "passRateValue": "{{pct}}%",
+    "stats": {
+      "passRate": "Ultimo success rate",
+      "totalTests": "Test nell'ultima esecuzione",
+      "flaky": "Test instabili"
+    },
+    "table": {
+      "title": "Esecuzioni recenti",
+      "date": "Data",
+      "branch": "Branch",
+      "commit": "Commit",
+      "passRate": "Success rate",
+      "tests": "Superati / Totali",
+      "flaky": "Instabili",
+      "report": "Report"
+    },
+    "viewReport": "Visualizza"
   },
   "planOverviewPage": {
     "exporting": "Esportazione...",

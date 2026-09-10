@@ -173,8 +173,29 @@
   "e2eHistoryPage": {
     "title": "E2E History",
     "subtitle": "Pass rate trend and recent runs from the tst-e2e Playwright suite, published to Firebase after each CI run.",
-    "underConstructionTitle": "Under construction",
-    "underConstructionBody": "This page is being built out. Check back soon for e2e pass-rate trends and run history."
+    "notConfiguredTitle": "Not configured yet",
+    "notConfiguredBody": "Set FIREBASE_SERVICE_ACCOUNT_JSON on the server to start showing e2e pass-rate trends and run history here.",
+    "noRunsTitle": "No runs yet",
+    "noRunsBody": "Firebase is connected, but no e2e run has been published yet. Trend and run history will appear here after the first CI run.",
+    "chartTitle": "Pass rate trend",
+    "passRateChartLabel": "E2E pass rate trend chart",
+    "passRateValue": "{{pct}}%",
+    "stats": {
+      "passRate": "Latest pass rate",
+      "totalTests": "Tests in latest run",
+      "flaky": "Flaky tests"
+    },
+    "table": {
+      "title": "Recent runs",
+      "date": "Date",
+      "branch": "Branch",
+      "commit": "Commit",
+      "passRate": "Pass rate",
+      "tests": "Passed / Total",
+      "flaky": "Flaky",
+      "report": "Report"
+    },
+    "viewReport": "View"
   },
   "planOverviewPage": {
     "exporting": "Exporting...",
