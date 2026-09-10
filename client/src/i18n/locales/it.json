@@ -2,12 +2,21 @@
   "common": {
     "title": "QA Dashboard"
   },
+  "pagination": {
+    "range": "{{rangeStart}}-{{rangeEnd}} di {{total}}",
+    "pageOf": "Pagina {{page}} di {{pageCount}}",
+    "previous": "Pagina precedente",
+    "next": "Pagina successiva"
+  },
   "nav": {
     "primary": "Principale",
     "home": "Vai alla home",
     "dynamicSprintReport": "Report Sprint",
     "excelExport": "Export Excel",
     "coverageRoadmap": "Copertura Automazione",
+    "cycleTime": "Tempo di Ciclo",
+    "automationKpis": "KPI di Automazione",
+    "e2eHistory": "Storico E2E",
     "refresh": "Aggiorna Ora",
     "refreshing": "Aggiornamento...",
     "refreshFailed": "Aggiornamento non riuscito: {{message}}",
@@ -21,7 +30,14 @@
     "testGraphLogoutFailed": "Disconnessione non riuscita: {{message}}",
     "collapseSidebar": "Comprimi barra laterale",
     "expandSidebar": "Espandi barra laterale",
-    "changePat": "Cambia PAT"
+    "changePat": "Cambia PAT",
+    "settings": "Impostazioni"
+  },
+  "settingsDialog": {
+    "title": "Impostazioni",
+    "showExtraKpisLabel": "Mostra KPI aggiuntivi",
+    "showExtraKpisHint": "Controlla la sezione \"KPI aggiuntivi\" nella card del Report Sprint - se disattivata, viene nascosta a schermo e omessa da ogni report inviato/esportato (HTML, PDF, PPTX). Salvato in questo browser.",
+    "close": "Chiudi"
   },
   "azdoPatSteps": {
     "step1": "In Azure DevOps apri il tuo profilo (in alto a destra) e vai su Impostazioni Utente > Personal Access Token.",
@@ -45,7 +61,10 @@
     "navSections": {
       "dynamic-sprint-report": "Crea un report filtrato per area path, sprint e piano di test.",
       "excel-export": "Esporta in Excel più ambiti insieme (Plurifonds, sprint Auto...) con l'opzione \"Tutto\" combinata.",
-      "coverage-roadmap": "Monitora la copertura di automazione per epic del progetto Test Factory, con owner, scadenza e stato."
+      "coverage-roadmap": "Monitora la copertura di automazione per epic del progetto Test Factory, con owner, scadenza e stato.",
+      "cycle-time": "Scopri quanto è veloce il team nel completare i task di automazione di Test Factory - tempo di ciclo e andamento settimanale.",
+      "automation-kpis": "Copertura di automazione reale sui test case, success rate e test instabili per il progetto Test Factory.",
+      "e2e-history": "Andamento del success rate e storico delle esecuzioni recenti della suite Playwright tst-e2e, pubblicati via Firebase."
     },
     "gotIt": "Capito"
   },
@@ -64,6 +83,41 @@
     "Paused": "In Pausa",
     "InProgress": "In Corso",
     "NotRun": "Non Eseguito"
+  },
+  "cycleTimePage": {
+    "title": "Tempo di Ciclo",
+    "subtitle": "Quanto impiegano i task di automazione da \"In Progress\" a \"Done\", e quanti ne finiscono ogni settimana - negli epic di Test Factory.",
+    "noTasks": "Nessun task completato con un avvio registrato - una volta che i task passano da In Progress a Done, appariranno qui.",
+    "noTasksForEpic": "Nessun task completato per questo epic.",
+    "epicFilterLabel": "Epic",
+    "allEpics": "Tutti gli epic",
+    "stats": {
+      "avgCycleTime": "Tempo di ciclo medio",
+      "medianCycleTime": "Tempo di ciclo mediano",
+      "tasksCompleted": "Task completati",
+      "stillOpen": "Ancora aperti"
+    },
+    "throughputChartTitle": "Task completati per settimana",
+    "throughputChartLabel": "Grafico a barre dei task di automazione completati per settimana",
+    "cycleTimeChartTitle": "Andamento del tempo di ciclo medio",
+    "cycleTimeChartLabel": "Grafico a linee del tempo di ciclo medio in giorni per settimana",
+    "daysValue": "{{days}}g",
+    "avgDays": "{{days}}g medi",
+    "avgDaysShort": "{{days}}g",
+    "tasksCompleted_one": "{{count}} task completato",
+    "tasksCompleted_other": "{{count}} task completati",
+    "openTasksTitle_one": "Task aperto ({{count}})",
+    "openTasksTitle_other": "Task aperti ({{count}})",
+    "completedTasksTitle_one": "Task completato ({{count}})",
+    "completedTasksTitle_other": "Task completati ({{count}})",
+    "table": {
+      "task": "Task",
+      "epic": "Epic",
+      "started": "Avviato",
+      "done": "Completato",
+      "cycleTime": "Tempo di ciclo",
+      "state": "Stato"
+    }
   },
   "coverageRoadmapPage": {
     "title": "Copertura Automazione",
@@ -92,6 +146,35 @@
       "in-progress": "In corso",
       "at-risk": "A rischio"
     }
+  },
+  "automationKpiPage": {
+    "title": "KPI di Automazione",
+    "subtitle": "Copertura di automazione reale sui test case, success rate e test instabili per Test Factory - basati sul campo Automation Status di ogni Test Case, non sul completamento dei task epic.",
+    "noTestCases": "Nessun test case trovato per questo progetto.",
+    "noFlakyTests": "Nessun test automatico instabile trovato - nessuno ha sia un pass che un fail registrati.",
+    "coveragePctValue": "{{pct}}%",
+    "automatedOfTotal": "{{automated}} di {{total}} automatizzati",
+    "moduleChartTitle": "Copertura di automazione per modulo",
+    "moduleChartLabel": "Grafico a barre della percentuale di copertura di automazione per modulo",
+    "stats": {
+      "coverage": "Copertura di automazione",
+      "automatedTests": "Test automatizzati",
+      "manualTests": "Test manuali",
+      "successRate": "Success rate di automazione"
+    },
+    "flakyTestsTitle_one": "Test instabile ({{count}})",
+    "flakyTestsTitle_other": "Test instabili ({{count}})",
+    "table": {
+      "testCase": "Test case",
+      "flakeCount": "Fallimenti",
+      "lastFailed": "Ultimo fallimento"
+    }
+  },
+  "e2eHistoryPage": {
+    "title": "Storico E2E",
+    "subtitle": "Andamento del success rate ed esecuzioni recenti della suite Playwright tst-e2e, pubblicate su Azure Cosmos DB dopo ogni run CI.",
+    "underConstructionTitle": "In costruzione",
+    "underConstructionBody": "Questa pagina è ancora in fase di sviluppo. Torna presto per l'andamento del success rate e lo storico delle esecuzioni e2e."
   },
   "planOverviewPage": {
     "exporting": "Esportazione...",
@@ -190,7 +273,14 @@
           "withoutResolutionDate": "Bug senza data di\nrisoluzione",
           "bugsByUs": "Bug aperti da Test Factory",
           "bugsByDsi": "Bug aperti da DSI",
-          "bugsByBusiness": "Bug aperti da Test Business"
+          "bugsByBusiness": "Bug aperti da Test Business",
+          "extraKpisSection": "KPI aggiuntivi",
+          "firstExecutionPassRateFunctional": "First Execution\nPass Rate (Func.)",
+          "firstExecutionPassRateUat": "First Execution\nPass Rate (UAT)",
+          "avgFixTimeBusinessDays": "Tempo Medio Fix Bug\n(gg lavorativi)",
+          "criticalHighBugPct": "Bug Critici/High\n(% sul totale)",
+          "testPlanCorrectnessPct": "Test Plan Correctness\n/ Executability",
+          "duplicateNotApplicable": "Casi N/A\nDuplicati"
         },
         "kpisHelp": {
           "totalTestCases": "Tutti i casi di test presenti nel/i piano/i selezionato/i, qualsiasi sia il loro stato.",
@@ -209,7 +299,13 @@
           "criticalBugs": "Bug di severity Critica ancora aperti, conteggiati solo tra i bug effettivi (in perimetro) - a differenza degli altri conteggi bug di questa scheda, qui i bug fuori perimetro sono esclusi.",
           "reopenedBugs": "Bug che sono stati riaperti almeno una volta dopo essere stati chiusi, in base alla loro storia completa - indipendentemente dallo stato attuale, e conteggiati su ogni bug rilevato inclusi quelli fuori perimetro.",
           "avgClosureTime": "Numero medio di giorni tra l'apertura e la chiusura di un bug, calcolato su ogni bug rilevato (compresi quelli fuori perimetro) che ha una data di chiusura effettiva. I bug ancora aperti non vengono conteggiati.",
-          "withoutResolutionDate": "Bug ancora attivi (non Chiusi, non Da verificare, non In verifica) che non hanno ancora una data di risoluzione stimata. Un dato separato dalla media del tempo di chiusura qui sopra, che si basa sulla data di chiusura effettiva di ogni bug."
+          "withoutResolutionDate": "Bug ancora attivi (non Chiusi, non Da verificare, non In verifica) che non hanno ancora una data di risoluzione stimata. Un dato separato dalla media del tempo di chiusura qui sopra, che si basa sulla data di chiusura effettiva di ogni bug.",
+          "firstExecutionPassRateFunctional": "% dei casi di test dei piani Funzionali risultati PASS alla primissima esecuzione (non l'esito corrente/piu' recente). Target >= 80%.",
+          "firstExecutionPassRateUat": "% dei casi di test dei piani UAT risultati PASS alla primissima esecuzione (non l'esito corrente/piu' recente). Target >= 90%.",
+          "avgFixTimeBusinessDays": "Giorni lavorativi medi (lun-ven) tra l'apertura di un bug e la sua prima transizione in Resolved/Da verificare (fix pronta per il retest) - non giorni di calendario fino a Closed. Target <= 2 giorni lavorativi.",
+          "criticalHighBugPct": "Bug aperti con severity Critical o High, in percentuale sul totale dei bug rilevati. Target <= 0,5%.",
+          "testPlanCorrectnessPct": "% di casi di test pianificati non Bloccati da un bug collegato. Nota: un caso di test Bloccato senza bug collegato non riduce attualmente questo punteggio - il team QA deve collegare un bug al caso Bloccato perche' venga conteggiato qui. Target 95-100%.",
+          "duplicateNotApplicable": "Casi di test Non Applicabile il cui titolo compare come Non Applicabile anche in un'altra suite dei piani selezionati, o nello sprint precedente. Il confronto avviene per titolo, non per ID, perche' un caso ri-aggiunto genera un nuovo work item. Target 0."
         },
         "sectionHelp": {
           "suiteProgress": "Il \"% Eseguiti\" di ogni suite conta anche i casi Non Applicabile come eseguiti (viene escluso solo Da eseguire) - più ampio della KPI \"Casi di test eseguiti\" qui sopra, che esclude del tutto i Non Applicabile. Pass Rate = Passati ÷ (Totale meno Non Applicabile).",

@@ -20,6 +20,15 @@ const ExcelExportPage = lazy(() =>
 const CoverageRoadmapPage = lazy(() =>
     import("./pages/CoverageRoadmapPage").then((m) => ({ default: m.CoverageRoadmapPage }))
 );
+const CycleTimeReportPage = lazy(() =>
+    import("./pages/CycleTimeReportPage").then((m) => ({ default: m.CycleTimeReportPage }))
+);
+const AutomationKpiPage = lazy(() =>
+    import("./pages/AutomationKpiPage").then((m) => ({ default: m.AutomationKpiPage }))
+);
+const E2eHistoryPage = lazy(() =>
+    import("./pages/E2eHistoryPage").then((m) => ({ default: m.E2eHistoryPage }))
+);
 
 function PageFallback() {
     return (
@@ -41,6 +50,18 @@ function AppRoutes() {
                 <Route
                     path="/coverage-roadmap"
                     element={<CoverageRoadmapPage />}
+                />
+                <Route
+                    path="/cycle-time"
+                    element={<CycleTimeReportPage />}
+                />
+                <Route
+                    path="/automation-kpis"
+                    element={<AutomationKpiPage />}
+                />
+                <Route
+                    path="/e2e-history"
+                    element={<E2eHistoryPage />}
                 />
                 <Route
                     path="*"

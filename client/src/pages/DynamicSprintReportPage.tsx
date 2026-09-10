@@ -29,6 +29,7 @@ import {
     fetchPlans,
     fetchPlanOverview,
     fetchDefects,
+    fetchReportExtraKpis,
 } from "../api/client";
 import { useScope } from "../hooks/useScope";
 import { useCheckedTestPlans } from "../hooks/useCheckedTestPlans";
@@ -216,6 +217,29 @@ export function DynamicSprintReportPage() {
         queryKey: ["defects", filters, scope.project],
         queryFn: () => fetchDefects(filters, scope.project),
         enabled: scope.isComplete && (hasIterations ? !!scope.sprint : true),
+    });
+
+    // The report's 4 additional KPIs - a separate, heavier query (enumerates
+    // Azure DevOps test run history server-side, see ReportExtraKpis in
+    // types.ts) than the defects query above, so it's kept independent
+    // rather than folded into `data` - a slow extra-KPIs fetch never blocks
+    // the rest of the report from rendering.
+    const { data: extraKpis } = useQuery({
+        queryKey: [
+            "report-extra-kpis",
+            scope.project,
+            scope.areaPath,
+            scope.sprint,
+            selectedPlanIds,
+        ],
+        queryFn: () =>
+            fetchReportExtraKpis(
+                scope.project,
+                scope.areaPath,
+                scope.sprint,
+                selectedPlanIds
+            ),
+        enabled: scope.isComplete && selectedPlanIds.length > 0,
     });
 
     // The suite dropdown normally lists every suite name that appears on a
@@ -432,6 +456,7 @@ export function DynamicSprintReportPage() {
                                     includeDeadline={false}
                                     enableEmailPreface
                                     enableEmailClosing
+                                    extraKpis={extraKpis}
                                 />
                             </>
                         )}

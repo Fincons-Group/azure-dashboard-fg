@@ -186,6 +186,31 @@ function findLastTransitionInto(
     return result;
 }
 
+// Mirror of findLastTransitionInto - the FIRST time the bug transitioned
+// into targetStates, rather than the most recent. Used for
+// firstResolvedTransition, where a reopened-then-refixed bug should still
+// report when it was first ready for retest, not the latest cycle.
+function findFirstTransitionInto(
+    revisions: any[],
+    targetStates: string[]
+): { changedDate: string } | undefined {
+    for (let i = 1; i < revisions.length; i++) {
+        const prevState = revisions[i - 1].fields?.["System.State"];
+        const currState = revisions[i].fields?.["System.State"];
+
+        if (targetStates.includes(currState) && !targetStates.includes(prevState)) {
+            return { changedDate: revisions[i].fields?.["System.ChangedDate"] };
+        }
+    }
+
+    return undefined;
+}
+
+// States that represent "fix ready for QA retest" - reuses VERIFICA_STATE
+// since this project's workflow already treats it as the Resolved
+// equivalent (see the comment on VERIFICA_STATE above).
+const RESOLVED_STATES = [VERIFICA_STATE];
+
 // Mirror of findLastTransitionInto - last time the bug LEFT targetStates
 // (arrived somewhere outside the set, having been inside it), rather than
 // entered it. Used for verificaExitTransition ("verified today").
@@ -458,6 +483,7 @@ async function buildDefectRecord(
         verificaPendingTransition: findLastTransitionInto(revisions, VERIFICA_PENDING_STATES),
         verificaExitTransition: findLastTransitionOutOf(revisions, VERIFICA_PENDING_STATES),
         lastReopenedTransition: findLastTransitionInto(revisions, REOPENED_TO_STATES),
+        firstResolvedTransition: findFirstTransitionInto(revisions, RESOLVED_STATES),
         hasLinkedTestCase: linkedTestCaseIds.length > 0,
         url: buildWorkItemUrl(bug.id, project),
         creator: bug.fields["System.CreatedBy"]?.displayName,
@@ -649,6 +675,10 @@ function assembleDefectRecord(
         lastReopenedTransition: findLastTransitionInto(
             revisions,
             REOPENED_TO_STATES
+        ),
+        firstResolvedTransition: findFirstTransitionInto(
+            revisions,
+            RESOLVED_STATES
         ),
         hasLinkedTestCase: linkedTestCaseIds.length > 0,
         url: buildWorkItemUrl(bug.id, project),

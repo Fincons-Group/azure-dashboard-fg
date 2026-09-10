@@ -15,10 +15,12 @@ import type { CoverageArea, CoverageStatus, CoverageTask } from "./types.js";
 const TARGET_FIELD =
     process.env.AZDO_EPIC_TARGET_FIELD?.trim() || "Custom.TargetCoverage";
 
-// Work item states that count as "automated" for an epic's child task -
-// covers the common process templates (Agile/Scrum/Basic/CMMI) without
-// needing to know which one the project uses.
-const DONE_STATES = new Set(["Closed", "Done", "Completed", "Resolved"]);
+// Work item states that count as "automated"/"finished" for an epic's child
+// task - covers the common process templates (Agile/Scrum/Basic/CMMI)
+// without needing to know which one the project uses. Exported so
+// cycleTimeData.ts's cycle-time clock uses the exact same "done" definition
+// as the coverage roll-up here.
+export const DONE_STATES = new Set(["Closed", "Done", "Completed", "Resolved"]);
 
 // Below this fraction of target reached, with a due date already in view,
 // an area reads as at risk rather than merely in progress - a rough
