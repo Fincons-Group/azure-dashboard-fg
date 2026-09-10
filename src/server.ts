@@ -57,6 +57,27 @@ const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:3000")
 
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: "15mb" }));
+
+// Dev convenience: serves local Playwright/SmartReport output so the E2E
+// History page's "View" link resolves to something real while testing
+// against a laptop-local tst-e2e checkout. Unset in every other deployment -
+// the real pipeline (Part C of docs/e2e-firebase-integration-plan.md) will
+// publish reportUrl pointing at wherever CI uploads the report instead.
+if (process.env.E2E_REPORTS_DIR) {
+    app.use("/e2e-reports", express.static(process.env.E2E_REPORTS_DIR));
+}
+
+// Same dev convenience as E2E_REPORTS_DIR above, for the NRT/A11Y/DAST Test
+// Suites hub: point this at a local tst-e2e checkout's `reports/` folder
+// (the parent of its runs/, a11y/, and zap/ subfolders) so TestSuitesPage's
+// "Open ..." links resolve to the real smart-report.html / a11y/index.html /
+// ZAP report instead of a dead button. That page's run data is still a
+// client-side mock (see client/src/data/testSuitesMockData.ts) - this only
+// serves the static report files the mock's reportFile paths point at.
+if (process.env.TEST_SUITES_REPORTS_DIR) {
+    app.use("/test-suites-reports", express.static(process.env.TEST_SUITES_REPORTS_DIR));
+}
+
 app.use((req, res, next) => {
     runWithAzdoConfig(
         {

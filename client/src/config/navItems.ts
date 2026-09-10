@@ -6,6 +6,7 @@ import {
     ArrowTrendingRegular,
     FlashAutoRegular,
     BeakerRegular,
+    AppsListRegular,
 } from "@fluentui/react-icons";
 
 export interface NavItemConfig {
@@ -16,9 +17,10 @@ export interface NavItemConfig {
 }
 
 // This branch ships the Sprint Report, the multi-scope Excel Export page,
-// the Test Factory Coverage Roadmap, and its Cycle Time report (see
-// App.tsx/Sidebar.tsx), so the Getting Started guide's nav accordion
-// (GettingStartedGuide.tsx) describes those four sections.
+// the Test Factory Coverage Roadmap, its Cycle Time report, its Automation
+// KPIs, E2E History, and the Test Suites hub (see App.tsx/Sidebar.tsx), so
+// the Getting Started guide's nav accordion (GettingStartedGuide.tsx)
+// describes each of those sections.
 export const NAV_ITEMS: NavItemConfig[] = [
     {
         key: "dynamic-sprint-report",
@@ -55,5 +57,11 @@ export const NAV_ITEMS: NavItemConfig[] = [
         labelKey: "nav.e2eHistory",
         icon: BeakerRegular,
         descriptionKey: "onboardingGuide.navSections.e2e-history",
+    },
+    {
+        key: "test-suites",
+        labelKey: "nav.testSuites",
+        icon: AppsListRegular,
+        descriptionKey: "onboardingGuide.navSections.test-suites",
     },
 ];

@@ -29,6 +29,9 @@ const AutomationKpiPage = lazy(() =>
 const E2eHistoryPage = lazy(() =>
     import("./pages/E2eHistoryPage").then((m) => ({ default: m.E2eHistoryPage }))
 );
+const TestSuitesPage = lazy(() =>
+    import("./pages/TestSuitesPage").then((m) => ({ default: m.TestSuitesPage }))
+);
 
 function PageFallback() {
     return (
@@ -62,6 +65,10 @@ function AppRoutes() {
                 <Route
                     path="/e2e-history"
                     element={<E2eHistoryPage />}
+                />
+                <Route
+                    path="/test-suites"
+                    element={<TestSuitesPage />}
                 />
                 <Route
                     path="*"

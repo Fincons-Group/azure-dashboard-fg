@@ -27,7 +27,9 @@
     "build": "npm run build:client",
     "start": "tsx src/server.ts",
     "kill:dev": "node scripts/kill-dev.js",
-    "release": "node scripts/release.js"
+    "release": "node scripts/release.js",
+    "e2e:publish-local": "node scripts/publish-local-test-runs.js",
+    "e2e:cleanup-local": "node scripts/cleanup-local-test-runs.js"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.19.0",

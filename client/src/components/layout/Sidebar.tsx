@@ -14,6 +14,7 @@ import {
     ArrowTrendingRegular,
     FlashAutoRegular,
     BeakerRegular,
+    AppsListRegular,
     ChevronLeftRegular,
     ChevronRightRegular,
     type FluentIcon,
@@ -166,11 +167,11 @@ type NavItem = {
     icon: FluentIcon;
 };
 
-// This branch ships five destinations - the Sprint Report, the multi-scope
-// Excel Export page, the Test Factory Coverage Roadmap, its Cycle Time
-// report, and its real test-case Automation KPIs - so no per-user visibility
-// toggle, no automation group, no badge query (that queried defect counts,
-// which have no page to link to here).
+// This branch ships the Sprint Report, the multi-scope Excel Export page,
+// the Test Factory Coverage Roadmap, its Cycle Time report, its real
+// test-case Automation KPIs, E2E History, and the NRT/A11Y/DAST Test Suites
+// hub - so no per-user visibility toggle, no automation group, no badge
+// query (that queried defect counts, which have no page to link to here).
 const NAV_ITEMS: NavItem[] = [
     {
         key: "dynamic-sprint-report",
@@ -207,6 +208,12 @@ const NAV_ITEMS: NavItem[] = [
         labelKey: "nav.e2eHistory",
         to: "/e2e-history",
         icon: BeakerRegular,
+    },
+    {
+        key: "test-suites",
+        labelKey: "nav.testSuites",
+        to: "/test-suites",
+        icon: AppsListRegular,
     },
 ];
 
