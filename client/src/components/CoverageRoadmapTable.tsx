@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Text, makeStyles, tokens } from "@fluentui/react-components";
+import { Card, Text, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
 import {
     ChevronRightRegular,
     CheckmarkCircleRegular,
@@ -329,7 +329,10 @@ function EpicRow({
             >
                 <span className={styles.areaName}>
                     <ChevronRightRegular
-                        className={`${styles.chevron} ${expanded ? styles.chevronOpen : ""}`}
+                        className={mergeClasses(
+                            styles.chevron,
+                            expanded && styles.chevronOpen
+                        )}
                         fontSize={12}
                     />
                     <span className={styles.areaNameText}>

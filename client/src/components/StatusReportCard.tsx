@@ -10,7 +10,7 @@ import {
   computeBugStatusData,
   computeStatusCardKpis,
 } from "../utils/export";
-import type { Outcome, SprintDefectReport } from "../types";
+import type { Outcome, ReportExtraKpis, SprintDefectReport } from "../types";
 
 function formatUpdatedTimestamp(date: Date): {
   datePart: string;
@@ -453,6 +453,21 @@ export interface StatusReportCardProps {
   // DSI-sourced bugs sets this to false to keep the subtitle from
   // claiming a source that doesn't apply.
   includeDsiSource?: boolean;
+  // The 4 additional KPIs from GET /api/report-extra-kpis (see
+  // ReportExtraKpis in types.ts). Undefined while still loading - the
+  // extra tiles render a "-" placeholder rather than blocking the rest of
+  // the card.
+  extraKpis?: ReportExtraKpis;
+  // Off by default. Distinct from `extraKpis` being present: this decides
+  // whether the whole section renders at all (the user's global Settings
+  // toggle - see useSettings.ts), while `extraKpis` itself being undefined
+  // just means "still loading" and renders "-" placeholders within a
+  // section that IS shown. Off hides the section even while loading.
+  showExtraKpis?: boolean;
+}
+
+function formatExtraKpiPct(value: number | null | undefined): string {
+  return value == null ? "-" : `${value}%`;
 }
 
 // Renders one row of severity chips (used for both the "all effective bugs"
@@ -590,6 +605,8 @@ export const StatusReportCard = forwardRef<
     dashboardLinkRef,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    extraKpis,
+    showExtraKpis = false,
   },
   ref,
 ) {
@@ -862,6 +879,74 @@ export const StatusReportCard = forwardRef<
               />
             </div>
           </div>
+
+          {/* KPI aggiuntivi - hidden entirely when the Settings toggle is off */}
+          {showExtraKpis && (
+          <div className={styles.kpiSection}>
+            <span className={styles.kpiSectionTitle}>
+              🧭{" "}
+              {t(
+                "defectManagementPage.sprintReport.statusCard.kpis.extraKpisSection",
+              )}
+            </span>
+            <div className={styles.kpiGrid6}>
+              <KpiTile
+                value={formatExtraKpiPct(
+                  extraKpis?.firstExecutionPassRate.functional,
+                )}
+                color="#4ec9b0"
+                borderColor="#4ec9b0"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateFunctional"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.firstExecutionPassRateFunctional"
+              />
+              <KpiTile
+                value={formatExtraKpiPct(extraKpis?.firstExecutionPassRate.uat)}
+                color="#4ec9b0"
+                borderColor="#4ec9b0"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateUat"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.firstExecutionPassRateUat"
+              />
+              <KpiTile
+                value={
+                  extraKpis?.avgFixTimeBusinessDays == null
+                    ? "-"
+                    : t("defectManagementPage.stats.days", {
+                        value: extraKpis.avgFixTimeBusinessDays,
+                      })
+                }
+                color="#6bcf6b"
+                borderColor="#605e5c"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.avgFixTimeBusinessDays"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgFixTimeBusinessDays"
+              />
+              <KpiTile
+                value={extraKpis ? `${extraKpis.criticalHighBugPct}%` : "-"}
+                color="#ff6b6b"
+                borderColor="#d13438"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.criticalHighBugPct"
+              />
+              <KpiTile
+                value={extraKpis ? `${extraKpis.testPlanCorrectnessPct}%` : "-"}
+                color="#b180d7"
+                borderColor="#b180d7"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.testPlanCorrectnessPct"
+              />
+              <KpiTile
+                value={
+                  extraKpis
+                    ? `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`
+                    : "-"
+                }
+                color="#f2c94c"
+                borderColor="#f2c94c"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.duplicateNotApplicable"
+              />
+            </div>
+          </div>
+          )}
         </div>
 
         {dashboardUrl && (

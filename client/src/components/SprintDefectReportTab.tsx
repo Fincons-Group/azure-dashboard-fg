@@ -28,6 +28,7 @@ import { ChartCard } from "./ChartCard";
 import { StatusReportCard } from "./StatusReportCard";
 import type { SuiteProgressGroup } from "./StatusReportCard";
 import { fetchPlanOverview, fetchPlans } from "../api/client";
+import { useSettings } from "../hooks/useSettings";
 import {
   DEFAULT_REPORT_CC,
   DEFAULT_REPORT_RECIPIENTS,
@@ -48,6 +49,7 @@ import {
 import type {
   DefectStats,
   Outcome,
+  ReportExtraKpis,
   SprintDefectReport,
   VerificaActivitySummary,
 } from "../types";
@@ -281,6 +283,7 @@ export function SprintDefectReportTab({
   enableEmailPreface = false,
   enableEmailClosing = false,
   project,
+  extraKpis,
 }: {
   stats: DefectStats;
   suiteGroupDefs?: SuiteGroupDef[];
@@ -300,10 +303,23 @@ export function SprintDefectReportTab({
   // Scopes the plan/plan-overview lookups below to a specific Azure DevOps
   // project.
   project?: string;
+  // The report's 4 additional KPIs (see ReportExtraKpis in types.ts) -
+  // fetched by the page (a separate, heavier query than `stats`) and
+  // threaded through to the on-screen card and every export below so they
+  // never drift apart on what "the report" includes.
+  extraKpis?: ReportExtraKpis;
 }) {
   const { t } = useTranslation();
   const styles = useStyles();
   const report = stats.sprintDefectReport;
+
+  // Global Settings toggle (see useSettings.ts/SettingsDialog.tsx) - off
+  // means the "KPI aggiuntivi" section is dropped from every export below
+  // AND from the on-screen preview, regardless of whether extraKpis has
+  // loaded. Distinct from showOriginBreakdown, which is per-report local
+  // state rather than a persisted app-wide setting.
+  const { settings } = useSettings();
+  const emailExtraKpis = settings.showExtraKpis ? extraKpis : undefined;
 
   // Dynamic Sprint Report recomputes defaultHeaderTitle from the selected
   // Test Plans (see DynamicSprintReportPage.tsx) - derived (not seeded
@@ -672,6 +688,7 @@ export function SprintDefectReportTab({
           dashboardUrl,
           showOriginBreakdown,
           includeDsiSource,
+          extraKpis: emailExtraKpis,
         },
         t,
       );
@@ -712,6 +729,7 @@ export function SprintDefectReportTab({
           dashboardUrl,
           showOriginBreakdown,
           includeDsiSource,
+          extraKpis: emailExtraKpis,
         },
         t,
       );
@@ -733,6 +751,7 @@ export function SprintDefectReportTab({
         dashboardUrl,
         showOriginBreakdown,
         includeDsiSource,
+        extraKpis: emailExtraKpis,
       },
       t,
     );
@@ -750,6 +769,7 @@ export function SprintDefectReportTab({
         dashboardUrl,
         showOriginBreakdown,
         includeDsiSource,
+        extraKpis: emailExtraKpis,
       },
       t,
     );
@@ -776,6 +796,7 @@ export function SprintDefectReportTab({
       dashboardUrl,
       showOriginBreakdown,
       includeDsiSource,
+      extraKpis: emailExtraKpis,
     };
 
     const bodyHtml = buildStatusReportCardEmailDocument(
@@ -1115,6 +1136,8 @@ export function SprintDefectReportTab({
                 dashboardLinkRef={dashboardLinkRef}
                 showOriginBreakdown={showOriginBreakdown}
                 includeDsiSource={includeDsiSource}
+                extraKpis={extraKpis}
+                showExtraKpis={settings.showExtraKpis}
               />
             </div>
           </div>

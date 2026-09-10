@@ -8,7 +8,11 @@ import {
     tokens,
 } from "@fluentui/react-components";
 import { useState } from "react";
-import { ArrowSyncRegular, QuestionCircleRegular } from "@fluentui/react-icons";
+import {
+    ArrowSyncRegular,
+    QuestionCircleRegular,
+    SettingsRegular,
+} from "@fluentui/react-icons";
 import { useTranslation } from "react-i18next";
 import { NAV_HEIGHT, RAIL_BG, RAIL_FG, RAIL_FG_ACTIVE } from "../../layoutConstants";
 import { postRefresh } from "../../api/client";
@@ -17,6 +21,7 @@ import { LanguageSwitcher } from "../LanguageSwitcher";
 import { ThemeSwitcher } from "../ThemeSwitcher";
 import { TestGraphMailButton } from "../TestGraphMailButton";
 import { GettingStartedGuide } from "../GettingStartedGuide";
+import { SettingsDialog } from "../SettingsDialog";
 
 // Colors are hardcoded (not theme tokens) to match the Sidebar rail, which
 // is also always dark regardless of the light/dark content theme - see
@@ -74,6 +79,7 @@ export function TopBar({ title }: { title: string }) {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [helpOpen, setHelpOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
 
     const refreshMutation = useMutation({
         mutationFn: postRefresh,
@@ -158,6 +164,15 @@ export function TopBar({ title }: { title: string }) {
                     {t("nav.help")}
                 </Button>
 
+                <Button
+                    appearance="subtle"
+                    className={styles.refreshButton}
+                    icon={<SettingsRegular />}
+                    onClick={() => setSettingsOpen(true)}
+                >
+                    {t("nav.settings")}
+                </Button>
+
                 <LanguageSwitcher />
                 <ThemeSwitcher />
             </div>
@@ -165,6 +180,11 @@ export function TopBar({ title }: { title: string }) {
             <GettingStartedGuide
                 open={helpOpen}
                 onClose={() => setHelpOpen(false)}
+            />
+
+            <SettingsDialog
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
             />
         </div>
     );

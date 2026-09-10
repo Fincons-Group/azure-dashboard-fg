@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import PptxGenJS from "pptxgenjs";
-import type { Outcome, SprintDefectReport } from "../types";
+import type { Outcome, ReportExtraKpis, SprintDefectReport } from "../types";
 import type { SuiteProgressGroup } from "../components/StatusReportCard";
 
 function sanitizeFilenamePart(value: string): string {
@@ -64,6 +64,13 @@ export function severityRank(raw: string): number {
   return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
+// extraKpis' percentage fields are null (not just absent) while a bucket has
+// no data yet (e.g. no first-execution history for UAT plans) - shared by
+// every export below so "no data" always reads as "-", never "null%".
+function formatExtraKpiPct(value: number | null): string {
+  return value == null ? "-" : `${value}%`;
+}
+
 function formatDateDDMMYYYY(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -98,6 +105,11 @@ export interface StatusReportCardEmailData {
   showOriginBreakdown?: boolean;
   // On by default - see StatusReportCard.tsx's prop of the same name.
   includeDsiSource?: boolean;
+  // The report's 4 additional KPIs - see StatusReportCard.tsx's prop of the
+  // same name and ReportExtraKpis in types.ts. Omitted entirely by any
+  // caller that hasn't fetched them yet; every render function below skips
+  // the extra section when this is undefined.
+  extraKpis?: ReportExtraKpis;
 }
 
 const EMAIL_CARD_WIDTH = 900;
@@ -541,6 +553,7 @@ export function buildStatusReportCardEmailBodyHtml(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    extraKpis,
   } = data;
 
   const { datePart, timePart } = formatEmailTimestamp(new Date());
@@ -759,9 +772,7 @@ export function buildStatusReportCardEmailBodyHtml(
         lightKpiTile(
           String(bugsByBusiness),
           1,
-          t(
-            "defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness",
-          ),
+          t("defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"),
           "33%",
         )
       : lightKpiTile(
@@ -798,7 +809,66 @@ export function buildStatusReportCardEmailBodyHtml(
       ),
       "25%",
     ) +
-    `</tr></table>`;
+    `</tr></table>` +
+    (extraKpis
+      ? kpiSectionTitle(
+          `🧭 ${t("defectManagementPage.sprintReport.statusCard.kpis.extraKpisSection")}`,
+        ) +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:4px;"><tr>` +
+        lightKpiTile(
+          formatExtraKpiPct(extraKpis.firstExecutionPassRate.functional),
+          4,
+          t(
+            "defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateFunctional",
+          ),
+          "16%",
+        ) +
+        lightKpiTile(
+          formatExtraKpiPct(extraKpis.firstExecutionPassRate.uat),
+          4,
+          t(
+            "defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateUat",
+          ),
+          "16%",
+        ) +
+        lightKpiTile(
+          extraKpis.avgFixTimeBusinessDays == null
+            ? "-"
+            : t("defectManagementPage.stats.days", {
+                value: extraKpis.avgFixTimeBusinessDays,
+              }),
+          1,
+          t(
+            "defectManagementPage.sprintReport.statusCard.kpis.avgFixTimeBusinessDays",
+          ),
+          "16%",
+        ) +
+        lightKpiTile(
+          `${extraKpis.criticalHighBugPct}%`,
+          3,
+          t(
+            "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+          ),
+          "16%",
+        ) +
+        lightKpiTile(
+          `${extraKpis.testPlanCorrectnessPct}%`,
+          6,
+          t(
+            "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
+          ),
+          "16%",
+        ) +
+        lightKpiTile(
+          `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
+          2,
+          t(
+            "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
+          ),
+          "16%",
+        ) +
+        `</tr></table>`
+      : "");
 
   const dashboardHtml = dashboardUrl
     ? lightDashboardButton(
@@ -1442,6 +1512,61 @@ function buildPdfBugRow2KpiDefs(
   ];
 }
 
+function buildPdfExtraKpiDefs(
+  extraKpis: ReportExtraKpis,
+  t: TranslateFn,
+): { kpi: (typeof LIGHT_KPI)[number]; label: string; value: string }[] {
+  return [
+    {
+      kpi: LIGHT_KPI[4],
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateFunctional",
+      ),
+      value: formatExtraKpiPct(extraKpis.firstExecutionPassRate.functional),
+    },
+    {
+      kpi: LIGHT_KPI[4],
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateUat",
+      ),
+      value: formatExtraKpiPct(extraKpis.firstExecutionPassRate.uat),
+    },
+    {
+      kpi: LIGHT_KPI[1],
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.avgFixTimeBusinessDays",
+      ),
+      value:
+        extraKpis.avgFixTimeBusinessDays == null
+          ? "-"
+          : t("defectManagementPage.stats.days", {
+              value: extraKpis.avgFixTimeBusinessDays,
+            }),
+    },
+    {
+      kpi: LIGHT_KPI[3],
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+      ),
+      value: `${extraKpis.criticalHighBugPct}%`,
+    },
+    {
+      kpi: LIGHT_KPI[6],
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
+      ),
+      value: `${extraKpis.testPlanCorrectnessPct}%`,
+    },
+    {
+      kpi: LIGHT_KPI[2],
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
+      ),
+      value: `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
+    },
+  ];
+}
+
 function pdfDrawDashboardButton(
   ctx: PdfDrawCtx,
   y: number,
@@ -1796,6 +1921,7 @@ export function buildStatusReportCardPdfDocument(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    extraKpis,
   } = data;
 
   const doc = new jsPDF();
@@ -2002,7 +2128,62 @@ export function buildStatusReportCardPdfDocument(
 
   y =
     (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY + 6;
+      .finalY + 4;
+
+  if (extraKpis) {
+    // Section label: extra KPIs
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(LIGHT_INK_MUTED);
+    doc.text(
+      t(
+        "defectManagementPage.sprintReport.statusCard.kpis.extraKpisSection",
+      ).toUpperCase(),
+      PDF_MARGIN,
+      y + 3,
+    );
+    y += 6;
+
+    const extraKpiDefs = buildPdfExtraKpiDefs(extraKpis, t);
+
+    autoTable(doc, {
+      startY: y,
+      theme: "plain",
+      tableWidth: innerWidth,
+      margin: { left: PDF_MARGIN },
+      head: [extraKpiDefs.map((d) => d.label)],
+      body: [extraKpiDefs.map((d) => d.value)],
+      styles: {
+        fontSize: 7,
+        halign: "center",
+        cellPadding: 2,
+        textColor: LIGHT_INK_MUTED,
+      },
+      headStyles: { textColor: LIGHT_INK_MUTED, fontStyle: "normal" },
+      bodyStyles: { fontSize: 12, fontStyle: "bold" },
+      columnStyles: Object.fromEntries(
+        extraKpiDefs.map((d, index) => [
+          index,
+          {
+            fillColor: d.kpi.bg,
+            textColor: d.kpi.accent,
+            cellWidth: innerWidth / extraKpiDefs.length,
+          },
+        ]),
+      ),
+      didParseCell: (hookData) => {
+        if (hookData.section === "head") {
+          hookData.cell.styles.fillColor =
+            extraKpiDefs[hookData.column.index].kpi.bg;
+          hookData.cell.styles.textColor = LIGHT_INK_MUTED;
+        }
+      },
+    });
+
+    y =
+      (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+        .finalY + 6;
+  }
 
   y = pdfDrawDashboardButton(ctx, y, dashboardUrl);
   y = pdfDrawActionsSection(ctx, y, actionsText);
@@ -2059,6 +2240,21 @@ const KPI_LEGEND_BUGS: KpiLegendEntry[] = [
   { labelKey: "reopenedBugs", helpKey: "reopenedBugs" },
   { labelKey: "avgClosureTime", helpKey: "avgClosureTime" },
   { labelKey: "withoutResolutionDate", helpKey: "withoutResolutionDate" },
+];
+
+const KPI_LEGEND_EXTRA: KpiLegendEntry[] = [
+  {
+    labelKey: "firstExecutionPassRateFunctional",
+    helpKey: "firstExecutionPassRateFunctional",
+  },
+  {
+    labelKey: "firstExecutionPassRateUat",
+    helpKey: "firstExecutionPassRateUat",
+  },
+  { labelKey: "avgFixTimeBusinessDays", helpKey: "avgFixTimeBusinessDays" },
+  { labelKey: "criticalHighBugPct", helpKey: "criticalHighBugPct" },
+  { labelKey: "testPlanCorrectnessPct", helpKey: "testPlanCorrectnessPct" },
+  { labelKey: "duplicateNotApplicable", helpKey: "duplicateNotApplicable" },
 ];
 
 function pdfDrawKpiLegendSection(
@@ -2164,12 +2360,21 @@ export function buildKpiLegendPdfDocument(t: TranslateFn): jsPDF {
     t,
   );
 
-  pdfDrawKpiLegendSection(
+  y = pdfDrawKpiLegendSection(
     doc,
     innerWidth,
     y,
     t("defectManagementPage.sprintReport.statusCard.kpis.bugsSection"),
     KPI_LEGEND_BUGS,
+    t,
+  );
+
+  pdfDrawKpiLegendSection(
+    doc,
+    innerWidth,
+    y,
+    t("defectManagementPage.sprintReport.statusCard.kpis.extraKpisSection"),
+    KPI_LEGEND_EXTRA,
     t,
   );
 
@@ -2451,6 +2656,7 @@ function computePptxNaturalHeights(params: {
   hasDashboard: boolean;
   originDefs: unknown[];
   originRowsData: unknown[];
+  hasExtraKpis: boolean;
 }): PptxNaturalHeights {
   const {
     hasAlert,
@@ -2461,6 +2667,7 @@ function computePptxNaturalHeights(params: {
     hasDashboard,
     originDefs,
     originRowsData,
+    hasExtraKpis,
   } = params;
 
   const naturalAlertLineCount = hasAlert
@@ -2470,7 +2677,11 @@ function computePptxNaturalHeights(params: {
     ? naturalAlertLineCount * 0.2 + 0.14 + 0.18
     : 0;
 
-  const naturalKpiBlock = 0.62 + 0.08 + 0.62 + 0.08 + 0.62 + 0.15;
+  // 3 fixed rows (unconditional today) + a 4th only when extraKpis is
+  // present, so a card without it keeps the exact same slide height as
+  // before this KPI existed.
+  const naturalKpiBlock =
+    0.62 + 0.08 + 0.62 + 0.08 + 0.62 + (hasExtraKpis ? 0.08 + 0.62 : 0) + 0.15;
 
   const naturalDashboardBlock = hasDashboard ? 0.32 + 0.2 : 0;
 
@@ -2622,6 +2833,55 @@ function buildPptxRow3KpiDefs(
   ];
 }
 
+function buildPptxRow4KpiDefs(
+  extraKpis: ReportExtraKpis,
+  t: TranslateFn,
+): { value: string; label: string }[] {
+  return [
+    {
+      value: formatExtraKpiPct(extraKpis.firstExecutionPassRate.functional),
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateFunctional",
+      ),
+    },
+    {
+      value: formatExtraKpiPct(extraKpis.firstExecutionPassRate.uat),
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateUat",
+      ),
+    },
+    {
+      value:
+        extraKpis.avgFixTimeBusinessDays == null
+          ? "-"
+          : t("defectManagementPage.stats.days", {
+              value: extraKpis.avgFixTimeBusinessDays,
+            }),
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.avgFixTimeBusinessDays",
+      ),
+    },
+    {
+      value: `${extraKpis.criticalHighBugPct}%`,
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+      ),
+    },
+    {
+      value: `${extraKpis.testPlanCorrectnessPct}%`,
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
+      ),
+    },
+    {
+      value: `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
+      label: t(
+        "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
+      ),
+    },
+  ];
+}
+
 interface PptxDrawCtx {
   slide: PptxGenJS.PresSlide;
   M: number;
@@ -2687,6 +2947,7 @@ function pptxDrawKpiTiles(
   kpiDefs: { value: string; label: string }[],
   row2KpiDefs: { value: string; label: string }[],
   row3KpiDefs: { value: string; label: string }[],
+  row4KpiDefs?: { value: string; label: string }[],
 ): void {
   const { slide, M, innerW, s } = ctx;
   const kpiHeight = s(0.62);
@@ -2732,6 +2993,10 @@ function pptxDrawKpiTiles(
   drawRow(kpiDefs, 0, cursorY);
   drawRow(row2KpiDefs, 0, cursorY + kpiHeight + s(0.08));
   drawRow(row3KpiDefs, 4, cursorY + (kpiHeight + s(0.08)) * 2);
+
+  if (row4KpiDefs) {
+    drawRow(row4KpiDefs, 1, cursorY + (kpiHeight + s(0.08)) * 3);
+  }
 }
 
 function pptxDrawDashboardButton(
@@ -3174,6 +3439,7 @@ export async function exportStatusReportCardToPptx(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    extraKpis,
   } = data;
 
   const M = 0.45;
@@ -3207,6 +3473,7 @@ export async function exportStatusReportCardToPptx(
     hasDashboard,
     originDefs,
     originRowsData,
+    hasExtraKpis: Boolean(extraKpis),
   });
 
   // No shrinking - the slide is exactly as tall as the content needs.
@@ -3288,8 +3555,18 @@ export async function exportStatusReportCardToPptx(
     t,
   );
   const row3KpiDefs = buildPptxRow3KpiDefs(kpis, report, t);
+  const row4KpiDefs = extraKpis
+    ? buildPptxRow4KpiDefs(extraKpis, t)
+    : undefined;
 
-  pptxDrawKpiTiles(ctx, cursorY, kpiDefs, row2KpiDefs, row3KpiDefs);
+  pptxDrawKpiTiles(
+    ctx,
+    cursorY,
+    kpiDefs,
+    row2KpiDefs,
+    row3KpiDefs,
+    row4KpiDefs,
+  );
   cursorY += s(heights.naturalKpiBlock);
 
   cursorY = pptxDrawDashboardButton(

@@ -7,6 +7,10 @@ import type {
     ProjectSummary,
     AreaPathNode,
     CoverageArea,
+    CycleTimeResponse,
+    AutomationKpiResponse,
+    ReportExtraKpis,
+    E2eHistoryResponse,
 } from "../types";
 import i18n from "../i18n";
 import { loadStoredAzdoConnection } from "../azdoConnection";
@@ -138,6 +142,47 @@ export function fetchCoverage(project?: string): Promise<CoverageArea[]> {
     const qs = project ? `?project=${encodeURIComponent(project)}` : "";
 
     return getJson(`/api/coverage${qs}`);
+}
+
+export function fetchCycleTime(project?: string): Promise<CycleTimeResponse> {
+    const qs = project ? `?project=${encodeURIComponent(project)}` : "";
+
+    return getJson(`/api/cycle-time${qs}`);
+}
+
+export function fetchAutomationKpis(
+    project?: string
+): Promise<AutomationKpiResponse> {
+    const qs = project ? `?project=${encodeURIComponent(project)}` : "";
+
+    return getJson(`/api/automation-kpis${qs}`);
+}
+
+// Companion call to fetchDefects/fetchPlanOverview for the Sprint Report's
+// 4 additional KPIs - see ReportExtraKpis in types.ts for why this is kept
+// as its own request instead of folded into either of those.
+export function fetchReportExtraKpis(
+    project?: string,
+    area?: string,
+    iteration?: string,
+    planIds?: number[]
+): Promise<ReportExtraKpis> {
+    const params = new URLSearchParams();
+
+    if (project) params.set("project", project);
+    if (area) params.set("area", area);
+    if (iteration) params.set("iteration", iteration);
+    planIds?.forEach((planId) => params.append("planId", String(planId)));
+
+    const qs = params.toString();
+
+    return getJson(`/api/report-extra-kpis${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchE2eHistory(limit?: number): Promise<E2eHistoryResponse> {
+    const qs = limit ? `?limit=${limit}` : "";
+
+    return getJson(`/api/e2e-history${qs}`);
 }
 
 export function fetchDefects(

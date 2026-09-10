@@ -33,6 +33,20 @@ import {
     getCoverageRoadmap,
     clearCoverageCache,
 } from "./coverageData.js";
+import {
+    getCycleTimeReport,
+    clearCycleTimeCache,
+} from "./cycleTimeData.js";
+import {
+    getAutomationKpis,
+    clearAutomationKpiCache,
+} from "./automationKpiData.js";
+import { computeReportExtraKpis } from "./reportExtraKpis.js";
+import {
+    getE2eRunHistory,
+    clearE2eHistoryCache,
+    FirebaseConfigError,
+} from "./firebaseE2eData.js";
 
 const app = express();
 
@@ -152,6 +166,36 @@ app.get("/api/plans/:planId/overview", async (req, res) => {
     }
 });
 
+// Companion endpoint to /api/defects + /api/plans/:planId/overview for the
+// Sprint Report's 4 additional KPIs - kept as its own route (rather than
+// folded into either response) because firstExecutionPassRate requires
+// enumerating Azure DevOps test run history, which is heavier than
+// everything else the report fetches and benefits from its own cache and
+// client-side loading state (see DynamicSprintReportPage.tsx).
+app.get("/api/report-extra-kpis", async (req, res) => {
+    try {
+        const planId = req.query.planId;
+        const planIds = (
+            Array.isArray(planId)
+                ? (planId as string[])
+                : planId
+                ? [planId as string]
+                : []
+        ).map(Number);
+
+        res.json(
+            await computeReportExtraKpis({
+                project: req.query.project as string | undefined,
+                area: req.query.area as string | undefined,
+                iteration: req.query.iteration as string | undefined,
+                planIds,
+            })
+        );
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
 app.get("/api/coverage", async (req, res) => {
     try {
         res.json(
@@ -160,6 +204,53 @@ app.get("/api/coverage", async (req, res) => {
             )
         );
     } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+app.get("/api/cycle-time", async (req, res) => {
+    try {
+        res.json(
+            await getCycleTimeReport(
+                req.query.project as string | undefined
+            )
+        );
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+app.get("/api/automation-kpis", async (req, res) => {
+    try {
+        res.json(
+            await getAutomationKpis(
+                req.query.project as string | undefined
+            )
+        );
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+// Not gated on Firebase being configured at all - returns { runs: [],
+// configured: false } instead of an error until
+// FIREBASE_SERVICE_ACCOUNT_JSON is set, so the E2E History page can show a
+// setup hint rather than an error banner (see FirebaseConfigError in
+// firebaseE2eData.ts).
+app.get("/api/e2e-history", async (req, res) => {
+    try {
+        const limit = Number(req.query.limit) || 30;
+
+        res.json({
+            runs: await getE2eRunHistory(limit),
+            configured: true,
+        });
+    } catch (error: any) {
+        if (error instanceof FirebaseConfigError) {
+            res.json({ runs: [], configured: false });
+            return;
+        }
+
         sendApiError(res, error);
     }
 });
@@ -242,6 +333,9 @@ app.post("/api/refresh", (_, res) => {
     clearDefectCache();
     clearPlanOverviewCache();
     clearCoverageCache();
+    clearCycleTimeCache();
+    clearAutomationKpiCache();
+    clearE2eHistoryCache();
 
     res.status(200).json({ refreshed: true });
 });
