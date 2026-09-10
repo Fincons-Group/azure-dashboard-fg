@@ -807,8 +807,8 @@ export interface E2eRun {
 
 export interface E2eHistoryResponse {
   runs: E2eRun[];
-  // False when COSMOS_ENDPOINT/COSMOS_KEY aren't set yet - lets the client
+  // False when FIREBASE_SERVICE_ACCOUNT_JSON isn't set yet - lets the client
   // show a "not configured" hint instead of an error banner (see
-  // CosmosConfigError in src/cosmosE2eData.ts).
+  // FirebaseConfigError in src/firebaseE2eData.ts).
   configured: boolean;
 }
