@@ -1007,18 +1007,31 @@ export async function getAreaPaths(project?: string): Promise<IterationNode[]> {
 }
 
 export function buildWorkItemUrl(id: number, project?: string): string {
-    const org = process.env.AZDO_ORG;
+    const org = getCurrentConfig().org;
     const encodedProject = encodeURIComponent(
-        project ?? process.env.AZDO_PROJECT!
+        project ?? getCurrentConfig().project
     );
 
     return `https://dev.azure.com/${org}/${encodedProject}/_workitems/edit/${id}`;
 }
 
-export function buildTestRunUrl(runId: number, project?: string): string {
-    const org = process.env.AZDO_ORG;
+export function buildTestPlanUrl(
+    planId: number,
+    suiteId: number,
+    project?: string
+): string {
+    const org = getCurrentConfig().org;
     const encodedProject = encodeURIComponent(
-        project ?? process.env.AZDO_PROJECT!
+        project ?? getCurrentConfig().project
+    );
+
+    return `https://dev.azure.com/${org}/${encodedProject}/_testPlans/define?planId=${planId}&suiteId=${suiteId}`;
+}
+
+export function buildTestRunUrl(runId: number, project?: string): string {
+    const org = getCurrentConfig().org;
+    const encodedProject = encodeURIComponent(
+        project ?? getCurrentConfig().project
     );
 
     return `https://dev.azure.com/${org}/${encodedProject}/_TestManagement/Runs?runId=${runId}&_a=runCharts`;
