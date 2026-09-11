@@ -8,6 +8,7 @@ import {
     extractWorkItemIds,
     buildWorkItemUrl,
     buildTestRunUrl,
+    buildTestPlanUrl,
 } from "./azdo.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import { dedupe } from "./inflight.js";
@@ -587,15 +588,14 @@ export async function computeTestPlans(project?: string): Promise<
 > {
     const plans = await getTestPlans(project);
 
-    const org = process.env.AZDO_ORG;
-    const encodedProject = encodeURIComponent(
-        project ?? process.env.AZDO_PROJECT!
-    );
-
     return plans.map((plan: any): TestPlanSummary => ({
         id: plan.id,
         name: plan.name,
-        url: `https://dev.azure.com/${org}/${encodedProject}/_testPlans/define?planId=${plan.id}&suiteId=${plan.rootSuite?.id ?? plan.id}`,
+        url: buildTestPlanUrl(
+            plan.id,
+            plan.rootSuite?.id ?? plan.id,
+            project
+        ),
         areaPath: plan.areaPath,
         iteration: plan.iteration,
         state: plan.state,
