@@ -487,6 +487,7 @@ async function buildDefectRecord(
         hasLinkedTestCase: linkedTestCaseIds.length > 0,
         url: buildWorkItemUrl(bug.id, project),
         creator: bug.fields["System.CreatedBy"]?.displayName,
+        creatorUniqueName: bug.fields["System.CreatedBy"]?.uniqueName,
         assignedTo: bug.fields["System.AssignedTo"]
             ? {
                 displayName: bug.fields["System.AssignedTo"].displayName,
@@ -683,6 +684,7 @@ function assembleDefectRecord(
         hasLinkedTestCase: linkedTestCaseIds.length > 0,
         url: buildWorkItemUrl(bug.id, project),
         creator: bug.fields["System.CreatedBy"]?.displayName,
+        creatorUniqueName: bug.fields["System.CreatedBy"]?.uniqueName,
         assignedTo: bug.fields["System.AssignedTo"]
             ? {
                   displayName: bug.fields["System.AssignedTo"].displayName,
@@ -1199,6 +1201,7 @@ export function computeSprintDefectReport(
         severity: r.severity,
         url: r.url,
         creator: r.creator,
+        creatorUniqueName: r.creatorUniqueName,
         assignee: r.assignedTo,
         createdDate: r.createdDate,
         changedDate: r.changedDate,

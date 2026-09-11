@@ -15,6 +15,7 @@ import {
     FlashAutoRegular,
     BeakerRegular,
     AppsListRegular,
+    BugRegular,
     ChevronLeftRegular,
     ChevronRightRegular,
     type FluentIcon,
@@ -169,9 +170,9 @@ type NavItem = {
 
 // This branch ships the Sprint Report, the multi-scope Excel Export page,
 // the Test Factory Coverage Roadmap, its Cycle Time report, its real
-// test-case Automation KPIs, E2E History, and the NRT/A11Y/DAST Test Suites
-// hub - so no per-user visibility toggle, no automation group, no badge
-// query (that queried defect counts, which have no page to link to here).
+// test-case Automation KPIs, E2E History, the NRT/A11Y/DAST Test Suites
+// hub, and the Bugs page - so no per-user visibility toggle, no automation
+// group, no badge query.
 const NAV_ITEMS: NavItem[] = [
     {
         key: "dynamic-sprint-report",
@@ -214,6 +215,12 @@ const NAV_ITEMS: NavItem[] = [
         labelKey: "nav.testSuites",
         to: "/test-suites",
         icon: AppsListRegular,
+    },
+    {
+        key: "bugs",
+        labelKey: "nav.bugs",
+        to: "/bugs",
+        icon: BugRegular,
     },
 ];
 

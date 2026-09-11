@@ -18,6 +18,7 @@
     "automationKpis": "Automation KPIs",
     "e2eHistory": "E2E History",
     "testSuites": "Test Suites",
+    "bugs": "Bugs",
     "refresh": "Refresh Now",
     "refreshing": "Refreshing...",
     "refreshFailed": "Refresh failed: {{message}}",
@@ -66,7 +67,8 @@
       "cycle-time": "See how fast the team completes Test Factory automation tasks - cycle time and weekly throughput trends.",
       "automation-kpis": "Real test-case automation coverage, success rate, and flaky tests for the Test Factory project.",
       "e2e-history": "Pass rate trend and recent run history from the tst-e2e Playwright suite, published via Firebase.",
-      "test-suites": "NRT, accessibility and security gates in one hub - pick a suite to see its latest run and browse history."
+      "test-suites": "NRT, accessibility and security gates in one hub - pick a suite to see its latest run and browse history.",
+      "bugs": "Bugs pending QA verification and bugs opened today, both scoped to Fincons Group (@finconsgroup.com) team members."
     },
     "gotIt": "Got it"
   },
@@ -119,6 +121,27 @@
       "done": "Done",
       "cycleTime": "Cycle time",
       "state": "State"
+    }
+  },
+  "bugsPage": {
+    "title": "Bugs",
+    "subtitle": "Bugs pending QA verification and bugs opened today, both scoped to Fincons Group (@finconsgroup.com) team members.",
+    "table": {
+      "bug": "Bug",
+      "state": "State",
+      "assignee": "Assignee",
+      "creator": "Creator",
+      "created": "Created"
+    },
+    "toVerify": {
+      "title": "Bugs to verify ({{count}})",
+      "subtitle": "Bugs in \"Da verificare\" or \"In verifica\", assigned to a @finconsgroup.com team member.",
+      "empty": "No bugs pending verification for a Fincons Group assignee right now."
+    },
+    "openedToday": {
+      "title": "Opened today ({{count}})",
+      "subtitle": "Bugs created today by a @finconsgroup.com team member.",
+      "empty": "No bugs opened today by a Fincons Group creator."
     }
   },
   "coverageRoadmapPage": {

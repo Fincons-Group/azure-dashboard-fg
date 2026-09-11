@@ -18,6 +18,7 @@
     "automationKpis": "KPI di Automazione",
     "e2eHistory": "Storico E2E",
     "testSuites": "Suite di Test",
+    "bugs": "Bug",
     "refresh": "Aggiorna Ora",
     "refreshing": "Aggiornamento...",
     "refreshFailed": "Aggiornamento non riuscito: {{message}}",
@@ -66,7 +67,8 @@
       "cycle-time": "Scopri quanto è veloce il team nel completare i task di automazione di Test Factory - tempo di ciclo e andamento settimanale.",
       "automation-kpis": "Copertura di automazione reale sui test case, success rate e test instabili per il progetto Test Factory.",
       "e2e-history": "Andamento del success rate e storico delle esecuzioni recenti della suite Playwright tst-e2e, pubblicati via Firebase.",
-      "test-suites": "NRT, accessibilità e sicurezza in un unico hub - scegli una suite per vedere l'ultima esecuzione e lo storico."
+      "test-suites": "NRT, accessibilità e sicurezza in un unico hub - scegli una suite per vedere l'ultima esecuzione e lo storico.",
+      "bugs": "Bug in attesa di verifica QA e bug aperti oggi, entrambi filtrati sui membri del team Fincons Group (@finconsgroup.com)."
     },
     "gotIt": "Capito"
   },
@@ -119,6 +121,27 @@
       "done": "Completato",
       "cycleTime": "Tempo di ciclo",
       "state": "Stato"
+    }
+  },
+  "bugsPage": {
+    "title": "Bug",
+    "subtitle": "Bug in attesa di verifica QA e bug aperti oggi, entrambi filtrati sui membri del team Fincons Group (@finconsgroup.com).",
+    "table": {
+      "bug": "Bug",
+      "state": "Stato",
+      "assignee": "Assegnatario",
+      "creator": "Creato da",
+      "created": "Creato il"
+    },
+    "toVerify": {
+      "title": "Bug da verificare ({{count}})",
+      "subtitle": "Bug in stato \"Da verificare\" o \"In verifica\", assegnati a un membro del team @finconsgroup.com.",
+      "empty": "Nessun bug in attesa di verifica assegnato a Fincons Group al momento."
+    },
+    "openedToday": {
+      "title": "Aperti oggi ({{count}})",
+      "subtitle": "Bug creati oggi da un membro del team @finconsgroup.com.",
+      "empty": "Nessun bug aperto oggi da un creatore Fincons Group."
     }
   },
   "coverageRoadmapPage": {

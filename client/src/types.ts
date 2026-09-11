@@ -17,6 +17,9 @@ export interface BugInfo {
   description?: string;
   url?: string;
   creator?: string;
+  // System.CreatedBy's uniqueName (email) - lets the Bugs page filter
+  // "opened today" bugs down to ones raised by a @finconsgroup.com creator.
+  creatorUniqueName?: string;
   assignee?: {
     displayName: string;
     uniqueName: string;

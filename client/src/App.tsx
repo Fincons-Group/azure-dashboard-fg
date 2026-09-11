@@ -32,6 +32,9 @@ const E2eHistoryPage = lazy(() =>
 const TestSuitesPage = lazy(() =>
     import("./pages/TestSuitesPage").then((m) => ({ default: m.TestSuitesPage }))
 );
+const BugsPage = lazy(() =>
+    import("./pages/BugsPage").then((m) => ({ default: m.BugsPage }))
+);
 
 function PageFallback() {
     return (
@@ -70,6 +73,7 @@ function AppRoutes() {
                     path="/test-suites"
                     element={<TestSuitesPage />}
                 />
+                <Route path="/bugs" element={<BugsPage />} />
                 <Route
                     path="*"
                     element={<Navigate to="/dynamic-sprint-report" replace />}
