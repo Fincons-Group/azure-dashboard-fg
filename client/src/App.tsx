@@ -29,6 +29,12 @@ const AutomationKpiPage = lazy(() =>
 const E2eHistoryPage = lazy(() =>
     import("./pages/E2eHistoryPage").then((m) => ({ default: m.E2eHistoryPage }))
 );
+const TestSuitesPage = lazy(() =>
+    import("./pages/TestSuitesPage").then((m) => ({ default: m.TestSuitesPage }))
+);
+const BugsPage = lazy(() =>
+    import("./pages/BugsPage").then((m) => ({ default: m.BugsPage }))
+);
 
 function PageFallback() {
     return (
@@ -63,6 +69,11 @@ function AppRoutes() {
                     path="/e2e-history"
                     element={<E2eHistoryPage />}
                 />
+                <Route
+                    path="/test-suites"
+                    element={<TestSuitesPage />}
+                />
+                <Route path="/bugs" element={<BugsPage />} />
                 <Route
                     path="*"
                     element={<Navigate to="/dynamic-sprint-report" replace />}

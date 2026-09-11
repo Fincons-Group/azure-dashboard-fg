@@ -17,6 +17,8 @@
     "cycleTime": "Tempo di Ciclo",
     "automationKpis": "KPI di Automazione",
     "e2eHistory": "Storico E2E",
+    "testSuites": "Suite di Test",
+    "bugs": "Bug",
     "refresh": "Aggiorna Ora",
     "refreshing": "Aggiornamento...",
     "refreshFailed": "Aggiornamento non riuscito: {{message}}",
@@ -64,7 +66,9 @@
       "coverage-roadmap": "Monitora la copertura di automazione per epic del progetto Test Factory, con owner, scadenza e stato.",
       "cycle-time": "Scopri quanto è veloce il team nel completare i task di automazione di Test Factory - tempo di ciclo e andamento settimanale.",
       "automation-kpis": "Copertura di automazione reale sui test case, success rate e test instabili per il progetto Test Factory.",
-      "e2e-history": "Andamento del success rate e storico delle esecuzioni recenti della suite Playwright tst-e2e, pubblicati via Firebase."
+      "e2e-history": "Andamento del success rate e storico delle esecuzioni recenti della suite Playwright tst-e2e, pubblicati via Firebase.",
+      "test-suites": "NRT, accessibilità e sicurezza in un unico hub - scegli una suite per vedere l'ultima esecuzione e lo storico.",
+      "bugs": "Bug in attesa di verifica QA e bug aperti oggi, entrambi filtrati sui membri del team Fincons Group (@finconsgroup.com)."
     },
     "gotIt": "Capito"
   },
@@ -117,6 +121,27 @@
       "done": "Completato",
       "cycleTime": "Tempo di ciclo",
       "state": "Stato"
+    }
+  },
+  "bugsPage": {
+    "title": "Bug",
+    "subtitle": "Bug in attesa di verifica QA e bug aperti oggi, entrambi filtrati sui membri del team Fincons Group (@finconsgroup.com).",
+    "table": {
+      "bug": "Bug",
+      "state": "Stato",
+      "assignee": "Assegnatario",
+      "creator": "Creato da",
+      "created": "Creato il"
+    },
+    "toVerify": {
+      "title": "Bug da verificare ({{count}})",
+      "subtitle": "Bug in stato \"Da verificare\" o \"In verifica\", assegnati a un membro del team @finconsgroup.com.",
+      "empty": "Nessun bug in attesa di verifica assegnato a Fincons Group al momento."
+    },
+    "openedToday": {
+      "title": "Aperti oggi ({{count}})",
+      "subtitle": "Bug creati oggi da un membro del team @finconsgroup.com.",
+      "empty": "Nessun bug aperto oggi da un creatore Fincons Group."
     }
   },
   "coverageRoadmapPage": {
@@ -196,6 +221,121 @@
       "report": "Report"
     },
     "viewReport": "Visualizza"
+  },
+  "testSuitesPage": {
+    "title": "Suite di Test",
+    "subtitle": "NRT, accessibilità e sicurezza per la suite di automazione - scegli una suite per vedere l'ultima esecuzione e lo storico.",
+    "eyebrow": "Quality gate automatizzati",
+    "appLabel": "App",
+    "appOptions": {
+      "plurifond": "Plurifonds",
+      "frontOfficeAuto": "Front Office Auto",
+      "all": "Tutte le app (regressione completa)"
+    },
+    "envLabel": "Ambiente",
+    "envOptions": {
+      "tst": "TST",
+      "pre": "PRE",
+      "prd": "PRD"
+    },
+    "tabs": {
+      "overview": "Panoramica",
+      "nrt": "NRT",
+      "a11y": "A11Y",
+      "dast": "DAST"
+    },
+    "notWiredTitle": "Non ancora collegato",
+    "notWiredBody": "Non c'è ancora uno storico per {{app}} su {{env}}. Una volta collegata la pipeline, le esecuzioni appariranno qui come per Plurifonds.",
+    "suites": {
+      "nrt": {
+        "name": "NRT",
+        "full": "Test di Non Regressione",
+        "tool": "via playwright-smart-reporter",
+        "desc": "Specifiche Playwright su sei domini di business (vit, sin, dan, ana, por, doc), eseguite ad ogni build candidata."
+      },
+      "a11y": {
+        "name": "A11Y",
+        "full": "Audit di Accessibilità",
+        "tool": "via axe-core",
+        "desc": "Scansione axe-core di ogni step del wizard Plurifonds, verificata secondo WCAG 2.2 AA."
+      },
+      "dast": {
+        "name": "DAST",
+        "full": "Test di Sicurezza Dinamici",
+        "tool": "via OWASP ZAP",
+        "desc": "Scansione ZAP baseline + attiva sull'ambiente di staging, eseguita settimanalmente prima di ogni release."
+      }
+    },
+    "ranAt": "Eseguito {{time}}",
+    "viewReports": "Vedi i report",
+    "openReport": "Apri {{file}}",
+    "openReportIt": "Apri report in italiano ({{file}})",
+    "renderedBy": "Generato da {{tool}}",
+    "linkedNoteNrt": "Questa esecuzione ha incluso anche il progetto a11y-chrome - vedi la scheda A11Y per i risultati.",
+    "linkedNoteA11y": "Catturato all'interno dell'esecuzione NRT {{runId}} (il progetto a11y-chrome è girato insieme alle specifiche vit).",
+    "status": {
+      "good": "Superato",
+      "warn": "Da verificare",
+      "bad": "Fallito"
+    },
+    "nrt": {
+      "passRate": "Success rate",
+      "totalTests": "Test totali",
+      "flaky": "Instabili",
+      "duration": "Durata",
+      "trendTitle": "Andamento - ultime {{count}} esecuzioni",
+      "domainsTitle": "Risultati per dominio",
+      "domainCol": "Dominio",
+      "passedCol": "Superati",
+      "totalCol": "Totali",
+      "flakyCol": "Instabili",
+      "testsTitle": "Test",
+      "testStatus": {
+        "passed": "Superato",
+        "failed": "Fallito",
+        "skipped": "Saltato"
+      },
+      "noSteps": "Nessuno step registrato per questo test."
+    },
+    "a11y": {
+      "violations": "Violazioni",
+      "incomplete": "Da verificare",
+      "passes": "Superati",
+      "stepsScanned": "Step scansionati",
+      "moreInfoNote": "Questo riepilogo mostra solo id delle regole e conteggi. Per screenshot e contesto completo di pagina su una violazione, apri il report qui sopra.",
+      "impactTitle": "Violazioni per impatto",
+      "stepsTitle": "Step",
+      "stepsShown": "{{shown}} di {{total}} mostrati",
+      "onlyFailedSteps_one": "Mostra solo lo step con errori ({{count}})",
+      "onlyFailedSteps_other": "Mostra solo gli step con errori ({{count}})",
+      "noFailedSteps": "Nessuno step ha fallito in questa esecuzione.",
+      "stepFailed": "{{violations}} violazioni, {{incomplete}} da verificare",
+      "stepClean": "Nessuna violazione",
+      "impact": {
+        "critical": "Critico",
+        "serious": "Grave",
+        "moderate": "Moderato",
+        "minor": "Minore"
+      }
+    },
+    "dast": {
+      "riskScore": "Punteggio di rischio",
+      "openAlerts": "Alert aperti",
+      "endpointsScanned": "Endpoint scansionati",
+      "highRisk": "Rischio alto",
+      "riskTitle": "Alert per livello di rischio",
+      "alertsTitle": "Alert",
+      "risk": {
+        "High": "Alto",
+        "Medium": "Medio",
+        "Low": "Basso",
+        "Informational": "Informativo"
+      }
+    },
+    "pastRuns": "Esecuzioni precedenti",
+    "totalRuns_one": "{{count}} esecuzione",
+    "totalRuns_other": "{{count}} esecuzioni",
+    "latest": "Ultima"
   },
   "planOverviewPage": {
     "exporting": "Esportazione...",

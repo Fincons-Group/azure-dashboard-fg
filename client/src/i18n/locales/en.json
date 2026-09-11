@@ -17,6 +17,8 @@
     "cycleTime": "Cycle Time",
     "automationKpis": "Automation KPIs",
     "e2eHistory": "E2E History",
+    "testSuites": "Test Suites",
+    "bugs": "Bugs",
     "refresh": "Refresh Now",
     "refreshing": "Refreshing...",
     "refreshFailed": "Refresh failed: {{message}}",
@@ -64,7 +66,9 @@
       "coverage-roadmap": "Track automation coverage per epic for the Test Factory project, with owner, due date, and status.",
       "cycle-time": "See how fast the team completes Test Factory automation tasks - cycle time and weekly throughput trends.",
       "automation-kpis": "Real test-case automation coverage, success rate, and flaky tests for the Test Factory project.",
-      "e2e-history": "Pass rate trend and recent run history from the tst-e2e Playwright suite, published via Firebase."
+      "e2e-history": "Pass rate trend and recent run history from the tst-e2e Playwright suite, published via Firebase.",
+      "test-suites": "NRT, accessibility and security gates in one hub - pick a suite to see its latest run and browse history.",
+      "bugs": "Bugs pending QA verification and bugs opened today, both scoped to Fincons Group (@finconsgroup.com) team members."
     },
     "gotIt": "Got it"
   },
@@ -117,6 +121,27 @@
       "done": "Done",
       "cycleTime": "Cycle time",
       "state": "State"
+    }
+  },
+  "bugsPage": {
+    "title": "Bugs",
+    "subtitle": "Bugs pending QA verification and bugs opened today, both scoped to Fincons Group (@finconsgroup.com) team members.",
+    "table": {
+      "bug": "Bug",
+      "state": "State",
+      "assignee": "Assignee",
+      "creator": "Creator",
+      "created": "Created"
+    },
+    "toVerify": {
+      "title": "Bugs to verify ({{count}})",
+      "subtitle": "Bugs in \"Da verificare\" or \"In verifica\", assigned to a @finconsgroup.com team member.",
+      "empty": "No bugs pending verification for a Fincons Group assignee right now."
+    },
+    "openedToday": {
+      "title": "Opened today ({{count}})",
+      "subtitle": "Bugs created today by a @finconsgroup.com team member.",
+      "empty": "No bugs opened today by a Fincons Group creator."
     }
   },
   "coverageRoadmapPage": {
@@ -196,6 +221,121 @@
       "report": "Report"
     },
     "viewReport": "View"
+  },
+  "testSuitesPage": {
+    "title": "Test Suites",
+    "subtitle": "NRT, accessibility and security gates for the automation suite - pick a suite to see its latest run and browse history.",
+    "eyebrow": "Automated quality gates",
+    "appLabel": "App",
+    "appOptions": {
+      "plurifond": "Plurifonds",
+      "frontOfficeAuto": "Front Office Auto",
+      "all": "All apps (full regression)"
+    },
+    "envLabel": "Environment",
+    "envOptions": {
+      "tst": "TST",
+      "pre": "PRE",
+      "prd": "PRD"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "nrt": "NRT",
+      "a11y": "A11Y",
+      "dast": "DAST"
+    },
+    "notWiredTitle": "Not wired up yet",
+    "notWiredBody": "There's no run history for {{app}} on {{env}} yet. Once its pipeline is onboarded, runs will show up here the same way Plurifonds' do.",
+    "suites": {
+      "nrt": {
+        "name": "NRT",
+        "full": "Non-Regression Tests",
+        "tool": "via playwright-smart-reporter",
+        "desc": "Playwright specs across six business domains (vit, sin, dan, ana, por, doc), run on every candidate build."
+      },
+      "a11y": {
+        "name": "A11Y",
+        "full": "Accessibility Audit",
+        "tool": "via axe-core",
+        "desc": "axe-core scan of every routed step of the Plurifonds wizard, checked against WCAG 2.2 AA."
+      },
+      "dast": {
+        "name": "DAST",
+        "full": "Dynamic App Security Testing",
+        "tool": "via OWASP ZAP",
+        "desc": "ZAP baseline + active scan of the staging environment, run weekly ahead of each release train."
+      }
+    },
+    "ranAt": "Ran {{time}}",
+    "viewReports": "View reports",
+    "openReport": "Open {{file}}",
+    "openReportIt": "Open Italian report ({{file}})",
+    "renderedBy": "Rendered by {{tool}}",
+    "linkedNoteNrt": "This run also carried the a11y-chrome project - see the A11Y tab for its findings.",
+    "linkedNoteA11y": "Captured inside NRT run {{runId}} (a11y-chrome project ran alongside the vit specs).",
+    "status": {
+      "good": "Passing",
+      "warn": "Attention",
+      "bad": "Failing"
+    },
+    "nrt": {
+      "passRate": "Pass rate",
+      "totalTests": "Total tests",
+      "flaky": "Flaky",
+      "duration": "Duration",
+      "trendTitle": "Trend - last {{count}} runs",
+      "domainsTitle": "Results by domain",
+      "domainCol": "Domain",
+      "passedCol": "Passed",
+      "totalCol": "Total",
+      "flakyCol": "Flaky",
+      "testsTitle": "Tests",
+      "testStatus": {
+        "passed": "Passed",
+        "failed": "Failed",
+        "skipped": "Skipped"
+      },
+      "noSteps": "No steps recorded for this test."
+    },
+    "a11y": {
+      "violations": "Violations",
+      "incomplete": "Incomplete",
+      "passes": "Passes",
+      "stepsScanned": "Steps scanned",
+      "moreInfoNote": "This summary only lists rule ids and counts. For screenshots and full page context on any violation, open the report above.",
+      "impactTitle": "Violations by impact",
+      "stepsTitle": "Steps",
+      "stepsShown": "{{shown}} of {{total}} shown",
+      "onlyFailedSteps_one": "Show only the {{count}} step that failed",
+      "onlyFailedSteps_other": "Show only the {{count}} steps that failed",
+      "noFailedSteps": "No steps failed in this run.",
+      "stepFailed": "{{violations}} violations, {{incomplete}} to verify",
+      "stepClean": "No violations",
+      "impact": {
+        "critical": "Critical",
+        "serious": "Serious",
+        "moderate": "Moderate",
+        "minor": "Minor"
+      }
+    },
+    "dast": {
+      "riskScore": "Risk score",
+      "openAlerts": "Open alerts",
+      "endpointsScanned": "Endpoints scanned",
+      "highRisk": "High risk",
+      "riskTitle": "Alerts by risk level",
+      "alertsTitle": "Alerts",
+      "risk": {
+        "High": "High",
+        "Medium": "Medium",
+        "Low": "Low",
+        "Informational": "Informational"
+      }
+    },
+    "pastRuns": "Past runs",
+    "totalRuns_one": "{{count}} run",
+    "totalRuns_other": "{{count}} runs",
+    "latest": "Latest"
   },
   "planOverviewPage": {
     "exporting": "Exporting...",

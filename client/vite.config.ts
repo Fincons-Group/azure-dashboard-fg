@@ -69,6 +69,14 @@ export default defineConfig(() => ({
     port: 3000,
     proxy: {
       '/api': 'http://localhost:3001',
+      // Dev-only static report mounts (see E2E_REPORTS_DIR /
+      // TEST_SUITES_REPORTS_DIR in src/server.ts) - without this, a plain
+      // <a href="/test-suites-reports/..."> resolves against the client's
+      // own origin (:3000) instead of the server that serves it (:3001),
+      // and Vite's SPA fallback swallows the 404 into whatever the app's
+      // default route is instead of opening the report.
+      '/test-suites-reports': 'http://localhost:3001',
+      '/e2e-reports': 'http://localhost:3001',
     },
   },
   optimizeDeps: {

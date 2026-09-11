@@ -17,6 +17,9 @@ export interface BugInfo {
   description?: string;
   url?: string;
   creator?: string;
+  // System.CreatedBy's uniqueName (email) - lets the Bugs page filter
+  // "opened today" bugs down to ones raised by a @finconsgroup.com creator.
+  creatorUniqueName?: string;
   assignee?: {
     displayName: string;
     uniqueName: string;
@@ -662,4 +665,150 @@ export interface IterationNode {
   path: string;
   startDate: string | null;
   finishDate: string | null;
+}
+
+// The NRT/A11Y/DAST test-suite hub (TestSuitesPage). Mock data for now (see
+// data/testSuitesMockData.ts) - there's no backend endpoint yet for these
+// three suites, unlike E2eRun above which already reads from Firestore.
+// Kept as real types (not inlined in the page) so the eventual API can slot
+// in behind the same shape.
+export type TestSuiteKey = "nrt" | "a11y" | "dast";
+
+// Which product the run covers. "plurifond"/"frontOfficeAuto" mirror the
+// Area Path leaf names used elsewhere (see seedPresets() in
+// useExcelExportPresets.ts: "Nuova Frontiera\\Plurifond" and
+// "...\\Front Office Auto\\..."). "all" is a full regression run that
+// exercises every app together in one pass - NRT/A11Y/DAST runs are not
+// always scoped to a single app.
+export type TestAppScope = "plurifond" | "frontOfficeAuto" | "all";
+
+// Mirrors tst-e2e's own Environment enum (tst/pre/prd) in
+// src/config/environments.ts of the automation repo.
+export type TestEnvironment = "tst" | "pre" | "prd";
+
+export type TestRunStatus = "good" | "warn" | "bad";
+
+export interface NrtDomainResult {
+  // Short domain code used in spec paths/tags (vit, sin, dan, ana, por, doc).
+  domain: string;
+  label: string;
+  total: number;
+  passed: number;
+  flaky: number;
+}
+
+export interface NrtTestStep {
+  title: string;
+  durationMs: number;
+}
+
+// One Playwright spec's result within a run - mirrors what
+// scripts/publish-local-test-runs.js walks out of the run's suites tree
+// (title/tags/tests/results/steps), one entry per test rather than per spec
+// file, so a spec with multiple tests (e.g. a skipped variant) gets one row
+// each.
+export interface NrtTestResult {
+  title: string;
+  domain: string;
+  file: string;
+  status: "passed" | "failed" | "skipped";
+  durationMs: number;
+  steps: NrtTestStep[];
+}
+
+export interface NrtRunDetail {
+  totalTests: number;
+  passed: number;
+  flaky: number;
+  durationMs: number;
+  domains: NrtDomainResult[];
+  // Optional: older mock runs and any real run published before this field
+  // existed won't have it - the UI should treat it as "no per-test detail
+  // available" rather than an empty list.
+  tests?: NrtTestResult[];
+}
+
+export interface A11yRuleViolation {
+  // axe-core rule id, e.g. "color-contrast" - see
+  // https://dequeuniversity.com/rules/axe/4.12/{ruleId}
+  ruleId: string;
+  impact: "critical" | "serious" | "moderate" | "minor";
+  count: number;
+  description: string;
+}
+
+// One axe-core scan target within a run - mirrors one
+// tst-e2e/reports/a11y/<run>/axe-data-<label>.json file (the wizard step or
+// dialog that got scanned, e.g. "comparto-initial").
+export interface A11yStepResult {
+  label: string;
+  violations: number;
+  incomplete: number;
+  critical: number;
+  serious: number;
+  moderate: number;
+  minor: number;
+  rules: A11yRuleViolation[];
+}
+
+export interface A11yRunDetail {
+  stepsScanned: number;
+  violations: number;
+  incomplete: number;
+  // Not present in the raw axe-data-*.json files (only violations/incomplete
+  // are persisted there) - undefined when this run's numbers were parsed
+  // from real report files rather than the aggregated a11y/index.html.
+  passes?: number;
+  critical: number;
+  serious: number;
+  moderate: number;
+  minor: number;
+  steps: A11yStepResult[];
+}
+
+export interface DastAlert {
+  // OWASP ZAP risk level - no "Critical" tier, unlike axe's impact scale.
+  risk: "High" | "Medium" | "Low" | "Informational";
+  title: string;
+  target: string;
+}
+
+export interface DastRunDetail {
+  endpointsScanned: number;
+  riskScore: number;
+  high: number;
+  medium: number;
+  low: number;
+  informational: number;
+  alerts: DastAlert[];
+}
+
+export interface TestSuiteRun {
+  // e.g. "nrt_20260910_0857_tst_full_core_v1.0" - mirrors the run-folder
+  // naming already used under tst-e2e/reports/runs/.
+  id: string;
+  suite: TestSuiteKey;
+  app: TestAppScope;
+  env: TestEnvironment;
+  branch: string;
+  commitSha?: string;
+  startedAt: string;
+  status: TestRunStatus;
+  // Filename of the generated report this run opens into (smart-report.html,
+  // a11y/index.html, or the dated ZAP report) - not a full URL yet, since
+  // there's nowhere public these are hosted until a backend exists.
+  reportFile: string;
+  // ZAP's own report generator emits an English and an Italian HTML report
+  // side by side for the same scan (see reports/zap/ - one plain-named file,
+  // one with an "-IT-" suffix) - only ever set for suite "dast", where the
+  // UI renders a second "Open report" button for it.
+  reportFileIt?: string;
+  reportTool: string;
+  // NRT and A11Y specs can execute inside the very same Playwright run (the
+  // a11y-chrome project alongside the vit specs) - this cross-links the two
+  // suite entries that came from one run.
+  linkedRunId?: string;
+  nrt?: NrtRunDetail;
+  a11y?: A11yRunDetail;
+  dast?: DastRunDetail;
 }

@@ -17,7 +17,12 @@ import { loadStoredAzdoConnection } from "../azdoConnection";
 
 const LOCAL_API_BASE_URL = "http://localhost:4174";
 
-function getApiBaseUrl(): string {
+// Exported so callers that build a plain <a href> (e.g. TestSuitesPage's
+// report links) resolve against the actual API origin instead of whatever
+// origin the link gets clicked from - a relative path there breaks whenever
+// the client and server aren't guaranteed same-origin (this packaged app's
+// GitHub Pages + local-server deployment, or plain multi-port dev).
+export function getApiBaseUrl(): string {
     if (import.meta.env.VITE_API_BASE_URL) {
         return import.meta.env.VITE_API_BASE_URL;
     }

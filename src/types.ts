@@ -252,6 +252,12 @@ export interface DefectRecord {
   closureReason?: ClosureReason;
   url?: string;
   creator?: string;
+  // System.CreatedBy's uniqueName (email) - kept separate from `creator`
+  // (its displayName) since every existing caller of `creator` expects a
+  // plain string. Lets the Bugs page filter "opened today" bugs down to
+  // ones raised by a @finconsgroup.com creator, the same domain check
+  // assignedTo.uniqueName already supports for assignees.
+  creatorUniqueName?: string;
   assignedTo?: { displayName: string; uniqueName: string };
   // When the bug moved into its current state - only meaningful while
   // state is "Da verificare" (see VERIFICA_STATE in defectData.ts), used
@@ -291,6 +297,9 @@ export interface DefectSummary {
   ageDays?: number;
   url?: string;
   creator?: string;
+  // See DefectRecord.creatorUniqueName - passed through by toSummary() in
+  // computeSprintDefectReport so the Bugs page can filter by creator domain.
+  creatorUniqueName?: string;
   assignee?: { displayName: string; uniqueName: string };
   // ISO strings from Azure DevOps - carried through so the Excel export can
   // show them and build its "today's bugs" sheet. Optional: absent on
