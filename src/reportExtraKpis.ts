@@ -5,54 +5,13 @@ import {
   computeSprintDefectReport,
 } from "./defectData.js";
 import { computePlanOverview } from "./planOverviewData.js";
-import { getFirstExecutionOutcomes } from "./testRunHistoryData.js";
+import {
+  getFirstExecutionOutcomes,
+  getFirstExecutionStepSummaries,
+} from "./testRunHistoryData.js";
 import { classifyPlan } from "./planClassifier.js";
 import { businessDaysBetween } from "./businessDays.js";
-import { getIterations, type IterationNode } from "./azdo.js";
-import { computeTestPlans } from "./dashboardData.js";
 import type { ReportExtraKpis } from "./types.js";
-
-// Finds the sprint immediately before `iterationPath` under the same parent
-// node, ordered by start date (not by name - "Sprint 10" would otherwise
-// sort before "Sprint 2"). Returns null when there's no dated sibling
-// before it (e.g. the very first sprint, or an iteration tree without
-// dates configured).
-function findPreviousIteration(
-  iterationPath: string,
-  iterations: IterationNode[],
-): IterationNode | null {
-  const current = iterations.find((it) => it.path === iterationPath);
-  if (!current || !current.startDate) {
-    return null;
-  }
-
-  const parentPath = iterationPath.slice(
-    0,
-    iterationPath.length - current.name.length - 1,
-  );
-
-  const before = iterations
-    .filter((it) => {
-      const itParentPath = it.path.slice(
-        0,
-        it.path.length - it.name.length - 1,
-      );
-      return (
-        itParentPath === parentPath &&
-        it.path !== current.path &&
-        it.startDate &&
-        it.startDate < current.startDate!
-      );
-    })
-    .sort((a, b) => (a.startDate! < b.startDate! ? 1 : -1));
-
-  return before[0] ?? null;
-}
-
-// Same denominator style as the existing Bug Re-open Rate (see
-// client/src/utils/export.ts's reopenedPct) - open bugs at Critical or High
-// severity, as a % of total detected bugs in scope.
-const CRITICAL_HIGH_SEVERITIES = new Set(["1 - Critical", "2 - High"]);
 
 export interface ComputeReportExtraKpisParams {
   project?: string;
@@ -66,29 +25,44 @@ export async function computeReportExtraKpis(
 ): Promise<ReportExtraKpis> {
   const { project, area, iteration, planIds } = params;
 
-  const [records, allSuiteNames, overviews, firstExecutionOutcomes] =
+  const [
+    records,
+    allSuiteNames,
+    overviews,
+    firstExecutionOutcomes,
+    firstExecutionSteps,
+  ] =
     await Promise.all([
       getDefectData(project),
       getAllSuiteNames(project),
       Promise.all(
         planIds.map((planId) => computePlanOverview(planId, project)),
       ),
-      getFirstExecutionOutcomes(project),
+      getFirstExecutionOutcomes(project, planIds),
+      getFirstExecutionStepSummaries(project, planIds),
     ]);
 
   const filtered = filterRecords(records, { iteration, area });
   const report = computeSprintDefectReport(filtered, allSuiteNames);
+  const allTestCases = overviews.flatMap((overview) => overview.testCases);
 
-  // KPI: Critical/High Bugs % (open only, mirrors report.reopenedCount's
-  // denominator - see computeStatusCardKpis in client/src/utils/export.ts).
-  const criticalHighOpenCount = report.effectiveDefects.filter(
-    (bug) =>
-      bug.state !== "Closed" &&
-      CRITICAL_HIGH_SEVERITIES.has(bug.severity ?? ""),
+  // KPI: Critical Defect Rate. The PDF defines the denominator as executed
+  // test cases (and explicitly includes NotApplicable), not total bugs.
+  const executedOutcomes = new Set([
+    "Passed",
+    "Failed",
+    "Blocked",
+    "NotApplicable",
+  ]);
+  const executedTestCaseCount = allTestCases.filter((testCase) =>
+    executedOutcomes.has(testCase.outcome),
   ).length;
-  const criticalHighBugPct = report.total
-    ? Math.round((criticalHighOpenCount / report.total) * 1000) / 10
-    : 0;
+  const criticalDefectCount = report.effectiveDefects.filter(
+    (bug) => bug.severity === "1 - Critical",
+  ).length;
+  const criticalHighBugPct = executedTestCaseCount
+    ? Math.round((criticalDefectCount / executedTestCaseCount) * 1000) / 10
+    : null;
 
   // KPI: Average Bug Fix Time - opened -> first Resolved, business days.
   const resolvedBugs = filtered.filter((r) => r.firstResolvedTransition);
@@ -108,17 +82,14 @@ export async function computeReportExtraKpis(
       ) / 10
     : null;
 
-  // KPI: Test Plan Correctness/Executability - a Blocked test case only
-  // counts against the score if it has a linked bug (see ReportExtraKpis'
-  // field comment for the process caveat this implies: an untracked
-  // Blocked outcome doesn't lower the score).
-  const allTestCases = overviews.flatMap((overview) => overview.testCases);
-  const blockedWithLinkedBug = allTestCases.filter(
-    (tc) => tc.outcome === "Blocked" && tc.bugIds.length > 0,
+  // In this team's process, an incorrect/non-executable case is marked N/A
+  // during Execute. That Azure outcome is therefore the authoritative flag.
+  const notApplicableCount = allTestCases.filter(
+    (tc) => tc.outcome === "NotApplicable",
   ).length;
   const testPlanCorrectnessPct = allTestCases.length
     ? Math.round(
-        ((allTestCases.length - blockedWithLinkedBug) / allTestCases.length) *
+        ((allTestCases.length - notApplicableCount) / allTestCases.length) *
           1000,
       ) / 10
     : 100;
@@ -130,9 +101,21 @@ export async function computeReportExtraKpis(
   // excluded from the denominator, matching the existing passRate
   // convention in computeStatusCardKpis (which excludes NotApplicable).
   const buckets = {
-    functional: { passed: 0, failed: 0 },
-    uat: { passed: 0, failed: 0 },
+    functional: { passed: 0, executed: 0, stepPassed: 0, stepExecuted: 0 },
+    uat: { passed: 0, executed: 0, stepPassed: 0, stepExecuted: 0 },
   };
+
+  const finishedOutcomes = new Set([
+    "passed",
+    "failed",
+    "blocked",
+    "notapplicable",
+    "inconclusive",
+    "timeout",
+    "aborted",
+    "warning",
+    "error",
+  ]);
 
   for (const overview of overviews) {
     const kind = classifyPlan(overview.planName);
@@ -144,103 +127,76 @@ export async function computeReportExtraKpis(
         continue;
       }
 
-      if (firstExecution.outcome === "Passed") {
+      const normalizedOutcome = firstExecution.outcome.toLowerCase();
+      if (finishedOutcomes.has(normalizedOutcome)) {
+        buckets[kind].executed++;
+      }
+      if (normalizedOutcome === "passed") {
         buckets[kind].passed++;
-      } else if (firstExecution.outcome === "Failed") {
-        buckets[kind].failed++;
+      }
+
+      const stepSummary = firstExecutionSteps.get(testCase.testCaseId);
+      if (stepSummary) {
+        buckets[kind].stepPassed += stepSummary.passed;
+        buckets[kind].stepExecuted += stepSummary.executed;
       }
     }
   }
 
   const passRateOf = (bucket: {
     passed: number;
-    failed: number;
+    executed: number;
   }): number | null => {
-    const denominator = bucket.passed + bucket.failed;
-    return denominator
-      ? Math.round((bucket.passed / denominator) * 1000) / 10
+    return bucket.executed
+      ? Math.round((bucket.passed / bucket.executed) * 1000) / 10
       : null;
   };
 
-  // KPI: Duplicate NotApplicable test cases - flags a NotApplicable test
-  // case whose title also shows up as NotApplicable elsewhere: another
-  // suite of the same plan(s) in scope, or the previous sprint's plan(s)
-  // (same area path). Matched by title, not test case ID, because a test
-  // case is a new work item (new ID, same title) each time it's
-  // re-added to a suite - see the field comment on ReportExtraKpis.
-  const notApplicableTestCases = allTestCases.filter(
-    (tc) => tc.outcome === "NotApplicable",
-  );
+  const stepPassRateOf = (bucket: {
+    stepPassed: number;
+    stepExecuted: number;
+  }): number | null =>
+    bucket.stepExecuted
+      ? Math.round((bucket.stepPassed / bucket.stepExecuted) * 1000) / 10
+      : null;
 
-  const currentSuiteIdsByTitle = new Map<string, Set<number>>();
-  for (const tc of notApplicableTestCases) {
-    const suiteIds = currentSuiteIdsByTitle.get(tc.title) ?? new Set();
-    suiteIds.add(tc.suiteId);
-    currentSuiteIdsByTitle.set(tc.title, suiteIds);
-  }
+  const verifiedBugs = filtered.filter((bug) => bug.firstResolvedTransition);
+  const reopenedAfterVerificationCount = verifiedBugs.filter(
+    (bug) => bug.reopenedCount > 0,
+  ).length;
+  const bugReopenRate = verifiedBugs.length
+    ? Math.round((reopenedAfterVerificationCount / verifiedBugs.length) * 1000) /
+      10
+    : null;
 
-  const withinPlanDuplicateTitles = new Set(
-    Array.from(currentSuiteIdsByTitle.entries())
-      .filter(([, suiteIds]) => suiteIds.size > 1)
-      .map(([title]) => title),
-  );
-
-  let previousSprintNotApplicableTitles = new Set<string>();
-  let previousSprintName: string | null = null;
-
-  if (iteration) {
-    const iterations = await getIterations(project);
-    const previous = findPreviousIteration(iteration, iterations);
-
-    if (previous) {
-      const previousPlans = (await computeTestPlans(project)).filter(
-        (plan) =>
-          plan.iteration === previous.path && (!area || plan.areaPath === area),
-      );
-
-      if (previousPlans.length) {
-        const previousOverviews = await Promise.all(
-          previousPlans.map((plan) => computePlanOverview(plan.id, project)),
-        );
-
-        previousSprintNotApplicableTitles = new Set(
-          previousOverviews
-            .flatMap((o) => o.testCases)
-            .filter((tc) => tc.outcome === "NotApplicable")
-            .map((tc) => tc.title),
-        );
-        previousSprintName = previous.name;
-      }
-    }
-  }
-
-  const duplicateTitles = new Set(
-    Array.from(currentSuiteIdsByTitle.keys()).filter(
-      (title) =>
-        withinPlanDuplicateTitles.has(title) ||
-        previousSprintNotApplicableTitles.has(title),
-    ),
-  );
-
-  const duplicateNotApplicable = {
-    count: duplicateTitles.size,
-    pct: notApplicableTestCases.length
-      ? Math.round(
-          (duplicateTitles.size / notApplicableTestCases.length) * 1000,
-        ) / 10
-      : 0,
-    titles: Array.from(duplicateTitles),
-    previousSprintName,
-  };
+  const closedBugs = filtered.filter((bug) => bug.closedDate);
+  const avgClosingTimeBusinessDays = closedBugs.length
+    ? Math.round(
+        (closedBugs.reduce(
+          (sum, bug) =>
+            sum +
+            businessDaysBetween(
+              new Date(bug.createdDate),
+              new Date(bug.closedDate!),
+            ),
+          0,
+        ) /
+          closedBugs.length) *
+          10,
+      ) / 10
+    : null;
 
   return {
     firstExecutionPassRate: {
       functional: passRateOf(buckets.functional),
       uat: passRateOf(buckets.uat),
+      functionalSteps: stepPassRateOf(buckets.functional),
+      uatSteps: stepPassRateOf(buckets.uat),
     },
     avgFixTimeBusinessDays,
     criticalHighBugPct,
     testPlanCorrectnessPct,
-    duplicateNotApplicable,
+    bugReopenRate,
+    avgClosingTimeBusinessDays,
   };
 }

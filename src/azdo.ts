@@ -593,13 +593,48 @@ export async function getTestRunStatistics(
 
 export async function getTestRunResults(
     runId: number,
-    project?: string
+    project?: string,
+    options: { includeIterations?: boolean } = {}
 ) {
-    const response = await clientFor(project).get(
-        `/test/Runs/${runId}/results?api-version=7.1`
-    );
+    try {
+        const results: any[] = [];
+        const pageSize = options.includeIterations ? 200 : 1000;
+        let skip = 0;
 
-    return response.data.value;
+        while (true) {
+            const details = options.includeIterations
+                ? "&detailsToInclude=Iterations"
+                : "";
+            const response = await clientFor(project).get(
+                `/test/Runs/${runId}/results?api-version=7.1&$top=${pageSize}&$skip=${skip}${details}`
+            );
+            const page = response.data.value ?? [];
+            results.push(...page);
+            if (page.length < pageSize) break;
+            skip += pageSize;
+        }
+
+        return results;
+    } catch (error) {
+        // Azure can retain a deleted run in the list briefly. Skipping that
+        // stale run is safer than failing the complete KPI response.
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+            return [];
+        }
+
+        // Some Azure DevOps installations reject step-level expansion even
+        // though ordinary result history is available. Preserve test-case
+        // KPIs in that case; step KPIs correctly remain unavailable.
+        if (
+            options.includeIterations &&
+            axios.isAxiosError(error) &&
+            error.response?.status === 400
+        ) {
+            return getTestRunResults(runId, project);
+        }
+
+        throw error;
+    }
 }
 
 export async function getActiveBugIds(project?: string): Promise<number[]> {

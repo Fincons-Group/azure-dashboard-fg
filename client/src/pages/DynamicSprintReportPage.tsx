@@ -224,7 +224,13 @@ export function DynamicSprintReportPage() {
     // types.ts) than the defects query above, so it's kept independent
     // rather than folded into `data` - a slow extra-KPIs fetch never blocks
     // the rest of the report from rendering.
-    const { data: extraKpis } = useQuery({
+    const {
+        data: extraKpis,
+        isLoading: extraKpisLoading,
+        isError: extraKpisIsError,
+        error: extraKpisError,
+        refetch: refetchExtraKpis,
+    } = useQuery({
         queryKey: [
             "report-extra-kpis",
             scope.project,
@@ -443,6 +449,22 @@ export function DynamicSprintReportPage() {
                                     onChange={setLocalFilters}
                                     fields={["suites", "environment", "targetVersion"]}
                                 />
+
+                                {extraKpisLoading && selectedPlanIds.length > 0 && (
+                                    <Text className={styles.hint}>
+                                        {t("dynamicSprintReportPage.extraKpisLoading")}
+                                    </Text>
+                                )}
+
+                                {extraKpisIsError && (
+                                    <ErrorState
+                                        message={t(
+                                            "dynamicSprintReportPage.extraKpisError",
+                                            { message: extraKpisError.message }
+                                        )}
+                                        onRetry={refetchExtraKpis}
+                                    />
+                                )}
 
                                 <SprintDefectReportTab
                                     stats={data.stats}

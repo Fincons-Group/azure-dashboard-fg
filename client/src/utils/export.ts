@@ -844,7 +844,7 @@ export function buildStatusReportCardEmailBodyHtml(
           "16%",
         ) +
         lightKpiTile(
-          `${extraKpis.criticalHighBugPct}%`,
+          formatExtraKpiPct(extraKpis.criticalHighBugPct),
           3,
           t(
             "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
@@ -856,14 +856,6 @@ export function buildStatusReportCardEmailBodyHtml(
           6,
           t(
             "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
-          ),
-          "16%",
-        ) +
-        lightKpiTile(
-          `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
-          2,
-          t(
-            "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
           ),
           "16%",
         ) +
@@ -1548,7 +1540,7 @@ function buildPdfExtraKpiDefs(
       label: t(
         "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
       ),
-      value: `${extraKpis.criticalHighBugPct}%`,
+      value: formatExtraKpiPct(extraKpis.criticalHighBugPct),
     },
     {
       kpi: LIGHT_KPI[6],
@@ -1556,13 +1548,6 @@ function buildPdfExtraKpiDefs(
         "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
       ),
       value: `${extraKpis.testPlanCorrectnessPct}%`,
-    },
-    {
-      kpi: LIGHT_KPI[2],
-      label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
-      ),
-      value: `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
     },
   ];
 }
@@ -2254,7 +2239,6 @@ const KPI_LEGEND_EXTRA: KpiLegendEntry[] = [
   { labelKey: "avgFixTimeBusinessDays", helpKey: "avgFixTimeBusinessDays" },
   { labelKey: "criticalHighBugPct", helpKey: "criticalHighBugPct" },
   { labelKey: "testPlanCorrectnessPct", helpKey: "testPlanCorrectnessPct" },
-  { labelKey: "duplicateNotApplicable", helpKey: "duplicateNotApplicable" },
 ];
 
 function pdfDrawKpiLegendSection(
@@ -2862,7 +2846,7 @@ function buildPptxRow4KpiDefs(
       ),
     },
     {
-      value: `${extraKpis.criticalHighBugPct}%`,
+      value: formatExtraKpiPct(extraKpis.criticalHighBugPct),
       label: t(
         "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
       ),
@@ -2871,12 +2855,6 @@ function buildPptxRow4KpiDefs(
       value: `${extraKpis.testPlanCorrectnessPct}%`,
       label: t(
         "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
-      ),
-    },
-    {
-      value: `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
-      label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
       ),
     },
   ];

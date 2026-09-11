@@ -647,16 +647,14 @@ export interface ReportExtraKpis {
   firstExecutionPassRate: {
     functional: number | null;
     uat: number | null;
+    functionalSteps: number | null;
+    uatSteps: number | null;
   };
   avgFixTimeBusinessDays: number | null;
-  criticalHighBugPct: number;
+  criticalHighBugPct: number | null;
   testPlanCorrectnessPct: number;
-  duplicateNotApplicable: {
-    count: number;
-    pct: number;
-    titles: string[];
-    previousSprintName: string | null;
-  };
+  bugReopenRate: number | null;
+  avgClosingTimeBusinessDays: number | null;
 }
 
 export interface IterationNode {

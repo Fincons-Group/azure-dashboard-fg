@@ -907,6 +907,24 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.firstExecutionPassRateUat"
               />
               <KpiTile
+                value={formatExtraKpiPct(
+                  extraKpis?.firstExecutionPassRate.functionalSteps,
+                )}
+                color="#4ec9b0"
+                borderColor="#4ec9b0"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateFunctionalSteps"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.firstExecutionPassRateFunctionalSteps"
+              />
+              <KpiTile
+                value={formatExtraKpiPct(
+                  extraKpis?.firstExecutionPassRate.uatSteps,
+                )}
+                color="#4ec9b0"
+                borderColor="#4ec9b0"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.firstExecutionPassRateUatSteps"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.firstExecutionPassRateUatSteps"
+              />
+              <KpiTile
                 value={
                   extraKpis?.avgFixTimeBusinessDays == null
                     ? "-"
@@ -920,7 +938,7 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgFixTimeBusinessDays"
               />
               <KpiTile
-                value={extraKpis ? `${extraKpis.criticalHighBugPct}%` : "-"}
+                value={formatExtraKpiPct(extraKpis?.criticalHighBugPct)}
                 color="#ff6b6b"
                 borderColor="#d13438"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct"
@@ -934,15 +952,24 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.testPlanCorrectnessPct"
               />
               <KpiTile
+                value={formatExtraKpiPct(extraKpis?.bugReopenRate)}
+                color="#ff9f43"
+                borderColor="#ff9f43"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugReopenRate"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugReopenRate"
+              />
+              <KpiTile
                 value={
-                  extraKpis
-                    ? `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`
-                    : "-"
+                  extraKpis?.avgClosingTimeBusinessDays == null
+                    ? "-"
+                    : t("defectManagementPage.stats.days", {
+                        value: extraKpis.avgClosingTimeBusinessDays,
+                      })
                 }
-                color="#f2c94c"
-                borderColor="#f2c94c"
-                labelKey="defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable"
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.duplicateNotApplicable"
+                color="#6bcf6b"
+                borderColor="#605e5c"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgClosingTimeBusinessDays"
               />
             </div>
           </div>

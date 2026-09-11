@@ -691,6 +691,8 @@ export interface ReportExtraKpis {
   firstExecutionPassRate: {
     functional: number | null;
     uat: number | null;
+    functionalSteps: number | null;
+    uatSteps: number | null;
   };
   // Opened -> first transition into Resolved/Da verificare, in business
   // days (not opened -> Closed in calendar days, which is the existing
@@ -698,23 +700,13 @@ export interface ReportExtraKpis {
   avgFixTimeBusinessDays: number | null;
   // Open bugs with severity Critical or High, as a % of total bugs -
   // same denominator style as the existing Bug Re-open Rate.
-  criticalHighBugPct: number;
+  criticalHighBugPct: number | null;
   // % of planned test cases NOT blocked by a linked bug. A test case
   // marked Blocked with no linked bug does not currently reduce this
   // score - see computeReportExtraKpis in src/reportExtraKpis.ts.
   testPlanCorrectnessPct: number;
-  // NotApplicable test cases that are likely duplicates: same title
-  // already marked NotApplicable in another suite of the same plan(s), or
-  // in the previous sprint's plan(s) of the same area path. Matched by
-  // title rather than test case ID because a test case is typically
-  // re-authored (new work item, same title) each time it's re-added to a
-  // suite/plan - see computeReportExtraKpis in src/reportExtraKpis.ts.
-  duplicateNotApplicable: {
-    count: number;
-    pct: number; // % of this scope's total NotApplicable test cases
-    titles: string[];
-    previousSprintName: string | null;
-  };
+  bugReopenRate: number | null;
+  avgClosingTimeBusinessDays: number | null;
 }
 
 export type CoverageStatus = "done" | "in-progress" | "at-risk";
