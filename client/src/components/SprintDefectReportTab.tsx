@@ -319,7 +319,6 @@ export function SprintDefectReportTab({
   // loaded. Distinct from showOriginBreakdown, which is per-report local
   // state rather than a persisted app-wide setting.
   const { settings } = useSettings();
-  const emailExtraKpis = settings.showExtraKpis ? extraKpis : undefined;
 
   // Dynamic Sprint Report recomputes defaultHeaderTitle from the selected
   // Test Plans (see DynamicSprintReportPage.tsx) - derived (not seeded
@@ -688,7 +687,8 @@ export function SprintDefectReportTab({
           dashboardUrl,
           showOriginBreakdown,
           includeDsiSource,
-          extraKpis: emailExtraKpis,
+          extraKpis,
+          showExtraKpis: settings.showExtraKpis,
         },
         t,
       );
@@ -729,7 +729,8 @@ export function SprintDefectReportTab({
           dashboardUrl,
           showOriginBreakdown,
           includeDsiSource,
-          extraKpis: emailExtraKpis,
+          extraKpis,
+          showExtraKpis: settings.showExtraKpis,
         },
         t,
       );
@@ -751,7 +752,8 @@ export function SprintDefectReportTab({
         dashboardUrl,
         showOriginBreakdown,
         includeDsiSource,
-        extraKpis: emailExtraKpis,
+        extraKpis,
+        showExtraKpis: settings.showExtraKpis,
       },
       t,
     );
@@ -769,7 +771,8 @@ export function SprintDefectReportTab({
         dashboardUrl,
         showOriginBreakdown,
         includeDsiSource,
-        extraKpis: emailExtraKpis,
+        extraKpis,
+        showExtraKpis: settings.showExtraKpis,
       },
       t,
     );
@@ -796,7 +799,8 @@ export function SprintDefectReportTab({
       dashboardUrl,
       showOriginBreakdown,
       includeDsiSource,
-      extraKpis: emailExtraKpis,
+      extraKpis,
+      showExtraKpis: settings.showExtraKpis,
     };
 
     const bodyHtml = buildStatusReportCardEmailDocument(

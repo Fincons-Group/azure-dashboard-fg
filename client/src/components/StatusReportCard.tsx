@@ -640,7 +640,6 @@ export const StatusReportCard = forwardRef<
     toCloseOutOfScopeCount,
     stillOpen,
     reopenedPct,
-    avgClosureDays,
     bugsByDsi,
     bugsByUs,
     bugsByBusiness,
@@ -862,13 +861,17 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.reopenedBugs"
               />
               <KpiTile
-                value={t("defectManagementPage.stats.days", {
-                  value: avgClosureDays,
-                })}
+                value={
+                  extraKpis?.avgClosingTimeBusinessDays == null
+                    ? "-"
+                    : t("defectManagementPage.stats.days", {
+                        value: extraKpis.avgClosingTimeBusinessDays,
+                      })
+                }
                 color="#6bcf6b"
                 borderColor="#605e5c"
-                labelKey="defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgClosureTime"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgClosingTimeBusinessDays"
               />
               <KpiTile
                 value={report.withoutResolutionDateCount}
@@ -957,19 +960,6 @@ export const StatusReportCard = forwardRef<
                 borderColor="#ff9f43"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugReopenRate"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugReopenRate"
-              />
-              <KpiTile
-                value={
-                  extraKpis?.avgClosingTimeBusinessDays == null
-                    ? "-"
-                    : t("defectManagementPage.stats.days", {
-                        value: extraKpis.avgClosingTimeBusinessDays,
-                      })
-                }
-                color="#6bcf6b"
-                borderColor="#605e5c"
-                labelKey="defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays"
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgClosingTimeBusinessDays"
               />
             </div>
           </div>

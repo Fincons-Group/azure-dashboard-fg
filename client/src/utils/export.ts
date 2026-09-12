@@ -105,10 +105,10 @@ export interface StatusReportCardEmailData {
   showOriginBreakdown?: boolean;
   // On by default - see StatusReportCard.tsx's prop of the same name.
   includeDsiSource?: boolean;
-  // The report's 4 additional KPIs - see StatusReportCard.tsx's prop of the
-  // same name and ReportExtraKpis in types.ts. Omitted entirely by any
-  // caller that hasn't fetched them yet; every render function below skips
-  // the extra section when this is undefined.
+  // Controls only the dedicated Additional KPIs section. Some values from
+  // extraKpis are also used in the standard Bug Status section.
+  showExtraKpis?: boolean;
+  // Additional KPI values fetched by the Dynamic Sprint Report.
   extraKpis?: ReportExtraKpis;
 }
 
@@ -553,6 +553,7 @@ export function buildStatusReportCardEmailBodyHtml(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    showExtraKpis = true,
     extraKpis,
   } = data;
 
@@ -575,7 +576,6 @@ export function buildStatusReportCardEmailBodyHtml(
     toCloseOutOfScopeCount,
     stillOpen,
     reopenedPct,
-    avgClosureDays,
     bugsByDsi,
     bugsByUs,
     bugsByBusiness,
@@ -796,9 +796,15 @@ export function buildStatusReportCardEmailBodyHtml(
       "25%",
     ) +
     lightKpiTile(
-      t("defectManagementPage.stats.days", { value: avgClosureDays }),
+      extraKpis?.avgClosingTimeBusinessDays == null
+        ? "-"
+        : t("defectManagementPage.stats.days", {
+            value: extraKpis.avgClosingTimeBusinessDays,
+          }),
       9,
-      t("defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"),
+      t(
+        "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
+      ),
       "25%",
     ) +
     lightKpiTile(
@@ -810,7 +816,7 @@ export function buildStatusReportCardEmailBodyHtml(
       "25%",
     ) +
     `</tr></table>` +
-    (extraKpis
+    (showExtraKpis && extraKpis
       ? kpiSectionTitle(
           `🧭 ${t("defectManagementPage.sprintReport.statusCard.kpis.extraKpisSection")}`,
         ) +
@@ -1468,6 +1474,7 @@ function buildPdfBugRow1KpiDefs(
 function buildPdfBugRow2KpiDefs(
   kpis: StatusCardKpis,
   report: SprintDefectReport,
+  extraKpis: ReportExtraKpis | undefined,
   t: TranslateFn,
 ): { kpi: (typeof LIGHT_KPI)[number]; label: string; value: string }[] {
   return [
@@ -1488,11 +1495,14 @@ function buildPdfBugRow2KpiDefs(
     {
       kpi: LIGHT_KPI[9],
       label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime",
+        "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
       ),
-      value: t("defectManagementPage.stats.days", {
-        value: kpis.avgClosureDays,
-      }),
+      value:
+        extraKpis?.avgClosingTimeBusinessDays == null
+          ? "-"
+          : t("defectManagementPage.stats.days", {
+              value: extraKpis.avgClosingTimeBusinessDays,
+            }),
     },
     {
       kpi: LIGHT_KPI[7],
@@ -1906,6 +1916,7 @@ export function buildStatusReportCardPdfDocument(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    showExtraKpis = true,
     extraKpis,
   } = data;
 
@@ -2075,7 +2086,7 @@ export function buildStatusReportCardPdfDocument(
     (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
       .finalY + 2;
 
-  const bugRow2Defs = buildPdfBugRow2KpiDefs(kpis, report, t);
+  const bugRow2Defs = buildPdfBugRow2KpiDefs(kpis, report, extraKpis, t);
 
   autoTable(doc, {
     startY: y,
@@ -2115,7 +2126,7 @@ export function buildStatusReportCardPdfDocument(
     (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
       .finalY + 4;
 
-  if (extraKpis) {
+  if (showExtraKpis && extraKpis) {
     // Section label: extra KPIs
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
@@ -2223,7 +2234,10 @@ const KPI_LEGEND_BUGS: KpiLegendEntry[] = [
   { labelKey: "bugsToClose", helpKey: "bugsToClose" },
   { labelKey: "criticalBugs", helpKey: "criticalBugs" },
   { labelKey: "reopenedBugs", helpKey: "reopenedBugs" },
-  { labelKey: "avgClosureTime", helpKey: "avgClosureTime" },
+  {
+    labelKey: "avgClosingTimeBusinessDays",
+    helpKey: "avgClosingTimeBusinessDays",
+  },
   { labelKey: "withoutResolutionDate", helpKey: "withoutResolutionDate" },
 ];
 
@@ -2785,6 +2799,7 @@ function buildPptxRow2KpiDefs(
 function buildPptxRow3KpiDefs(
   kpis: StatusCardKpis,
   report: SprintDefectReport,
+  extraKpis: ReportExtraKpis | undefined,
   t: TranslateFn,
 ): { value: string; label: string }[] {
   return [
@@ -2801,11 +2816,14 @@ function buildPptxRow3KpiDefs(
       ),
     },
     {
-      value: t("defectManagementPage.stats.days", {
-        value: kpis.avgClosureDays,
-      }),
+      value:
+        extraKpis?.avgClosingTimeBusinessDays == null
+          ? "-"
+          : t("defectManagementPage.stats.days", {
+              value: extraKpis.avgClosingTimeBusinessDays,
+            }),
       label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime",
+        "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
       ),
     },
     {
@@ -3417,6 +3435,7 @@ export async function exportStatusReportCardToPptx(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    showExtraKpis = true,
     extraKpis,
   } = data;
 
@@ -3451,7 +3470,7 @@ export async function exportStatusReportCardToPptx(
     hasDashboard,
     originDefs,
     originRowsData,
-    hasExtraKpis: Boolean(extraKpis),
+    hasExtraKpis: Boolean(showExtraKpis && extraKpis),
   });
 
   // No shrinking - the slide is exactly as tall as the content needs.
@@ -3532,8 +3551,8 @@ export async function exportStatusReportCardToPptx(
     closedOutOfScopeCount,
     t,
   );
-  const row3KpiDefs = buildPptxRow3KpiDefs(kpis, report, t);
-  const row4KpiDefs = extraKpis
+  const row3KpiDefs = buildPptxRow3KpiDefs(kpis, report, extraKpis, t);
+  const row4KpiDefs = showExtraKpis && extraKpis
     ? buildPptxRow4KpiDefs(extraKpis, t)
     : undefined;
 
