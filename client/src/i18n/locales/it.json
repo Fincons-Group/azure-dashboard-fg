@@ -136,7 +136,10 @@
     "toVerify": {
       "title": "Bug da verificare ({{count}})",
       "subtitle": "Bug in stato \"Da verificare\" o \"In verifica\", assegnati a un membro del team @finconsgroup.com.",
-      "empty": "Nessun bug in attesa di verifica assegnato a Fincons Group al momento."
+      "empty": "Nessun bug in attesa di verifica assegnato a Fincons Group al momento.",
+      "tabs": {
+        "overview": "Panoramica"
+      }
     },
     "openedToday": {
       "title": "Aperti oggi ({{count}})",

@@ -78,7 +78,13 @@ if (process.env.TEST_SUITES_REPORTS_DIR) {
     app.use("/test-suites-reports", express.static(process.env.TEST_SUITES_REPORTS_DIR));
 }
 
-app.use((req, res, next) => {
+// Scoped to /api - the static report routes above (and any request that
+// falls through them, e.g. a missing E2E_REPORTS_DIR/TEST_SUITES_REPORTS_DIR
+// file) never call Azure DevOps at all, so they shouldn't need a PAT to
+// resolve. Without this scoping, an unconfigured/missing report file used to
+// fall through to this gate and surface a confusing "Missing Azure DevOps
+// PAT" error instead of a plain 404.
+app.use("/api", (req, res, next) => {
     runWithAzdoConfig(
         {
             pat: req.header("x-ado-pat") ?? undefined,
@@ -86,9 +92,9 @@ app.use((req, res, next) => {
             project: req.header("x-ado-project") ?? undefined,
         },
         () => {
-            // Gate every route behind the PAT's owner, not just the ones
-            // that happen to call azdo.ts - a request must resolve to an
-            // allowed account before it can reach any handler below.
+            // Gate every /api route behind the PAT's owner, not just the
+            // ones that happen to call azdo.ts - a request must resolve to
+            // an allowed account before it can reach any handler below.
             assertAllowedDomain()
                 .then(next)
                 .catch((error) => sendApiError(res, error));

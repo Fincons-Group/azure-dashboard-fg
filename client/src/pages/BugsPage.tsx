@@ -1,27 +1,39 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
     Badge,
     Card,
+    Tab,
+    TabList,
     Text,
     makeStyles,
     tokens,
+    type SelectTabData,
+    type SelectTabEvent,
 } from "@fluentui/react-components";
 import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import { PaginationControls } from "../components/PaginationControls";
 import { usePagination } from "../hooks/usePagination";
-import { useScope } from "../hooks/useScope";
 import { fetchDefects } from "../api/client";
 import type { DefectSummary } from "../types";
 
 const TABLE_PAGE_SIZE = 8;
 
+// Bugs always live in the "Nuova Frontiera" ADO project - fixed here (like
+// CoverageRoadmapPage/AutomationKpiPage/CycleTimeReportPage fix "Test
+// Factory") rather than following the shared ScopeBar project selector.
+const PROJECT = "Nuova Frontiera";
+
 // Mirrors VERIFICA_PENDING_STATES in the server's defectData.ts - the
 // combined "Da verificare"/"In verifica" window QA is expected to act on.
-const VERIFY_STATES = ["Da verificare", "In verifica"];
+const VERIFY_STATES = ["Da verificare", "In verifica"] as const;
+
+// "Overview" (both states combined, the previous default) plus one tab per
+// individual state - same Panoramica/NRT/A11Y/DAST pattern as TestSuitesPage.
+type VerifyStateTab = "overview" | (typeof VERIFY_STATES)[number];
 
 // Same domain the server itself gates every PAT against (ALLOWED_EMAIL_DOMAIN
 // in src/azdo.ts) - re-applied here to scope each table to Fincons Group
@@ -75,6 +87,9 @@ const useStyles = makeStyles({
     tableCardHint: {
         fontSize: "12px",
         color: tokens.colorNeutralForeground3,
+    },
+    verifyTabs: {
+        padding: `0 ${tokens.spacingHorizontalM}`,
     },
     emptyHint: {
         padding: `0 ${tokens.spacingHorizontalM} ${tokens.spacingVerticalM}`,
@@ -133,26 +148,32 @@ function BugTitleCell({
 export function BugsPage() {
     const { t, i18n } = useTranslation();
     const styles = useStyles();
-    // Bug data is project-specific and lives wherever the team actually
-    // files bugs (e.g. "Nuova Frontiera") - unlike CoverageRoadmapPage/
-    // CycleTimeReportPage (fixed to the separate "Test Factory" automation
-    // project), this follows the shared ScopeBar project selector so it
-    // tracks whichever project the rest of the Sprint Report is scoped to.
-    const scope = useScope();
+
+    const [verifyStateTab, setVerifyStateTab] = useState<VerifyStateTab>("overview");
 
     const { data, isLoading, isError, error, refetch } = useQuery({
-        queryKey: ["defects-bugs-page", scope.project],
-        queryFn: () => fetchDefects(undefined, scope.project),
+        queryKey: ["defects-bugs-page", PROJECT],
+        queryFn: () => fetchDefects(undefined, PROJECT),
     });
 
     const bugsToVerify = useMemo(() => {
         const effective = data?.stats.sprintDefectReport.effectiveDefects ?? [];
 
         return effective
-            .filter((bug) => VERIFY_STATES.includes(bug.state))
+            .filter((bug) => (VERIFY_STATES as readonly string[]).includes(bug.state))
             .filter((bug) => isFinconsGroupEmail(bug.assignee?.uniqueName))
             .sort((a, b) => a.title.localeCompare(b.title));
     }, [data]);
+
+    const filteredBugsToVerify = useMemo(() => {
+        if (verifyStateTab === "overview") return bugsToVerify;
+
+        return bugsToVerify.filter((bug) => bug.state === verifyStateTab);
+    }, [bugsToVerify, verifyStateTab]);
+
+    const handleVerifyStateTabSelect = (_event: SelectTabEvent, tabData: SelectTabData) => {
+        setVerifyStateTab(tabData.value as VerifyStateTab);
+    };
 
     const bugsOpenedToday = useMemo(() => {
         const todays = data?.stats.sprintDefectReport.todaysDefects ?? [];
@@ -164,7 +185,7 @@ export function BugsPage() {
             .sort((a, b) => (b.createdDate ?? "").localeCompare(a.createdDate ?? ""));
     }, [data]);
 
-    const verifyPagination = usePagination(bugsToVerify, TABLE_PAGE_SIZE);
+    const verifyPagination = usePagination(filteredBugsToVerify, TABLE_PAGE_SIZE);
     const todayPagination = usePagination(bugsOpenedToday, TABLE_PAGE_SIZE);
 
     return (
@@ -180,14 +201,28 @@ export function BugsPage() {
                     <Card>
                         <div className={styles.tableCardHead}>
                             <Text className={styles.tableCardTitle}>
-                                {t("bugsPage.toVerify.title", { count: bugsToVerify.length })}
+                                {t("bugsPage.toVerify.title", { count: filteredBugsToVerify.length })}
                             </Text>
                             <Text className={styles.tableCardHint}>
                                 {t("bugsPage.toVerify.subtitle")}
                             </Text>
                         </div>
 
-                        {bugsToVerify.length === 0 ? (
+                        <TabList
+                            className={styles.verifyTabs}
+                            selectedValue={verifyStateTab}
+                            onTabSelect={handleVerifyStateTabSelect}
+                            size="small"
+                        >
+                            <Tab value="overview">{t("bugsPage.toVerify.tabs.overview")}</Tab>
+                            {VERIFY_STATES.map((state) => (
+                                <Tab key={state} value={state}>
+                                    {state}
+                                </Tab>
+                            ))}
+                        </TabList>
+
+                        {filteredBugsToVerify.length === 0 ? (
                             <Text className={styles.emptyHint}>
                                 {t("bugsPage.toVerify.empty")}
                             </Text>
@@ -233,7 +268,7 @@ export function BugsPage() {
                                 <PaginationControls
                                     page={verifyPagination.page}
                                     pageCount={verifyPagination.pageCount}
-                                    total={bugsToVerify.length}
+                                    total={filteredBugsToVerify.length}
                                     pageSize={TABLE_PAGE_SIZE}
                                     onPageChange={verifyPagination.setPage}
                                 />
