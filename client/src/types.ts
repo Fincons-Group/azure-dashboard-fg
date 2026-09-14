@@ -667,11 +667,9 @@ export interface IterationNode {
   finishDate: string | null;
 }
 
-// The NRT/A11Y/DAST test-suite hub (TestSuitesPage). Mock data for now (see
-// data/testSuitesMockData.ts) - there's no backend endpoint yet for these
-// three suites, unlike E2eRun above which already reads from Firestore.
-// Kept as real types (not inlined in the page) so the eventual API can slot
-// in behind the same shape.
+// The NRT/A11Y/DAST test-suite hub (TestSuitesPage) - reads from GET
+// /api/test-suites (see src/firebaseTestSuitesData.ts), same "not configured
+// yet" shape as E2eHistoryResponse below.
 export type TestSuiteKey = "nrt" | "a11y" | "dast";
 
 // Which product the run covers. "plurifond"/"frontOfficeAuto" mirror the
@@ -795,14 +793,23 @@ export interface TestSuiteRun {
   startedAt: string;
   status: TestRunStatus;
   // Filename of the generated report this run opens into (smart-report.html,
-  // a11y/index.html, or the dated ZAP report) - not a full URL yet, since
-  // there's nowhere public these are hosted until a backend exists.
+  // a11y/index.html, or the dated ZAP report), relative to whatever local
+  // tst-e2e checkout TEST_SUITES_REPORTS_DIR points the server's
+  // /test-suites-reports static route at - a dev-only convenience (see
+  // src/server.ts) that 404s in every other deployment. reportUrl below is
+  // the real, hosted path once one exists.
   reportFile: string;
+  // Absolute URL to the same report once it's actually hosted somewhere
+  // public (Firebase Storage/Hosting) - not populated by
+  // scripts/publish-local-test-runs.js yet, only by the eventual real CI
+  // pipeline. Preferred over reportFile/reportHref() when present.
+  reportUrl?: string;
   // ZAP's own report generator emits an English and an Italian HTML report
   // side by side for the same scan (see reports/zap/ - one plain-named file,
   // one with an "-IT-" suffix) - only ever set for suite "dast", where the
   // UI renders a second "Open report" button for it.
   reportFileIt?: string;
+  reportUrlIt?: string;
   reportTool: string;
   // NRT and A11Y specs can execute inside the very same Playwright run (the
   // a11y-chrome project alongside the vit specs) - this cross-links the two
@@ -811,4 +818,10 @@ export interface TestSuiteRun {
   nrt?: NrtRunDetail;
   a11y?: A11yRunDetail;
   dast?: DastRunDetail;
+}
+
+export interface TestSuitesResponse {
+  runs: TestSuiteRun[];
+  // False when the server's FIREBASE_SERVICE_ACCOUNT_JSON isn't set yet.
+  configured: boolean;
 }

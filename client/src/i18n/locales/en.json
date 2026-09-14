@@ -229,6 +229,8 @@
   "testSuitesPage": {
     "title": "Test Suites",
     "subtitle": "NRT, accessibility and security gates for the automation suite - pick a suite to see its latest run and browse history.",
+    "notConfiguredTitle": "Not configured yet",
+    "notConfiguredBody": "Set FIREBASE_SERVICE_ACCOUNT_JSON on the server to start showing real NRT/A11Y/DAST run history here.",
     "eyebrow": "Automated quality gates",
     "appLabel": "App",
     "appOptions": {

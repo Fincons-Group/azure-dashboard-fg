@@ -821,3 +821,108 @@ export interface E2eHistoryResponse {
   // FirebaseConfigError in src/firebaseE2eData.ts).
   configured: boolean;
 }
+
+// Server-side mirror of client/src/types.ts's TestSuiteRun and friends -
+// read straight off Firestore documents in firebaseTestSuitesData.ts, so
+// this needs to match that shape field-for-field. Keep the two in sync.
+export type TestSuiteKey = "nrt" | "a11y" | "dast";
+export type TestAppScope = "plurifond" | "frontOfficeAuto" | "all";
+export type TestEnvironment = "tst" | "pre" | "prd";
+export type TestRunStatus = "good" | "warn" | "bad";
+
+export interface NrtDomainResult {
+  domain: string;
+  label: string;
+  total: number;
+  passed: number;
+  flaky: number;
+}
+
+export interface NrtTestStep {
+  title: string;
+  durationMs: number;
+}
+
+export interface NrtTestResult {
+  title: string;
+  domain: string;
+  file: string;
+  status: "passed" | "failed" | "skipped";
+  durationMs: number;
+  steps: NrtTestStep[];
+}
+
+export interface NrtRunDetail {
+  totalTests: number;
+  passed: number;
+  flaky: number;
+  durationMs: number;
+  domains: NrtDomainResult[];
+  tests?: NrtTestResult[];
+}
+
+export interface A11yRuleViolation {
+  ruleId: string;
+  impact: "critical" | "serious" | "moderate" | "minor";
+  count: number;
+  description: string;
+}
+
+export interface A11yStepResult {
+  label: string;
+  violations: number;
+  incomplete: number;
+  critical: number;
+  serious: number;
+  moderate: number;
+  minor: number;
+  rules: A11yRuleViolation[];
+}
+
+export interface A11yRunDetail {
+  stepsScanned: number;
+  violations: number;
+  incomplete: number;
+  passes?: number;
+  critical: number;
+  serious: number;
+  moderate: number;
+  minor: number;
+  steps: A11yStepResult[];
+}
+
+export interface DastAlert {
+  risk: "High" | "Medium" | "Low" | "Informational";
+  title: string;
+  target: string;
+}
+
+export interface DastRunDetail {
+  endpointsScanned: number;
+  riskScore: number;
+  high: number;
+  medium: number;
+  low: number;
+  informational: number;
+  alerts: DastAlert[];
+}
+
+export interface TestSuiteRun {
+  id: string;
+  suite: TestSuiteKey;
+  app: TestAppScope;
+  env: TestEnvironment;
+  branch: string;
+  commitSha?: string;
+  startedAt: string;
+  status: TestRunStatus;
+  reportFile: string;
+  reportUrl?: string;
+  reportFileIt?: string;
+  reportUrlIt?: string;
+  reportTool: string;
+  linkedRunId?: string;
+  nrt?: NrtRunDetail;
+  a11y?: A11yRunDetail;
+  dast?: DastRunDetail;
+}

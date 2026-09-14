@@ -47,6 +47,10 @@ import {
     clearE2eHistoryCache,
     FirebaseConfigError,
 } from "./firebaseE2eData.js";
+import {
+    getTestSuiteRuns,
+    clearTestSuiteRunsCache,
+} from "./firebaseTestSuitesData.js";
 
 const app = express();
 
@@ -71,9 +75,9 @@ if (process.env.E2E_REPORTS_DIR) {
 // Suites hub: point this at a local tst-e2e checkout's `reports/` folder
 // (the parent of its runs/, a11y/, and zap/ subfolders) so TestSuitesPage's
 // "Open ..." links resolve to the real smart-report.html / a11y/index.html /
-// ZAP report instead of a dead button. That page's run data is still a
-// client-side mock (see client/src/data/testSuitesMockData.ts) - this only
-// serves the static report files the mock's reportFile paths point at.
+// ZAP report instead of a dead button, for runs whose Firestore document
+// (see firebaseTestSuitesData.ts) has no reportUrl of its own yet - this
+// only serves the static files reportFile's relative paths point at.
 if (process.env.TEST_SUITES_REPORTS_DIR) {
     app.use("/test-suites-reports", express.static(process.env.TEST_SUITES_REPORTS_DIR));
 }
@@ -282,6 +286,25 @@ app.get("/api/e2e-history", async (req, res) => {
     }
 });
 
+// Same "not configured" shape as /api/e2e-history above - lets TestSuitesPage
+// show a setup hint instead of an error banner when FIREBASE_SERVICE_ACCOUNT_JSON
+// isn't set.
+app.get("/api/test-suites", async (_req, res) => {
+    try {
+        res.json({
+            runs: await getTestSuiteRuns(),
+            configured: true,
+        });
+    } catch (error: any) {
+        if (error instanceof FirebaseConfigError) {
+            res.json({ runs: [], configured: false });
+            return;
+        }
+
+        sendApiError(res, error);
+    }
+});
+
 app.get("/api/defects", async (req, res) => {
     try {
         const project = req.query.project as string | undefined;
@@ -363,6 +386,7 @@ app.post("/api/refresh", (_, res) => {
     clearCycleTimeCache();
     clearAutomationKpiCache();
     clearE2eHistoryCache();
+    clearTestSuiteRunsCache();
 
     res.status(200).json({ refreshed: true });
 });

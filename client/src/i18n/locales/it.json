@@ -229,6 +229,8 @@
   "testSuitesPage": {
     "title": "Suite di Test",
     "subtitle": "NRT, accessibilità e sicurezza per la suite di automazione - scegli una suite per vedere l'ultima esecuzione e lo storico.",
+    "notConfiguredTitle": "Non ancora configurato",
+    "notConfiguredBody": "Imposta FIREBASE_SERVICE_ACCOUNT_JSON sul server per iniziare a mostrare qui lo storico reale delle esecuzioni NRT/A11Y/DAST.",
     "eyebrow": "Quality gate automatizzati",
     "appLabel": "App",
     "appOptions": {
