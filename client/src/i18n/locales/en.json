@@ -136,7 +136,11 @@
     "toVerify": {
       "title": "Bugs to verify ({{count}})",
       "subtitle": "Bugs in \"Da verificare\" or \"In verifica\", assigned to a @finconsgroup.com team member.",
-      "empty": "No bugs pending verification for a Fincons Group assignee right now."
+      "empty": "No bugs pending verification for a Fincons Group assignee right now.",
+      "excludeClosed": "Exclude closed",
+      "tabs": {
+        "overview": "Overview"
+      }
     },
     "openedToday": {
       "title": "Opened today ({{count}})",
