@@ -650,6 +650,29 @@ export async function getWorkItem(id: number, project?: string) {
     return response.data;
 }
 
+// JSON Patch update of one or more fields on a single work item. ADO
+// requires application/json-patch+json for this endpoint, which differs from
+// every read call in this file (those use the client's default
+// application/json), so the content type is overridden per-request here
+// rather than on the shared client.
+export async function updateWorkItemFields(
+    id: number,
+    fields: Record<string, unknown>,
+    project?: string
+): Promise<void> {
+    const patch = Object.entries(fields).map(([path, value]) => ({
+        op: "add",
+        path: `/fields/${path}`,
+        value,
+    }));
+
+    await clientFor(project).patch(
+        `/wit/workitems/${id}?api-version=7.1`,
+        patch,
+        { headers: { "Content-Type": "application/json-patch+json" } }
+    );
+}
+
 export async function getWorkItems(
     ids: number[],
     fields?: string[],

@@ -1,7 +1,8 @@
 // Temporary local dev tool: reads a tst-e2e checkout's report output straight
 // off disk and publishes it to Firebase, so the Test Suites / E2E History
 // pages have real-shaped data to render against before tst-e2e's own CI
-// pipeline exists (see docs/e2e-firebase-integration-plan.md Part C).
+// pipeline exists (see docs/e2e-firebase-integration-plan.md Part C and
+// docs/tst-e2e-reports-followups.md).
 //
 // Writes ONLY to the `testSuiteRunsLocal` collection - never the collection
 // the real CI pipeline will publish to - so this can never contaminate real
@@ -12,14 +13,21 @@
 // never fires by accident (e.g. copy-pasted into the wrong shell).
 //
 // Usage: E2E_LOCAL_PUBLISH=true node scripts/publish-local-test-runs.js
+// Add PUBLISH_REPORTS_TO_FIREBASE=true too to also upload each run's report
+// file(s) to Firebase Storage and set reportUrl/reportUrlIt on the document -
+// a separate opt-in since it's real storage-quota usage, not just a safety
+// confirmation (see .env.example). Requires the Firebase project to be on
+// the Blaze plan.
 import "dotenv/config";
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 const LOCAL_COLLECTION = "testSuiteRunsLocal";
+const PUBLISH_REPORTS = process.env.PUBLISH_REPORTS_TO_FIREBASE === "true";
 
 if (process.env.E2E_LOCAL_PUBLISH !== "true") {
     console.error(
@@ -155,7 +163,27 @@ function buildDomainSummary(tests, allDomains) {
     });
 }
 
-function buildNrtRuns() {
+// Uploads one local file to Storage at destPath and makes it publicly
+// readable (a fixed ACL grant via the Admin SDK, independent of Firestore's
+// security rules - see docs/e2e-firebase-integration-plan.md Part A, which
+// only locks down Firestore, not Storage). Missing files (e.g. a PDF variant
+// that wasn't generated) are skipped with a warning rather than failing the
+// whole run.
+async function uploadReport(bucket, localPath, destPath) {
+    try {
+        statSync(localPath);
+    } catch {
+        console.warn(`  (skipping upload, not found: ${localPath})`);
+        return undefined;
+    }
+
+    await bucket.upload(localPath, { destination: destPath });
+    await bucket.file(destPath).makePublic();
+
+    return `https://storage.googleapis.com/${bucket.name}/${destPath}`;
+}
+
+async function buildNrtRuns(bucket) {
     const jsonDir = path.join(reportsDir, "json");
     let files = [];
     try {
@@ -165,7 +193,7 @@ function buildNrtRuns() {
         return [];
     }
 
-    return files.map((file) => {
+    return Promise.all(files.map(async (file) => {
         const id = file.replace(/\.json$/, "");
         const { stats, suites } = JSON.parse(readFileSync(path.join(jsonDir, file), "utf8"));
         const startedAt = new Date(stats.startTime);
@@ -189,7 +217,7 @@ function buildNrtRuns() {
             tests,
         };
 
-        return {
+        const run = {
             id,
             suite: "nrt",
             app: "all",
@@ -202,10 +230,33 @@ function buildNrtRuns() {
             reportTool: "Playwright + SmartReport",
             nrt: detail,
         };
-    });
+
+        if (PUBLISH_REPORTS && bucket) {
+            const runDir = path.join(reportsDir, "runs", id);
+            const destDir = `test-suites-reports/runs/${id}`;
+
+            const reportUrl = await uploadReport(
+                bucket,
+                path.join(runDir, "smart-report.html"),
+                `${destDir}/smart-report.html`
+            );
+            // Firestore's Admin SDK rejects an explicit `undefined` field on
+            // .set() by default - only assign when the upload actually
+            // produced a URL.
+            if (reportUrl) run.reportUrl = reportUrl;
+            // Siblings smart-report.html itself links to (PDF download
+            // buttons) - uploaded alongside so those relative links resolve
+            // once hosted, same as they do when viewed locally.
+            for (const pdf of ["smart-report.pdf", "smart-report-dark.pdf", "smart-report-minimal.pdf"]) {
+                await uploadReport(bucket, path.join(runDir, pdf), `${destDir}/${pdf}`);
+            }
+        }
+
+        return run;
+    }));
 }
 
-function buildA11yRuns() {
+async function buildA11yRuns(bucket) {
     const a11yDir = path.join(reportsDir, "a11y");
     let entries = [];
     try {
@@ -270,21 +321,30 @@ function buildA11yRuns() {
         steps: steps.map(({ timestamp, ...step }) => step),
     };
 
-    return [
-        {
-            id,
-            suite: "a11y",
-            app: "plurifond",
-            env: "tst",
-            branch,
-            commitSha,
-            startedAt,
-            status: a11yStatus(detail),
-            reportFile: "a11y/index.html",
-            reportTool: "axe-core",
-            a11y: detail,
-        },
-    ];
+    const run = {
+        id,
+        suite: "a11y",
+        app: "plurifond",
+        env: "tst",
+        branch,
+        commitSha,
+        startedAt,
+        status: a11yStatus(detail),
+        reportFile: "a11y/index.html",
+        reportTool: "axe-core",
+        a11y: detail,
+    };
+
+    if (PUBLISH_REPORTS && bucket) {
+        const reportUrl = await uploadReport(
+            bucket,
+            path.join(a11yDir, "index.html"),
+            "test-suites-reports/a11y/index.html"
+        );
+        if (reportUrl) run.reportUrl = reportUrl;
+    }
+
+    return [run];
 }
 
 // ZAP only produces HTML reports here (no JSON summary), so there's nothing
@@ -294,15 +354,32 @@ function buildDastRuns() {
     return [];
 }
 
-const runs = [...buildNrtRuns(), ...buildA11yRuns(), ...buildDastRuns()];
+const serviceAccount = JSON.parse(serviceAccountRaw);
+const app = initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore(app);
+
+// Default bucket naming isn't inferred from the service account alone (the
+// Admin SDK needs an explicit storageBucket) - confirmed against the real
+// project that "<project_id>.appspot.com" is the right one, not the newer
+// "<project_id>.firebasestorage.app" convention some projects use instead.
+const bucket = PUBLISH_REPORTS
+    ? getStorage(app).bucket(`${serviceAccount.project_id}.appspot.com`)
+    : null;
+
+if (PUBLISH_REPORTS) {
+    console.log(`Report uploads enabled - publishing to gs://${bucket.name}/test-suites-reports/`);
+}
+
+const runs = [
+    ...(await buildNrtRuns(bucket)),
+    ...(await buildA11yRuns(bucket)),
+    ...buildDastRuns(),
+];
 
 if (runs.length === 0) {
     console.log("Nothing to publish.");
     process.exit(0);
 }
-
-const app = initializeApp({ credential: cert(JSON.parse(serviceAccountRaw)) });
-const db = getFirestore(app);
 
 for (const run of runs) {
     await db.collection(LOCAL_COLLECTION).doc(run.id).set(run);

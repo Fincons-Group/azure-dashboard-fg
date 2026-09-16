@@ -151,6 +151,40 @@ to this repo's Pages path automatically, and publishes `dist/` via
 > instead of fully public - check your org's plan/policy before relying on
 > this.
 
+### 3. (Optional) Scheduled Teams notifications
+
+`src/notificationTriggers.ts` can post to Teams at fixed times - a "bugs
+created today" card at 17:45, and a "bugs waiting Da verificare" card
+(assignee filtered to `TEAMS_VERIFICA_ALLOWED_SENDERS`, default
+`finconsgroup.com`) at 09:00 and 14:00 (Mon-Fri, Europe/Rome). Because the
+free Render tier sleeps after ~15 min idle, these aren't scheduled
+in-process (a `node-cron` timer would silently miss ticks while asleep) -
+instead `.github/workflows/notify-teams-cron.yml` wakes the backend with an
+HTTP call at each trigger time (it schedules each Rome local time twice, in
+both possible UTC offsets, and only actually calls the endpoint once the
+job's own Europe/Rome clock check confirms which one is real - see the
+workflow's comments for the exact UTC times and why).
+
+**On the Render service**, in addition to step 1's vars, set:
+
+- `ENABLE_TEAMS_NOTIFICATIONS=true`
+- `TEAMS_WEBHOOK_URL_BUGS_REPORTED` / `TEAMS_WEBHOOK_URL_ASSIGNEE_VERIFICA` -
+  the two Teams incoming-webhook URLs
+- `INTERNAL_CRON_SECRET` - a random value (e.g. `openssl rand -base64 24`)
+- `AZDO_PAT` / `AZDO_ORG` / `AZDO_PROJECT` - **unlike step 1's advice**,
+  these three DO need to be set here. The notify endpoints run on a
+  schedule, not from a browser request, so there's no per-request PAT to
+  fall back on (see `getCurrentConfig` in `src/azdo.ts`). Use a
+  dedicated, read-only-scoped PAT for this rather than reusing a personal
+  one, since it now lives on the host.
+
+**In this repo's Settings → Secrets and variables → Actions → Secrets**,
+add `CRON_SECRET` with the same value as `INTERNAL_CRON_SECRET` above - the
+workflow sends it as the `x-cron-secret` header, and `POST
+/internal/notify/*` refuses every request (503) until both sides are set.
+The Render URL itself is hardcoded in the workflow file - update it there
+if the service URL ever changes.
+
 ## Italian onboarding (Windows)
 
 - Manual guide (Italian): `docs/guida-windows-da-zero-it.md`
