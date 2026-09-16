@@ -35,6 +35,16 @@ import { useScope } from "../hooks/useScope";
 import { useCheckedTestPlans } from "../hooks/useCheckedTestPlans";
 import { buildStatusReportCardFilename } from "../utils/export";
 import {
+    buildInitialReportText,
+    buildFollowUpText,
+    formatReportSnapshotTimestamp,
+    loadPreviousSnapshot,
+    makeReportSnapshot,
+    reportScopeKeyForSelection,
+    saveReportSnapshot,
+    type ReportSnapshot,
+} from "../utils/reportComparison";
+import {
     buildReportPreview,
     exportDynamicSprintReportToExcel,
     type DynamicSprintReportExcelData,
@@ -84,10 +94,22 @@ const useStyles = makeStyles({
         justifyContent: "center",
         padding: tokens.spacingVerticalXXL,
     },
+    comparison: {
+        display: "flex",
+        flexDirection: "column",
+        gap: tokens.spacingVerticalS,
+        marginBottom: tokens.spacingVerticalL,
+        padding: tokens.spacingVerticalM,
+        backgroundColor: tokens.colorNeutralBackground2,
+        borderRadius: tokens.borderRadiusMedium,
+    },
+    followUp: {
+        whiteSpace: "pre-wrap",
+    },
 });
 
 export function DynamicSprintReportPage() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const styles = useStyles();
     const scope = useScope();
 
@@ -219,12 +241,18 @@ export function DynamicSprintReportPage() {
         enabled: scope.isComplete && (hasIterations ? !!scope.sprint : true),
     });
 
-    // The report's 4 additional KPIs - a separate, heavier query (enumerates
+    // The report's additional KPIs - a separate, heavier query (enumerates
     // Azure DevOps test run history server-side, see ReportExtraKpis in
     // types.ts) than the defects query above, so it's kept independent
     // rather than folded into `data` - a slow extra-KPIs fetch never blocks
     // the rest of the report from rendering.
-    const { data: extraKpis } = useQuery({
+    const {
+        data: extraKpis,
+        isLoading: extraKpisLoading,
+        isError: extraKpisIsError,
+        error: extraKpisError,
+        refetch: refetchExtraKpis,
+    } = useQuery({
         queryKey: [
             "report-extra-kpis",
             scope.project,
@@ -292,6 +320,66 @@ export function DynamicSprintReportPage() {
     const [reportData, setReportData] = useState<DynamicSprintReportExcelData | null>(
         null
     );
+    const [currentSnapshot, setCurrentSnapshot] = useState<ReportSnapshot | null>(null);
+    const [previousSnapshot, setPreviousSnapshot] = useState<ReportSnapshot | null>(null);
+    const [emailSuggestion, setEmailSuggestion] = useState<{
+        scopeKey: string;
+        text: string;
+        requestId: number;
+    } | null>(null);
+    const selectedScopeKey = reportScopeKeyForSelection(
+        scope.project, scope.areaPath, scope.sprint, selectedPlanIds, filters,
+    );
+    // These objects are deliberately derived on every render. Publishing a
+    // report writes localStorage and also changes button/mutation state, so
+    // the following render immediately sees the newly saved baseline without
+    // a synthetic timestamp dependency or an unrelated data refetch.
+    const previousPublishedSnapshot = loadPreviousSnapshot(selectedScopeKey);
+    let liveSnapshot: ReportSnapshot | null = null;
+    if (
+        data?.stats &&
+        selectedPlanIds.every((_, index) => !!planOverviewQueries[index]?.data)
+    ) {
+        const liveReport: DynamicSprintReportExcelData = {
+            meta: {
+                title: defaultHeaderTitle,
+                project: scope.project,
+                areaPath: scope.areaPath,
+                sprint: scope.sprint,
+                generatedAt: new Date(),
+            },
+            stats: data.stats,
+            plans: selectedPlanIds.map((planId, index) => {
+                const plan = plans?.find((candidate) => candidate.id === planId);
+                return {
+                    id: planId,
+                    name: plan?.name ?? String(planId),
+                    url: plan?.url,
+                    overview: planOverviewQueries[index]?.data,
+                };
+            }),
+        };
+        liveSnapshot = makeReportSnapshot(liveReport, filters);
+    }
+    const automaticEmailSuggestion = liveSnapshot
+        ? previousPublishedSnapshot
+            ? buildFollowUpText(
+                previousPublishedSnapshot,
+                liveSnapshot,
+                i18n.language
+            )
+            : buildInitialReportText(liveSnapshot, i18n.language)
+        : "";
+
+    const saveCurrentReportSnapshot = () => {
+        if (!liveSnapshot) {
+            return;
+        }
+        saveReportSnapshot({
+            ...liveSnapshot,
+            generatedAt: new Date().toISOString(),
+        });
+    };
 
     // Re-fetches the defect report and every selected plan's overview from
     // Azure DevOps first (rather than using whatever React Query happens to
@@ -304,9 +392,9 @@ export function DynamicSprintReportPage() {
                 Promise.all(planOverviewQueries.map((query) => query.refetch())),
             ]);
 
-            const freshStats = defectsResult.data?.stats ?? data?.stats;
+            const freshStats = defectsResult.isError ? null : defectsResult.data?.stats;
 
-            if (!freshStats) {
+            if (!freshStats || overviewResults.some((result) => result.isError)) {
                 return null;
             }
 
@@ -341,9 +429,18 @@ export function DynamicSprintReportPage() {
     const handleOpenPreview = async () => {
         setIsPreparingReport(true);
         setPreviewOpen(true);
+        setReportData(null);
+        setCurrentSnapshot(null);
+        setPreviousSnapshot(null);
 
         try {
-            setReportData(await buildReportData());
+            const freshReport = await buildReportData();
+            setReportData(freshReport);
+            if (freshReport) {
+                const snapshot = makeReportSnapshot(freshReport, filters);
+                setCurrentSnapshot(snapshot);
+                setPreviousSnapshot(loadPreviousSnapshot(snapshot.scopeKey));
+            }
         } finally {
             setIsPreparingReport(false);
         }
@@ -362,6 +459,9 @@ export function DynamicSprintReportPage() {
                 reportData,
                 t
             );
+            if (currentSnapshot) {
+                saveReportSnapshot(currentSnapshot);
+            }
         } finally {
             setIsDownloading(false);
         }
@@ -371,6 +471,9 @@ export function DynamicSprintReportPage() {
         () => (reportData ? buildReportPreview(reportData, t) : []),
         [reportData, t]
     );
+    const followUpText = previousSnapshot && currentSnapshot
+        ? buildFollowUpText(previousSnapshot, currentSnapshot, i18n.language)
+        : "";
 
     return (
         <PageLayout
@@ -444,6 +547,22 @@ export function DynamicSprintReportPage() {
                                     fields={["suites", "environment", "targetVersion"]}
                                 />
 
+                                {extraKpisLoading && selectedPlanIds.length > 0 && (
+                                    <Text className={styles.hint}>
+                                        {t("dynamicSprintReportPage.extraKpisLoading")}
+                                    </Text>
+                                )}
+
+                                {extraKpisIsError && (
+                                    <ErrorState
+                                        message={t(
+                                            "dynamicSprintReportPage.extraKpisError",
+                                            { message: extraKpisError.message }
+                                        )}
+                                        onRetry={refetchExtraKpis}
+                                    />
+                                )}
+
                                 <SprintDefectReportTab
                                     stats={data.stats}
                                     project={scope.project}
@@ -456,6 +575,22 @@ export function DynamicSprintReportPage() {
                                     includeDeadline={false}
                                     enableEmailPreface
                                     enableEmailClosing
+                                    suggestedEmailPreface={
+                                        emailSuggestion?.scopeKey === selectedScopeKey
+                                            ? emailSuggestion.text
+                                            : automaticEmailSuggestion
+                                    }
+                                    suggestedEmailPrefaceScopeKey={selectedScopeKey}
+                                    suggestedEmailPrefaceRequestId={
+                                        emailSuggestion?.scopeKey === selectedScopeKey
+                                            ? emailSuggestion.requestId
+                                            : 0
+                                    }
+                                    reportPublishingDisabled={
+                                        !liveSnapshot ||
+                                        (selectedPlanIds.length > 0 && !extraKpis)
+                                    }
+                                    onReportPublished={saveCurrentReportSnapshot}
                                     extraKpis={extraKpis}
                                 />
                             </>
@@ -489,6 +624,35 @@ export function DynamicSprintReportPage() {
                             )}
 
                             {!isPreparingReport && previewSheets.length > 0 && (
+                                <>
+                                <div className={styles.comparison}>
+                                    <Text weight="semibold">
+                                        {t("dynamicSprintReportPage.followUp.title")}
+                                    </Text>
+                                    {previousSnapshot ? (
+                                        <>
+                                            <Text>{t("dynamicSprintReportPage.followUp.previous", {
+                                                date: formatReportSnapshotTimestamp(
+                                                    previousSnapshot.generatedAt,
+                                                    i18n.language
+                                                ),
+                                            })}</Text>
+                                            <Text className={styles.followUp}>{followUpText}</Text>
+                                            <Button onClick={() => {
+                                                setEmailSuggestion((current) => ({
+                                                    scopeKey: currentSnapshot!.scopeKey,
+                                                    text: followUpText,
+                                                    requestId: (current?.requestId ?? 0) + 1,
+                                                }));
+                                                setPreviewOpen(false);
+                                            }}>
+                                                {t("dynamicSprintReportPage.followUp.useInEmail")}
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Text>{t("dynamicSprintReportPage.followUp.firstReport")}</Text>
+                                    )}
+                                </div>
                                 <ExcelReportPreview
                                     sheets={previewSheets}
                                     hiddenRowsNote={(count) =>
@@ -498,6 +662,7 @@ export function DynamicSprintReportPage() {
                                         )
                                     }
                                 />
+                                </>
                             )}
 
                             {!isPreparingReport && previewSheets.length === 0 && (

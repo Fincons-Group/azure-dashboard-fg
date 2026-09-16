@@ -202,7 +202,7 @@ app.get("/api/plans/:planId/overview", async (req, res) => {
 });
 
 // Companion endpoint to /api/defects + /api/plans/:planId/overview for the
-// Sprint Report's 4 additional KPIs - kept as its own route (rather than
+// Sprint Report's additional KPIs - kept as its own route (rather than
 // folded into either response) because firstExecutionPassRate requires
 // enumerating Azure DevOps test run history, which is heavier than
 // everything else the report fetches and benefits from its own cache and

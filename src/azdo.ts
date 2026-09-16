@@ -280,13 +280,24 @@ async function fetchAuthenticatedEmail(
             "/connectionData?api-version=7.1-preview.1"
         );
 
-        // AAD-backed identities carry the UPN/email under
-        // authenticatedUser.properties.Account rather than any top-level
-        // field - there's no dedicated "email" property on this response.
-        const email: string | undefined =
-            response.data?.authenticatedUser?.properties?.Account?.$value;
+        const email = extractAuthenticatedEmail(response.data);
 
-        return email ? email.trim().toLowerCase() : null;
+        if (!email) {
+            const authenticatedUser = response.data?.authenticatedUser;
+            console.error(
+                "Azure DevOps connectionData authenticated the PAT but did " +
+                    "not expose an email address for its owner:",
+                {
+                    org,
+                    hasUniqueName: !!authenticatedUser?.uniqueName,
+                    propertyNames: Object.keys(
+                        authenticatedUser?.properties ?? {}
+                    ),
+                }
+            );
+        }
+
+        return email;
     } catch (error) {
         console.error(
             "Failed to resolve the calling PAT's Azure DevOps identity " +
@@ -304,12 +315,80 @@ async function fetchAuthenticatedEmail(
     }
 }
 
-// Keyed by PAT (not by request) so the same PAT reused across many requests
-// only hits connectionData once per TTL - same shape as the dashboard caches
-// elsewhere (dashboardData.ts etc.), just keyed differently.
+function emailFromIdentityValue(value: unknown): string | null {
+    const rawValue =
+        typeof value === "string"
+            ? value
+            : value && typeof value === "object" && "$value" in value
+              ? (value as { $value?: unknown }).$value
+              : null;
+
+    if (typeof rawValue !== "string") {
+        return null;
+    }
+
+    const normalized = rawValue.trim().toLowerCase();
+    return normalized.includes("@") ? normalized : null;
+}
+
+export function extractAuthenticatedEmail(connectionData: unknown): string | null {
+    if (!connectionData || typeof connectionData !== "object") {
+        return null;
+    }
+
+    const authenticatedUser = (
+        connectionData as {
+            authenticatedUser?: Record<string, unknown>;
+        }
+    ).authenticatedUser;
+
+    if (!authenticatedUser || typeof authenticatedUser !== "object") {
+        return null;
+    }
+
+    const properties =
+        authenticatedUser.properties &&
+        typeof authenticatedUser.properties === "object"
+            ? (authenticatedUser.properties as Record<string, unknown>)
+            : {};
+    const preferredPropertyNames = ["Account", "Mail", "Email"];
+    const preferredProperties = preferredPropertyNames.map(
+        (name) => properties[name]
+    );
+    const otherEmailProperties = Object.entries(properties)
+        .filter(
+            ([name]) =>
+                !preferredPropertyNames.includes(name) &&
+                /(account|e-?mail|upn|principal)/i.test(name)
+        )
+        .map(([, value]) => value);
+    const candidates = [
+        ...preferredProperties,
+        ...otherEmailProperties,
+        authenticatedUser.mailAddress,
+        authenticatedUser.email,
+        authenticatedUser.mail,
+        authenticatedUser.uniqueName,
+        authenticatedUser.principalName,
+    ];
+
+    for (const candidate of candidates) {
+        const email = emailFromIdentityValue(candidate);
+
+        if (email) {
+            return email;
+        }
+    }
+
+    return null;
+}
+
+// Keyed by org and PAT so changing organization cannot reuse the result from
+// a previous connection. Failed identity lookups are deliberately not cached:
+// a transient Azure DevOps error must be recoverable through the Retry action.
 const domainCheckCache = new Map<
     string,
-    { allowed: boolean; email: string | null; timestamp: number }
+    { allowed: boolean; email: string; timestamp: number }
 >();
 const DOMAIN_CHECK_CACHE_MS = 10 * 60 * 1000;
 
@@ -319,7 +398,8 @@ const DOMAIN_CHECK_CACHE_MS = 10 * 60 * 1000;
 export async function assertAllowedDomain(): Promise<void> {
     const pat = requirePat();
     const org = requireOrg();
-    const cached = domainCheckCache.get(pat);
+    const cacheKey = `${org}|${pat}`;
+    const cached = domainCheckCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < DOMAIN_CHECK_CACHE_MS) {
         if (!cached.allowed) {
@@ -332,7 +412,13 @@ export async function assertAllowedDomain(): Promise<void> {
     const email = await fetchAuthenticatedEmail(org, pat);
     const allowed = !!email && email.endsWith(`@${ALLOWED_EMAIL_DOMAIN}`);
 
-    domainCheckCache.set(pat, { allowed, email, timestamp: Date.now() });
+    if (email) {
+        domainCheckCache.set(cacheKey, {
+            allowed,
+            email,
+            timestamp: Date.now(),
+        });
+    }
 
     if (!allowed) {
         throw new AzdoDomainError(email);
@@ -591,15 +677,60 @@ export async function getTestRunStatistics(
     }
 }
 
+const projectsWithoutIterationDetails = new Set<string>();
+
 export async function getTestRunResults(
     runId: number,
-    project?: string
+    project?: string,
+    options: { includeIterations?: boolean } = {}
 ) {
-    const response = await clientFor(project).get(
-        `/test/Runs/${runId}/results?api-version=7.1`
-    );
+    const results: any[] = [];
+    const currentConfig = getCurrentConfig();
+    const projectKey = `${currentConfig.org}/${project ?? currentConfig.project}`;
+    const includeIterations =
+        options.includeIterations === true &&
+        !projectsWithoutIterationDetails.has(projectKey);
 
-    return response.data.value;
+    try {
+        const pageSize = 1000;
+        let skip = 0;
+
+        while (true) {
+            const details = includeIterations
+                ? "&detailsToInclude=Iterations"
+                : "";
+            const response = await clientFor(project).get(
+                `/test/Runs/${runId}/results?api-version=7.1&$top=${pageSize}&$skip=${skip}${details}`
+            );
+            const page = response.data.value ?? [];
+            results.push(...page);
+            if (page.length < pageSize) break;
+            skip += pageSize;
+        }
+
+        return results;
+    } catch (error) {
+        // Azure can retain a deleted run in the list briefly. Preserve pages
+        // already fetched if a later page disappears; an initial 404 still
+        // returns [] and skips the stale run.
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+            return results;
+        }
+
+        // Some Azure DevOps installations reject step-level expansion even
+        // though ordinary result history is available. Preserve test-case
+        // KPIs in that case; step KPIs correctly remain unavailable.
+        if (
+            includeIterations &&
+            axios.isAxiosError(error) &&
+            error.response?.status === 400
+        ) {
+            projectsWithoutIterationDetails.add(projectKey);
+            return getTestRunResults(runId, project);
+        }
+
+        throw error;
+    }
 }
 
 export async function getActiveBugIds(project?: string): Promise<number[]> {

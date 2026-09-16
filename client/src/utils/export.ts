@@ -93,6 +93,15 @@ export type TranslateFn = (
   options?: Record<string, unknown>,
 ) => string;
 
+export function formatBusinessDaysKpi(
+  value: number | null | undefined,
+  t: TranslateFn,
+): string {
+  return value == null
+    ? "-"
+    : t("defectManagementPage.stats.days", { value });
+}
+
 export interface StatusReportCardEmailData {
   headerTitle: string;
   headerSubtitle: string;
@@ -105,10 +114,10 @@ export interface StatusReportCardEmailData {
   showOriginBreakdown?: boolean;
   // On by default - see StatusReportCard.tsx's prop of the same name.
   includeDsiSource?: boolean;
-  // The report's 4 additional KPIs - see StatusReportCard.tsx's prop of the
-  // same name and ReportExtraKpis in types.ts. Omitted entirely by any
-  // caller that hasn't fetched them yet; every render function below skips
-  // the extra section when this is undefined.
+  // Controls only the dedicated Additional KPIs section. Some values from
+  // extraKpis are also used in the standard Bug Status section.
+  showExtraKpis?: boolean;
+  // Additional KPI values fetched by the Dynamic Sprint Report.
   extraKpis?: ReportExtraKpis;
 }
 
@@ -553,6 +562,7 @@ export function buildStatusReportCardEmailBodyHtml(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    showExtraKpis = false,
     extraKpis,
   } = data;
 
@@ -575,7 +585,6 @@ export function buildStatusReportCardEmailBodyHtml(
     toCloseOutOfScopeCount,
     stillOpen,
     reopenedPct,
-    avgClosureDays,
     bugsByDsi,
     bugsByUs,
     bugsByBusiness,
@@ -796,9 +805,11 @@ export function buildStatusReportCardEmailBodyHtml(
       "25%",
     ) +
     lightKpiTile(
-      t("defectManagementPage.stats.days", { value: avgClosureDays }),
+      formatBusinessDaysKpi(extraKpis?.avgClosingTimeBusinessDays, t),
       9,
-      t("defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime"),
+      t(
+        "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
+      ),
       "25%",
     ) +
     lightKpiTile(
@@ -810,7 +821,7 @@ export function buildStatusReportCardEmailBodyHtml(
       "25%",
     ) +
     `</tr></table>` +
-    (extraKpis
+    (showExtraKpis && extraKpis
       ? kpiSectionTitle(
           `🧭 ${t("defectManagementPage.sprintReport.statusCard.kpis.extraKpisSection")}`,
         ) +
@@ -844,10 +855,10 @@ export function buildStatusReportCardEmailBodyHtml(
           "16%",
         ) +
         lightKpiTile(
-          `${extraKpis.criticalHighBugPct}%`,
+          formatExtraKpiPct(extraKpis.criticalDefectRatePct),
           3,
           t(
-            "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+            "defectManagementPage.sprintReport.statusCard.kpis.criticalDefectRatePct",
           ),
           "16%",
         ) +
@@ -856,14 +867,6 @@ export function buildStatusReportCardEmailBodyHtml(
           6,
           t(
             "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
-          ),
-          "16%",
-        ) +
-        lightKpiTile(
-          `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
-          2,
-          t(
-            "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
           ),
           "16%",
         ) +
@@ -1157,7 +1160,6 @@ export interface StatusCardKpis {
   toCloseOutOfScopeCount: number;
   stillOpen: number;
   reopenedPct: number;
-  avgClosureDays: number;
   bugsByDsi: number;
   bugsByUs: number;
   // Detected bugs whose Custom.Suite = "Test Business" (origin "Business").
@@ -1235,7 +1237,6 @@ export function computeStatusCardKpis(
   const reopenedPct = report.total
     ? Math.round((report.reopenedCount / report.total) * 1000) / 10
     : 0;
-  const avgClosureDays = Math.round(report.mttrDays ?? 0);
   const bugsByDsi = report.byOriginDetected["DSI"] ?? 0;
   const bugsByBusiness = report.byOriginDetected["Business"] ?? 0;
   // "Everything that's ours": total minus DSI minus Business. Business bugs
@@ -1269,7 +1270,6 @@ export function computeStatusCardKpis(
     toCloseOutOfScopeCount,
     stillOpen,
     reopenedPct,
-    avgClosureDays,
     bugsByDsi,
     bugsByUs,
     bugsByBusiness,
@@ -1476,6 +1476,7 @@ function buildPdfBugRow1KpiDefs(
 function buildPdfBugRow2KpiDefs(
   kpis: StatusCardKpis,
   report: SprintDefectReport,
+  extraKpis: ReportExtraKpis | undefined,
   t: TranslateFn,
 ): { kpi: (typeof LIGHT_KPI)[number]; label: string; value: string }[] {
   return [
@@ -1496,11 +1497,9 @@ function buildPdfBugRow2KpiDefs(
     {
       kpi: LIGHT_KPI[9],
       label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime",
+        "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
       ),
-      value: t("defectManagementPage.stats.days", {
-        value: kpis.avgClosureDays,
-      }),
+      value: formatBusinessDaysKpi(extraKpis?.avgClosingTimeBusinessDays, t),
     },
     {
       kpi: LIGHT_KPI[7],
@@ -1546,9 +1545,9 @@ function buildPdfExtraKpiDefs(
     {
       kpi: LIGHT_KPI[3],
       label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+        "defectManagementPage.sprintReport.statusCard.kpis.criticalDefectRatePct",
       ),
-      value: `${extraKpis.criticalHighBugPct}%`,
+      value: formatExtraKpiPct(extraKpis.criticalDefectRatePct),
     },
     {
       kpi: LIGHT_KPI[6],
@@ -1556,13 +1555,6 @@ function buildPdfExtraKpiDefs(
         "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
       ),
       value: `${extraKpis.testPlanCorrectnessPct}%`,
-    },
-    {
-      kpi: LIGHT_KPI[2],
-      label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
-      ),
-      value: `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
     },
   ];
 }
@@ -1921,6 +1913,7 @@ export function buildStatusReportCardPdfDocument(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    showExtraKpis = false,
     extraKpis,
   } = data;
 
@@ -2090,7 +2083,7 @@ export function buildStatusReportCardPdfDocument(
     (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
       .finalY + 2;
 
-  const bugRow2Defs = buildPdfBugRow2KpiDefs(kpis, report, t);
+  const bugRow2Defs = buildPdfBugRow2KpiDefs(kpis, report, extraKpis, t);
 
   autoTable(doc, {
     startY: y,
@@ -2130,7 +2123,7 @@ export function buildStatusReportCardPdfDocument(
     (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
       .finalY + 4;
 
-  if (extraKpis) {
+  if (showExtraKpis && extraKpis) {
     // Section label: extra KPIs
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
@@ -2238,7 +2231,10 @@ const KPI_LEGEND_BUGS: KpiLegendEntry[] = [
   { labelKey: "bugsToClose", helpKey: "bugsToClose" },
   { labelKey: "criticalBugs", helpKey: "criticalBugs" },
   { labelKey: "reopenedBugs", helpKey: "reopenedBugs" },
-  { labelKey: "avgClosureTime", helpKey: "avgClosureTime" },
+  {
+    labelKey: "avgClosingTimeBusinessDays",
+    helpKey: "avgClosingTimeBusinessDays",
+  },
   { labelKey: "withoutResolutionDate", helpKey: "withoutResolutionDate" },
 ];
 
@@ -2252,9 +2248,8 @@ const KPI_LEGEND_EXTRA: KpiLegendEntry[] = [
     helpKey: "firstExecutionPassRateUat",
   },
   { labelKey: "avgFixTimeBusinessDays", helpKey: "avgFixTimeBusinessDays" },
-  { labelKey: "criticalHighBugPct", helpKey: "criticalHighBugPct" },
+  { labelKey: "criticalDefectRatePct", helpKey: "criticalDefectRatePct" },
   { labelKey: "testPlanCorrectnessPct", helpKey: "testPlanCorrectnessPct" },
-  { labelKey: "duplicateNotApplicable", helpKey: "duplicateNotApplicable" },
 ];
 
 function pdfDrawKpiLegendSection(
@@ -2801,6 +2796,7 @@ function buildPptxRow2KpiDefs(
 function buildPptxRow3KpiDefs(
   kpis: StatusCardKpis,
   report: SprintDefectReport,
+  extraKpis: ReportExtraKpis | undefined,
   t: TranslateFn,
 ): { value: string; label: string }[] {
   return [
@@ -2817,11 +2813,9 @@ function buildPptxRow3KpiDefs(
       ),
     },
     {
-      value: t("defectManagementPage.stats.days", {
-        value: kpis.avgClosureDays,
-      }),
+      value: formatBusinessDaysKpi(extraKpis?.avgClosingTimeBusinessDays, t),
       label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.avgClosureTime",
+        "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
       ),
     },
     {
@@ -2862,21 +2856,15 @@ function buildPptxRow4KpiDefs(
       ),
     },
     {
-      value: `${extraKpis.criticalHighBugPct}%`,
+      value: formatExtraKpiPct(extraKpis.criticalDefectRatePct),
       label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+        "defectManagementPage.sprintReport.statusCard.kpis.criticalDefectRatePct",
       ),
     },
     {
       value: `${extraKpis.testPlanCorrectnessPct}%`,
       label: t(
         "defectManagementPage.sprintReport.statusCard.kpis.testPlanCorrectnessPct",
-      ),
-    },
-    {
-      value: `${extraKpis.duplicateNotApplicable.count} (${extraKpis.duplicateNotApplicable.pct}%)`,
-      label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.duplicateNotApplicable",
       ),
     },
   ];
@@ -3439,6 +3427,7 @@ export async function exportStatusReportCardToPptx(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
+    showExtraKpis = false,
     extraKpis,
   } = data;
 
@@ -3473,7 +3462,7 @@ export async function exportStatusReportCardToPptx(
     hasDashboard,
     originDefs,
     originRowsData,
-    hasExtraKpis: Boolean(extraKpis),
+    hasExtraKpis: Boolean(showExtraKpis && extraKpis),
   });
 
   // No shrinking - the slide is exactly as tall as the content needs.
@@ -3554,8 +3543,8 @@ export async function exportStatusReportCardToPptx(
     closedOutOfScopeCount,
     t,
   );
-  const row3KpiDefs = buildPptxRow3KpiDefs(kpis, report, t);
-  const row4KpiDefs = extraKpis
+  const row3KpiDefs = buildPptxRow3KpiDefs(kpis, report, extraKpis, t);
+  const row4KpiDefs = showExtraKpis && extraKpis
     ? buildPptxRow4KpiDefs(extraKpis, t)
     : undefined;
 

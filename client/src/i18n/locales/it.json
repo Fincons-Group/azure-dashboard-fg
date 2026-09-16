@@ -442,12 +442,15 @@
           "bugsByDsi": "Bug aperti da DSI",
           "bugsByBusiness": "Bug aperti da Test Business",
           "extraKpisSection": "KPI aggiuntivi",
-          "firstExecutionPassRateFunctional": "First Execution\nPass Rate (Func.)",
-          "firstExecutionPassRateUat": "First Execution\nPass Rate (UAT)",
-          "avgFixTimeBusinessDays": "Tempo Medio Fix Bug\n(gg lavorativi)",
-          "criticalHighBugPct": "Bug Critici/High\n(% sul totale)",
-          "testPlanCorrectnessPct": "Test Plan Correctness\n/ Executability",
-          "duplicateNotApplicable": "Casi N/A\nDuplicati"
+          "firstExecutionPassRateFunctional": "First Execution Pass Rate\nFunctional Test Case",
+          "firstExecutionPassRateUat": "First Execution Pass Rate\nUAT Test Case",
+          "firstExecutionPassRateFunctionalSteps": "First Execution Pass Rate\nFunctional Test Steps",
+          "firstExecutionPassRateUatSteps": "First Execution Pass Rate\nUAT Test Steps",
+          "avgFixTimeBusinessDays": "Tempo medio fix bug\n(gg lavorativi)",
+          "criticalDefectRatePct": "Tasso bug critici",
+          "testPlanCorrectnessPct": "Correttezza / eseguibilità\ndel piano di test",
+          "bugReopenRate": "Tasso di riapertura bug",
+          "avgClosingTimeBusinessDays": "Tempo medio di chiusura"
         },
         "kpisHelp": {
           "totalTestCases": "Tutti i casi di test presenti nel/i piano/i selezionato/i, qualsiasi sia il loro stato.",
@@ -469,10 +472,13 @@
           "withoutResolutionDate": "Bug ancora attivi (non Chiusi, non Da verificare, non In verifica) che non hanno ancora una data di risoluzione stimata. Un dato separato dalla media del tempo di chiusura qui sopra, che si basa sulla data di chiusura effettiva di ogni bug.",
           "firstExecutionPassRateFunctional": "% dei casi di test dei piani Funzionali risultati PASS alla primissima esecuzione (non l'esito corrente/piu' recente). Target >= 80%.",
           "firstExecutionPassRateUat": "% dei casi di test dei piani UAT risultati PASS alla primissima esecuzione (non l'esito corrente/piu' recente). Target >= 90%.",
+          "firstExecutionPassRateFunctionalSteps": "% dei singoli step funzionali risultati PASS alla prima esecuzione, indipendentemente dall'esito finale del test case. Gli N/A sono inclusi nel denominatore. Target >= 95%.",
+          "firstExecutionPassRateUatSteps": "% dei singoli step UAT risultati PASS alla prima esecuzione, indipendentemente dall'esito finale del test case. Gli N/A sono inclusi nel denominatore. Target >= 98%.",
           "avgFixTimeBusinessDays": "Giorni lavorativi medi (lun-ven) tra l'apertura di un bug e la sua prima transizione in Resolved/Da verificare (fix pronta per il retest) - non giorni di calendario fino a Closed. Target <= 2 giorni lavorativi.",
-          "criticalHighBugPct": "Bug aperti con severity Critical o High, in percentuale sul totale dei bug rilevati. Target <= 0,5%.",
-          "testPlanCorrectnessPct": "% di casi di test pianificati non Bloccati da un bug collegato. Nota: un caso di test Bloccato senza bug collegato non riduce attualmente questo punteggio - il team QA deve collegare un bug al caso Bloccato perche' venga conteggiato qui. Target 95-100%.",
-          "duplicateNotApplicable": "Casi di test Non Applicabile il cui titolo compare come Non Applicabile anche in un'altra suite dei piani selezionati, o nello sprint precedente. Il confronto avviene per titolo, non per ID, perche' un caso ri-aggiunto genera un nuovo work item. Target 0."
+          "criticalDefectRatePct": "Bug con severity Critical sul totale dei test case eseguiti; gli N/A sono inclusi nel denominatore. Target <= 0,5%.",
+          "testPlanCorrectnessPct": "% di casi di test pianificati non marcati Not Applicable durante Execute. Target 95-100%.",
+          "bugReopenRate": "% dei bug arrivati a Da verificare che sono stati riaperti almeno una volta dopo il retest. Ogni bug conta una sola volta. Target <= 7%.",
+          "avgClosingTimeBusinessDays": "Giorni lavorativi medi (lun-ven) tra apertura e chiusura del bug. Sabato e domenica sono esclusi; le festività infrasettimanali sono conteggiate. Target <= 4 giorni lavorativi."
         },
         "sectionHelp": {
           "suiteProgress": "Il \"% Eseguiti\" di ogni suite conta anche i casi Non Applicabile come eseguiti (viene escluso solo Da eseguire) - più ampio della KPI \"Casi di test eseguiti\" qui sopra, che esclude del tutto i Non Applicabile. Pass Rate = Passati ÷ (Totale meno Non Applicabile).",
@@ -505,6 +511,15 @@
     "selectSprintPrompt": "Seleziona uno sprint nel pannello laterale per caricare il report.",
     "defaultHeaderTitle": "Report di Stato Sprint",
     "defaultHeaderSubtitle": "Stato di esecuzione dei test",
+    "extraKpisLoading": "Calcolo dei KPI dal dettaglio storico di Azure DevOps...",
+    "extraKpisError": "Impossibile calcolare i KPI: {{message}}",
+    "followUp": {
+      "title": "Confronto con il report precedente",
+      "previous": "Ultimo report scaricato: {{date}}",
+      "firstReport": "Nessun report precedente per questo ambito. Scarica il file per usarlo come riferimento al prossimo confronto.",
+      "useInEmail": "Porta il testo nella scheda email",
+      "useSuggestion": "Usa il testo suggerito"
+    },
     "excel": {
       "exportButton": "Esporta Excel",
       "exporting": "Esportazione...",

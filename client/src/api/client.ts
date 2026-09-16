@@ -165,7 +165,7 @@ export function fetchAutomationKpis(
 }
 
 // Companion call to fetchDefects/fetchPlanOverview for the Sprint Report's
-// 4 additional KPIs - see ReportExtraKpis in types.ts for why this is kept
+// Additional KPIs - see ReportExtraKpis in types.ts for why this is kept
 // as its own request instead of folded into either of those.
 export function fetchReportExtraKpis(
     project?: string,

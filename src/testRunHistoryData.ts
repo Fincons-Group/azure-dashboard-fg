@@ -7,11 +7,9 @@ import { dedupe } from "./inflight.js";
 // field on it, and no per-test-case execution history either. Getting either
 // requires walking every test run's results instead. This is the heaviest
 // fetch in the app (enumerates every run + every run's results, project-
-// wide), so the raw per-result tuples are fetched/cached once here and
-// reused by both getFirstExecutionOutcomes (earliest result per test case,
-// for reportExtraKpis.ts) and getAllOutcomesByTestCase (full history per
-// test case, for automationKpiData.ts's success-rate/flaky-test rollup) -
-// isolated from getDefectData's and computePlanOverview's caches.
+// wide), so raw per-result tuples are cached per project and optional plan
+// selection. Calls with the same scope share both in-flight work and the
+// completed cache; expired selection entries are evicted below.
 const CACHE_DURATION_MS = 5 * 60 * 1000;
 
 export interface FirstExecutionOutcome {
@@ -23,6 +21,11 @@ interface ResultTuple {
     testCaseId: number;
     outcome: string;
     completedDate: string;
+    steps: Array<{
+        id: string;
+        outcome: string;
+        completedDate: string;
+    }>;
 }
 
 const resultTuplesCache = new Map<
@@ -58,8 +61,19 @@ function resultCompletedDate(result: any): string | undefined {
 
 const RUN_RESULT_CONCURRENCY = 10;
 
-async function getResultTuples(project?: string): Promise<ResultTuple[]> {
-    const projectKey = resolveProjectKey(project);
+async function getResultTuples(
+    project?: string,
+    planIds: number[] = []
+): Promise<ResultTuple[]> {
+    const now = Date.now();
+    for (const [key, entry] of resultTuplesCache) {
+        if (now - entry.timestamp >= CACHE_DURATION_MS) {
+            resultTuplesCache.delete(key);
+        }
+    }
+
+    const normalizedPlanIds = [...new Set(planIds)].sort((a, b) => a - b);
+    const projectKey = `${resolveProjectKey(project)}:${normalizedPlanIds.join(",") || "all"}`;
     const cached = resultTuplesCache.get(projectKey);
 
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
@@ -72,12 +86,19 @@ async function getResultTuples(project?: string): Promise<ResultTuple[]> {
             return fresh.data;
         }
 
-        const runs = await getTestRuns(project);
+        const allRuns = await getTestRuns(project);
+        const selectedPlanIds = new Set(normalizedPlanIds);
+        const runs = selectedPlanIds.size
+            ? allRuns.filter((run: any) =>
+                  selectedPlanIds.has(Number(run.plan?.id))
+              )
+            : allRuns;
 
         const resultsByRun = await mapWithConcurrency(
             runs,
             RUN_RESULT_CONCURRENCY,
-            (run: any) => getTestRunResults(run.id, project)
+            (run: any) =>
+                getTestRunResults(run.id, project, { includeIterations: true })
         );
 
         const tuples: ResultTuple[] = [];
@@ -92,7 +113,25 @@ async function getResultTuples(project?: string): Promise<ResultTuple[]> {
                     continue;
                 }
 
-                tuples.push({ testCaseId, outcome, completedDate });
+                const steps = (result.iterationDetails ?? []).flatMap(
+                    (iteration: any) =>
+                        (iteration.actionResults ?? [])
+                            .map((action: any) => ({
+                                id: String(
+                                    action.stepIdentifier ??
+                                        action.actionPath ??
+                                        ""
+                                ),
+                                outcome: String(action.outcome ?? ""),
+                                completedDate:
+                                    action.completedDate ??
+                                    action.startedDate ??
+                                    completedDate,
+                            }))
+                            .filter((step: any) => step.id && step.outcome)
+                );
+
+                tuples.push({ testCaseId, outcome, completedDate, steps });
             }
         }
 
@@ -102,13 +141,78 @@ async function getResultTuples(project?: string): Promise<ResultTuple[]> {
     });
 }
 
+export const FINISHED_OUTCOMES = new Set([
+    "passed",
+    "failed",
+    "blocked",
+    "notapplicable",
+    "inconclusive",
+    "timeout",
+    "aborted",
+    "warning",
+    "error",
+]);
+
+export interface FirstExecutionStepSummary {
+    passed: number;
+    executed: number;
+}
+
+// Returns the first completed result of every distinct step, grouped by test
+// case. A step key is scoped to its parent case so equal step identifiers in
+// two different cases never collide.
+export async function getFirstExecutionStepSummaries(
+    project?: string,
+    planIds: number[] = []
+): Promise<Map<number, FirstExecutionStepSummary>> {
+    const tuples = await getResultTuples(project, planIds);
+    const earliest = new Map<
+        string,
+        { testCaseId: number; outcome: string; completedDate: string }
+    >();
+
+    for (const tuple of tuples) {
+        for (const step of tuple.steps) {
+            const outcome = step.outcome.toLowerCase();
+            if (!FINISHED_OUTCOMES.has(outcome)) continue;
+
+            const key = `${tuple.testCaseId}:${step.id}`;
+            const existing = earliest.get(key);
+            if (
+                !existing ||
+                new Date(step.completedDate).getTime() <
+                    new Date(existing.completedDate).getTime()
+            ) {
+                earliest.set(key, {
+                    testCaseId: tuple.testCaseId,
+                    outcome,
+                    completedDate: step.completedDate,
+                });
+            }
+        }
+    }
+
+    const summaries = new Map<number, FirstExecutionStepSummary>();
+    for (const step of earliest.values()) {
+        const summary = summaries.get(step.testCaseId) ?? {
+            passed: 0,
+            executed: 0,
+        };
+        summary.executed++;
+        if (step.outcome === "passed") summary.passed++;
+        summaries.set(step.testCaseId, summary);
+    }
+    return summaries;
+}
+
 // Returns the first-execution outcome per test case ID, project-wide -
 // independent of which plans/suites are currently selected, so it caches
 // once per project rather than once per plan selection.
 export async function getFirstExecutionOutcomes(
-    project?: string
+    project?: string,
+    planIds: number[] = []
 ): Promise<Map<number, FirstExecutionOutcome>> {
-    const tuples = await getResultTuples(project);
+    const tuples = await getResultTuples(project, planIds);
     const earliestByTestCase = new Map<number, FirstExecutionOutcome>();
 
     for (const { testCaseId, outcome, completedDate } of tuples) {

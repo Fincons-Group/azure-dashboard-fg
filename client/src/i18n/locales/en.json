@@ -442,12 +442,15 @@
           "bugsByDsi": "Bugs opened by DSI",
           "bugsByBusiness": "Bugs opened by Test Business",
           "extraKpisSection": "Additional KPIs",
-          "firstExecutionPassRateFunctional": "First Execution\nPass Rate (Func.)",
-          "firstExecutionPassRateUat": "First Execution\nPass Rate (UAT)",
-          "avgFixTimeBusinessDays": "Avg Bug Fix Time\n(business days)",
-          "criticalHighBugPct": "Critical/High Bugs\n(% of total)",
+          "firstExecutionPassRateFunctional": "First Execution Pass Rate\nFunctional Test Case",
+          "firstExecutionPassRateUat": "First Execution Pass Rate\nUAT Test Case",
+          "firstExecutionPassRateFunctionalSteps": "First Execution Pass Rate\nFunctional Test Steps",
+          "firstExecutionPassRateUatSteps": "First Execution Pass Rate\nUAT Test Steps",
+          "avgFixTimeBusinessDays": "Average Bug Fix Time",
+          "criticalDefectRatePct": "Critical Defect Rate",
           "testPlanCorrectnessPct": "Test Plan Correctness\n/ Executability",
-          "duplicateNotApplicable": "Duplicate N/A\nTest Cases"
+          "bugReopenRate": "Bug Re-open Rate",
+          "avgClosingTimeBusinessDays": "Average Closing Time"
         },
         "kpisHelp": {
           "totalTestCases": "All test cases in the selected plan(s), regardless of their status.",
@@ -469,10 +472,13 @@
           "withoutResolutionDate": "Bugs still active (not Closed, Da verificare, or In verifica) that don't have an estimated resolution date set yet. A separate figure from the closure-time average above, which is based on each bug's actual closed date.",
           "firstExecutionPassRateFunctional": "% of Functional-plan test cases that passed on their very first execution attempt (not the current/latest outcome). Target >= 80%.",
           "firstExecutionPassRateUat": "% of UAT-plan test cases that passed on their very first execution attempt (not the current/latest outcome). Target >= 90%.",
+          "firstExecutionPassRateFunctionalSteps": "% of individual Functional steps that passed on their first execution, regardless of the final test-case outcome. N/A is included in the denominator. Target >= 95%.",
+          "firstExecutionPassRateUatSteps": "% of individual UAT steps that passed on their first execution, regardless of the final test-case outcome. N/A is included in the denominator. Target >= 98%.",
           "avgFixTimeBusinessDays": "Average business days (Mon-Fri) between a bug being opened and its first transition into Resolved/Da verificare (fix ready for retest) - not calendar days to Closed. Target <= 2 business days.",
-          "criticalHighBugPct": "Open bugs at Critical or High severity, as a percentage of total detected bugs. Target <= 0.5%.",
-          "testPlanCorrectnessPct": "% of planned test cases not Blocked by a linked bug. Note: a test case marked Blocked with no linked bug does not currently reduce this score - QA must link a bug to a Blocked case for it to count here. Target 95-100%.",
-          "duplicateNotApplicable": "Not Applicable test cases whose title also appears as Not Applicable in another suite of the selected plan(s), or in the previous sprint's plan(s). Matched by title, not ID, since a re-added test case gets a new work item ID. Target 0."
+          "criticalDefectRatePct": "Critical-severity bugs divided by executed test cases; N/A is included in the denominator. Target <= 0.5%.",
+          "testPlanCorrectnessPct": "% of planned test cases not marked Not Applicable during Execute. Target 95-100%.",
+          "bugReopenRate": "% of bugs that reached Ready for retest and were reopened at least once after retest. Each bug counts once. Target <= 7%.",
+          "avgClosingTimeBusinessDays": "Average business days (Mon-Fri) between bug creation and closure. Saturdays and Sundays are excluded; weekday public holidays are counted. Target <= 4 business days."
         },
         "sectionHelp": {
           "suiteProgress": "Each suite's own \"% Executed\" counts Not Applicable as executed too (only Not Run is excluded) - broader than the \"Test Cases Executed\" KPI above, which excludes Not Applicable entirely. Pass Rate = Passed Ã· (Total minus Not Applicable).",
@@ -504,7 +510,16 @@
     "selectAreaPathPrompt": "Select an area path in the sidebar to get started.",
     "selectSprintPrompt": "Select a sprint in the sidebar to load the report.",
     "defaultHeaderTitle": "Sprint Status Report",
-    "defaultHeaderSubtitle": "Test execution status",
+        "defaultHeaderSubtitle": "Test execution status",
+        "extraKpisLoading": "Calculating KPIs from Azure DevOps execution history...",
+        "extraKpisError": "Unable to calculate KPIs: {{message}}",
+    "followUp": {
+      "title": "Comparison with the previous report",
+      "previous": "Last downloaded report: {{date}}",
+      "firstReport": "No previous report for this scope. Download the file to use it as the baseline for the next comparison.",
+      "useInEmail": "Take this text to the email section",
+      "useSuggestion": "Use suggested text"
+    },
     "excel": {
       "exportButton": "Export Excel",
       "exporting": "Exporting...",
