@@ -136,7 +136,11 @@
     "toVerify": {
       "title": "Bug da verificare ({{count}})",
       "subtitle": "Bug in stato \"Da verificare\" o \"In verifica\", assegnati a un membro del team @finconsgroup.com.",
-      "empty": "Nessun bug in attesa di verifica assegnato a Fincons Group al momento."
+      "empty": "Nessun bug in attesa di verifica assegnato a Fincons Group al momento.",
+      "excludeClosed": "Escludi chiusi",
+      "tabs": {
+        "overview": "Panoramica"
+      }
     },
     "openedToday": {
       "title": "Aperti oggi ({{count}})",
@@ -225,6 +229,8 @@
   "testSuitesPage": {
     "title": "Suite di Test",
     "subtitle": "NRT, accessibilità e sicurezza per la suite di automazione - scegli una suite per vedere l'ultima esecuzione e lo storico.",
+    "notConfiguredTitle": "Non ancora configurato",
+    "notConfiguredBody": "Imposta FIREBASE_SERVICE_ACCOUNT_JSON sul server per iniziare a mostrare qui lo storico reale delle esecuzioni NRT/A11Y/DAST.",
     "eyebrow": "Quality gate automatizzati",
     "appLabel": "App",
     "appOptions": {
@@ -269,7 +275,7 @@
     "ranAt": "Eseguito {{time}}",
     "viewReports": "Vedi i report",
     "openReport": "Apri {{file}}",
-    "openReportIt": "Apri report in italiano ({{file}})",
+    "openReportIt": "Apri riepilogo in italiano ({{file}})",
     "renderedBy": "Generato da {{tool}}",
     "linkedNoteNrt": "Questa esecuzione ha incluso anche il progetto a11y-chrome - vedi la scheda A11Y per i risultati.",
     "linkedNoteA11y": "Catturato all'interno dell'esecuzione NRT {{runId}} (il progetto a11y-chrome è girato insieme alle specifiche vit).",

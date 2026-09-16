@@ -136,7 +136,11 @@
     "toVerify": {
       "title": "Bugs to verify ({{count}})",
       "subtitle": "Bugs in \"Da verificare\" or \"In verifica\", assigned to a @finconsgroup.com team member.",
-      "empty": "No bugs pending verification for a Fincons Group assignee right now."
+      "empty": "No bugs pending verification for a Fincons Group assignee right now.",
+      "excludeClosed": "Exclude closed",
+      "tabs": {
+        "overview": "Overview"
+      }
     },
     "openedToday": {
       "title": "Opened today ({{count}})",
@@ -225,6 +229,8 @@
   "testSuitesPage": {
     "title": "Test Suites",
     "subtitle": "NRT, accessibility and security gates for the automation suite - pick a suite to see its latest run and browse history.",
+    "notConfiguredTitle": "Not configured yet",
+    "notConfiguredBody": "Set FIREBASE_SERVICE_ACCOUNT_JSON on the server to start showing real NRT/A11Y/DAST run history here.",
     "eyebrow": "Automated quality gates",
     "appLabel": "App",
     "appOptions": {
@@ -269,7 +275,7 @@
     "ranAt": "Ran {{time}}",
     "viewReports": "View reports",
     "openReport": "Open {{file}}",
-    "openReportIt": "Open Italian report ({{file}})",
+    "openReportIt": "Open Italian summary ({{file}})",
     "renderedBy": "Rendered by {{tool}}",
     "linkedNoteNrt": "This run also carried the a11y-chrome project - see the A11Y tab for its findings.",
     "linkedNoteA11y": "Captured inside NRT run {{runId}} (a11y-chrome project ran alongside the vit specs).",

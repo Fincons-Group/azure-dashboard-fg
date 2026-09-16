@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import {
     Accordion,
     AccordionHeader,
@@ -27,11 +28,13 @@ import {
     ChevronRightRegular,
     OpenRegular,
     ShieldCheckmarkRegular,
+    WrenchRegular,
     type FluentIcon,
 } from "@fluentui/react-icons";
 import { PageLayout } from "../components/PageLayout";
-import { getApiBaseUrl } from "../api/client";
-import { TEST_SUITE_RUNS } from "../data/testSuitesMockData";
+import { LoadingCardGrid } from "../components/LoadingState";
+import { ErrorState } from "../components/ErrorState";
+import { getApiBaseUrl, fetchTestSuites } from "../api/client";
 import type {
     A11yRuleViolation,
     DastAlert,
@@ -170,6 +173,14 @@ const useStyles = makeStyles({
         alignItems: "center",
         textAlign: "center",
         gap: tokens.spacingVerticalS,
+    },
+    placeholderIcon: {
+        fontSize: "32px",
+        color: tokens.colorNeutralForeground3,
+    },
+    placeholderBody: {
+        color: tokens.colorNeutralForeground3,
+        maxWidth: "480px",
     },
     detailHead: {
         display: "flex",
@@ -502,11 +513,12 @@ function formatDateTime(iso: string): string {
     return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-// Points at whatever a local tst-e2e checkout's reports/ folder the server
-// is statically serving under /test-suites-reports (see
-// TEST_SUITES_REPORTS_DIR in src/server.ts) - a dev-only convenience, so
-// this 404s when that env var isn't set. reportFile/reportFileIt already
-// carry the full path relative to reports/ (e.g. "runs/<id>/smart-report.html",
+// Fallback for when a run has no reportUrl yet (no real CI pipeline exists,
+// see TestSuiteRun.reportUrl in types.ts) - points at whatever local tst-e2e
+// checkout's reports/ folder the server is statically serving under
+// /test-suites-reports (see TEST_SUITES_REPORTS_DIR in src/server.ts), a
+// dev-only convenience that 404s everywhere else. reportFile/reportFileIt
+// carry the path relative to reports/ (e.g. "runs/<id>/smart-report.html",
 // "a11y/index.html", "zap/<file>.html") - same convention
 // scripts/publish-local-test-runs.js writes - so this never re-derives a
 // per-suite subpath itself.
@@ -519,6 +531,15 @@ function formatDateTime(iso: string): string {
 // fallback and lands on whatever the app's default route is).
 function reportHref(file: string): string {
     return `${getApiBaseUrl()}/test-suites-reports/${file}`;
+}
+
+function openReportHref(run: TestSuiteRun): string {
+    return run.reportUrl ?? reportHref(run.reportFile);
+}
+
+function openReportItHref(run: TestSuiteRun): string | undefined {
+    if (run.reportUrlIt) return run.reportUrlIt;
+    return run.reportFileIt ? reportHref(run.reportFileIt) : undefined;
 }
 
 function StatTile({ value, label }: { value: string | number; label: string }) {
@@ -565,16 +586,23 @@ export function TestSuitesPage() {
     const [env, setEnv] = useState<TestEnvironment>("tst");
     const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
+    const { data, isLoading, isError, error, refetch } = useQuery({
+        queryKey: ["test-suites"],
+        queryFn: fetchTestSuites,
+    });
+
+    const runs = useMemo(() => data?.runs ?? [], [data]);
+
     const runsBySuite = useMemo(() => {
         const map = new Map<TestSuiteKey, TestSuiteRun[]>();
         for (const suite of SUITE_ORDER) {
-            const matching = TEST_SUITE_RUNS.filter(
-                (run) => run.suite === suite && run.app === appScope && run.env === env
-            ).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+            const matching = runs
+                .filter((run) => run.suite === suite && run.app === appScope && run.env === env)
+                .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
             map.set(suite, matching);
         }
         return map;
-    }, [appScope, env]);
+    }, [runs, appScope, env]);
 
     const handleTabSelect = (_event: SelectTabEvent, data: SelectTabData) => {
         setTab(data.value as TabKey);
@@ -595,6 +623,22 @@ export function TestSuitesPage() {
         <PageLayout title={t("testSuitesPage.title")} hideAreaSprintScope wide>
             <Text className={styles.subtitle}>{t("testSuitesPage.subtitle")}</Text>
 
+            {isLoading && <LoadingCardGrid />}
+
+            {isError && <ErrorState message={error.message} onRetry={refetch} />}
+
+            {data && !data.configured && (
+                <Card className={styles.placeholderCard}>
+                    <WrenchRegular className={styles.placeholderIcon} />
+                    <Text weight="semibold">{t("testSuitesPage.notConfiguredTitle")}</Text>
+                    <Text className={styles.placeholderBody}>
+                        {t("testSuitesPage.notConfiguredBody")}
+                    </Text>
+                </Card>
+            )}
+
+            {data && data.configured && (
+            <>
             <div className={styles.stickyBar}>
                 <TabList selectedValue={tab} onTabSelect={handleTabSelect}>
                     <Tab value="overview">{t("testSuitesPage.tabs.overview")}</Tab>
@@ -664,6 +708,8 @@ export function TestSuitesPage() {
                     appScope={appScope}
                     env={env}
                 />
+            )}
+            </>
             )}
         </PageLayout>
     );
@@ -790,7 +836,7 @@ function SuiteDetail({
                 <div className={styles.reportCta}>
                     <Button
                         as="a"
-                        href={reportHref(run.reportFile)}
+                        href={openReportHref(run)}
                         target="_blank"
                         rel="noreferrer"
                         appearance="primary"
@@ -798,10 +844,10 @@ function SuiteDetail({
                     >
                         {t("testSuitesPage.openReport", { file: run.reportFile })}
                     </Button>
-                    {run.reportFileIt && (
+                    {openReportItHref(run) && (
                         <Button
                             as="a"
-                            href={reportHref(run.reportFileIt)}
+                            href={openReportItHref(run)}
                             target="_blank"
                             rel="noreferrer"
                             appearance="secondary"

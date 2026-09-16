@@ -11,6 +11,7 @@ import type {
     AutomationKpiResponse,
     ReportExtraKpis,
     E2eHistoryResponse,
+    TestSuitesResponse,
 } from "../types";
 import i18n from "../i18n";
 import { loadStoredAzdoConnection } from "../azdoConnection";
@@ -188,6 +189,10 @@ export function fetchE2eHistory(limit?: number): Promise<E2eHistoryResponse> {
     const qs = limit ? `?limit=${limit}` : "";
 
     return getJson(`/api/e2e-history${qs}`);
+}
+
+export function fetchTestSuites(): Promise<TestSuitesResponse> {
+    return getJson("/api/test-suites");
 }
 
 export function fetchDefects(

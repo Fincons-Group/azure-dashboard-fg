@@ -47,6 +47,14 @@ import {
     clearE2eHistoryCache,
     FirebaseConfigError,
 } from "./firebaseE2eData.js";
+import {
+    getTestSuiteRuns,
+    clearTestSuiteRunsCache,
+} from "./firebaseTestSuitesData.js";
+import {
+    sendBugsCreatedTodayReport,
+    sendVerificaCheck,
+} from "./notificationTriggers.js";
 
 const app = express();
 
@@ -71,14 +79,20 @@ if (process.env.E2E_REPORTS_DIR) {
 // Suites hub: point this at a local tst-e2e checkout's `reports/` folder
 // (the parent of its runs/, a11y/, and zap/ subfolders) so TestSuitesPage's
 // "Open ..." links resolve to the real smart-report.html / a11y/index.html /
-// ZAP report instead of a dead button. That page's run data is still a
-// client-side mock (see client/src/data/testSuitesMockData.ts) - this only
-// serves the static report files the mock's reportFile paths point at.
+// ZAP report instead of a dead button, for runs whose Firestore document
+// (see firebaseTestSuitesData.ts) has no reportUrl of its own yet - this
+// only serves the static files reportFile's relative paths point at.
 if (process.env.TEST_SUITES_REPORTS_DIR) {
     app.use("/test-suites-reports", express.static(process.env.TEST_SUITES_REPORTS_DIR));
 }
 
-app.use((req, res, next) => {
+// Scoped to /api - the static report routes above (and any request that
+// falls through them, e.g. a missing E2E_REPORTS_DIR/TEST_SUITES_REPORTS_DIR
+// file) never call Azure DevOps at all, so they shouldn't need a PAT to
+// resolve. Without this scoping, an unconfigured/missing report file used to
+// fall through to this gate and surface a confusing "Missing Azure DevOps
+// PAT" error instead of a plain 404.
+app.use("/api", (req, res, next) => {
     runWithAzdoConfig(
         {
             pat: req.header("x-ado-pat") ?? undefined,
@@ -86,9 +100,9 @@ app.use((req, res, next) => {
             project: req.header("x-ado-project") ?? undefined,
         },
         () => {
-            // Gate every route behind the PAT's owner, not just the ones
-            // that happen to call azdo.ts - a request must resolve to an
-            // allowed account before it can reach any handler below.
+            // Gate every /api route behind the PAT's owner, not just the
+            // ones that happen to call azdo.ts - a request must resolve to
+            // an allowed account before it can reach any handler below.
             assertAllowedDomain()
                 .then(next)
                 .catch((error) => sendApiError(res, error));
@@ -276,6 +290,25 @@ app.get("/api/e2e-history", async (req, res) => {
     }
 });
 
+// Same "not configured" shape as /api/e2e-history above - lets TestSuitesPage
+// show a setup hint instead of an error banner when FIREBASE_SERVICE_ACCOUNT_JSON
+// isn't set.
+app.get("/api/test-suites", async (_req, res) => {
+    try {
+        res.json({
+            runs: await getTestSuiteRuns(),
+            configured: true,
+        });
+    } catch (error: any) {
+        if (error instanceof FirebaseConfigError) {
+            res.json({ runs: [], configured: false });
+            return;
+        }
+
+        sendApiError(res, error);
+    }
+});
+
 app.get("/api/defects", async (req, res) => {
     try {
         const project = req.query.project as string | undefined;
@@ -357,8 +390,52 @@ app.post("/api/refresh", (_, res) => {
     clearCycleTimeCache();
     clearAutomationKpiCache();
     clearE2eHistoryCache();
+    clearTestSuiteRunsCache();
 
     res.status(200).json({ refreshed: true });
+});
+
+// Triggered by an external scheduler (see functions/) rather than a browser,
+// so it sits outside the /api PAT-forwarding gate above - it runs against
+// this server's own AZDO_PAT env var (see getCurrentConfig's fallback in
+// azdo.ts), not a per-request header. Gated by a shared secret instead of a
+// PAT/domain check since there's no end-user identity here to check against.
+function requireCronSecret(req: express.Request, res: Response): boolean {
+    const expected = process.env.INTERNAL_CRON_SECRET;
+
+    if (!expected) {
+        res.status(503).json({
+            message: "INTERNAL_CRON_SECRET is not configured on this server.",
+        });
+        return false;
+    }
+
+    if (req.header("x-cron-secret") !== expected) {
+        res.status(401).json({ message: "Invalid cron secret." });
+        return false;
+    }
+
+    return true;
+}
+
+app.post("/internal/notify/bugs-created-today", async (req, res) => {
+    if (!requireCronSecret(req, res)) return;
+
+    try {
+        res.json(await sendBugsCreatedTodayReport());
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+app.post("/internal/notify/verifica-check", async (req, res) => {
+    if (!requireCronSecret(req, res)) return;
+
+    try {
+        res.json(await sendVerificaCheck());
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
 });
 
 const port = Number(process.env.PORT) || 3000;
