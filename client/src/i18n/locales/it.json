@@ -275,7 +275,7 @@
     "ranAt": "Eseguito {{time}}",
     "viewReports": "Vedi i report",
     "openReport": "Apri {{file}}",
-    "openReportIt": "Apri report in italiano ({{file}})",
+    "openReportIt": "Apri riepilogo in italiano ({{file}})",
     "renderedBy": "Generato da {{tool}}",
     "linkedNoteNrt": "Questa esecuzione ha incluso anche il progetto a11y-chrome - vedi la scheda A11Y per i risultati.",
     "linkedNoteA11y": "Catturato all'interno dell'esecuzione NRT {{runId}} (il progetto a11y-chrome è girato insieme alle specifiche vit).",

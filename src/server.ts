@@ -51,6 +51,10 @@ import {
     getTestSuiteRuns,
     clearTestSuiteRunsCache,
 } from "./firebaseTestSuitesData.js";
+import {
+    sendBugsCreatedTodayReport,
+    sendVerificaCheck,
+} from "./notificationTriggers.js";
 
 const app = express();
 
@@ -389,6 +393,49 @@ app.post("/api/refresh", (_, res) => {
     clearTestSuiteRunsCache();
 
     res.status(200).json({ refreshed: true });
+});
+
+// Triggered by an external scheduler (see functions/) rather than a browser,
+// so it sits outside the /api PAT-forwarding gate above - it runs against
+// this server's own AZDO_PAT env var (see getCurrentConfig's fallback in
+// azdo.ts), not a per-request header. Gated by a shared secret instead of a
+// PAT/domain check since there's no end-user identity here to check against.
+function requireCronSecret(req: express.Request, res: Response): boolean {
+    const expected = process.env.INTERNAL_CRON_SECRET;
+
+    if (!expected) {
+        res.status(503).json({
+            message: "INTERNAL_CRON_SECRET is not configured on this server.",
+        });
+        return false;
+    }
+
+    if (req.header("x-cron-secret") !== expected) {
+        res.status(401).json({ message: "Invalid cron secret." });
+        return false;
+    }
+
+    return true;
+}
+
+app.post("/internal/notify/bugs-created-today", async (req, res) => {
+    if (!requireCronSecret(req, res)) return;
+
+    try {
+        res.json(await sendBugsCreatedTodayReport());
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+app.post("/internal/notify/verifica-check", async (req, res) => {
+    if (!requireCronSecret(req, res)) return;
+
+    try {
+        res.json(await sendVerificaCheck());
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
 });
 
 const port = Number(process.env.PORT) || 3000;
