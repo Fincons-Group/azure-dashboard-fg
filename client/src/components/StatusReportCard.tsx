@@ -9,6 +9,7 @@ import {
   bugsToCloseLabel,
   computeBugStatusData,
   computeStatusCardKpis,
+  formatBusinessDaysKpi,
 } from "../utils/export";
 import type { Outcome, ReportExtraKpis, SprintDefectReport } from "../types";
 
@@ -453,7 +454,7 @@ export interface StatusReportCardProps {
   // DSI-sourced bugs sets this to false to keep the subtitle from
   // claiming a source that doesn't apply.
   includeDsiSource?: boolean;
-  // The 4 additional KPIs from GET /api/report-extra-kpis (see
+  // The additional KPIs from GET /api/report-extra-kpis (see
   // ReportExtraKpis in types.ts). Undefined while still loading - the
   // extra tiles render a "-" placeholder rather than blocking the rest of
   // the card.
@@ -861,13 +862,10 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.reopenedBugs"
               />
               <KpiTile
-                value={
-                  extraKpis?.avgClosingTimeBusinessDays == null
-                    ? "-"
-                    : t("defectManagementPage.stats.days", {
-                        value: extraKpis.avgClosingTimeBusinessDays,
-                      })
-                }
+                value={formatBusinessDaysKpi(
+                  extraKpis?.avgClosingTimeBusinessDays,
+                  t,
+                )}
                 color="#6bcf6b"
                 borderColor="#605e5c"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays"
@@ -941,11 +939,11 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.avgFixTimeBusinessDays"
               />
               <KpiTile
-                value={formatExtraKpiPct(extraKpis?.criticalHighBugPct)}
+                value={formatExtraKpiPct(extraKpis?.criticalDefectRatePct)}
                 color="#ff6b6b"
                 borderColor="#d13438"
-                labelKey="defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct"
-                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.criticalHighBugPct"
+                labelKey="defectManagementPage.sprintReport.statusCard.kpis.criticalDefectRatePct"
+                helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.criticalDefectRatePct"
               />
               <KpiTile
                 value={extraKpis ? `${extraKpis.testPlanCorrectnessPct}%` : "-"}

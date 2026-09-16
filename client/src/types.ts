@@ -651,7 +651,7 @@ export interface ReportExtraKpis {
     uatSteps: number | null;
   };
   avgFixTimeBusinessDays: number | null;
-  criticalHighBugPct: number | null;
+  criticalDefectRatePct: number | null;
   testPlanCorrectnessPct: number;
   bugReopenRate: number | null;
   avgClosingTimeBusinessDays: number | null;

@@ -7,11 +7,9 @@ import { dedupe } from "./inflight.js";
 // field on it, and no per-test-case execution history either. Getting either
 // requires walking every test run's results instead. This is the heaviest
 // fetch in the app (enumerates every run + every run's results, project-
-// wide), so the raw per-result tuples are fetched/cached once here and
-// reused by both getFirstExecutionOutcomes (earliest result per test case,
-// for reportExtraKpis.ts) and getAllOutcomesByTestCase (full history per
-// test case, for automationKpiData.ts's success-rate/flaky-test rollup) -
-// isolated from getDefectData's and computePlanOverview's caches.
+// wide), so raw per-result tuples are cached per project and optional plan
+// selection. Calls with the same scope share both in-flight work and the
+// completed cache; expired selection entries are evicted below.
 const CACHE_DURATION_MS = 5 * 60 * 1000;
 
 export interface FirstExecutionOutcome {
@@ -67,6 +65,13 @@ async function getResultTuples(
     project?: string,
     planIds: number[] = []
 ): Promise<ResultTuple[]> {
+    const now = Date.now();
+    for (const [key, entry] of resultTuplesCache) {
+        if (now - entry.timestamp >= CACHE_DURATION_MS) {
+            resultTuplesCache.delete(key);
+        }
+    }
+
     const normalizedPlanIds = [...new Set(planIds)].sort((a, b) => a - b);
     const projectKey = `${resolveProjectKey(project)}:${normalizedPlanIds.join(",") || "all"}`;
     const cached = resultTuplesCache.get(projectKey);
@@ -136,7 +141,7 @@ async function getResultTuples(
     });
 }
 
-const FINISHED_OUTCOMES = new Set([
+export const FINISHED_OUTCOMES = new Set([
     "passed",
     "failed",
     "blocked",

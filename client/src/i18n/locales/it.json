@@ -440,11 +440,11 @@
           "firstExecutionPassRateUat": "First Execution Pass Rate\nUAT Test Case",
           "firstExecutionPassRateFunctionalSteps": "First Execution Pass Rate\nFunctional Test Steps",
           "firstExecutionPassRateUatSteps": "First Execution Pass Rate\nUAT Test Steps",
-          "avgFixTimeBusinessDays": "Average Bug Fix Time",
-          "criticalHighBugPct": "Critical Defect Rate",
-          "testPlanCorrectnessPct": "Test Plan Correctness\n/ Executability",
-          "bugReopenRate": "Bug Re-open Rate",
-          "avgClosingTimeBusinessDays": "Average Closing Time"
+          "avgFixTimeBusinessDays": "Tempo medio fix bug\n(gg lavorativi)",
+          "criticalDefectRatePct": "Tasso bug critici",
+          "testPlanCorrectnessPct": "Correttezza / eseguibilità\ndel piano di test",
+          "bugReopenRate": "Tasso di riapertura bug",
+          "avgClosingTimeBusinessDays": "Tempo medio di chiusura"
         },
         "kpisHelp": {
           "totalTestCases": "Tutti i casi di test presenti nel/i piano/i selezionato/i, qualsiasi sia il loro stato.",
@@ -469,7 +469,7 @@
           "firstExecutionPassRateFunctionalSteps": "% dei singoli step funzionali risultati PASS alla prima esecuzione, indipendentemente dall'esito finale del test case. Gli N/A sono inclusi nel denominatore. Target >= 95%.",
           "firstExecutionPassRateUatSteps": "% dei singoli step UAT risultati PASS alla prima esecuzione, indipendentemente dall'esito finale del test case. Gli N/A sono inclusi nel denominatore. Target >= 98%.",
           "avgFixTimeBusinessDays": "Giorni lavorativi medi (lun-ven) tra l'apertura di un bug e la sua prima transizione in Resolved/Da verificare (fix pronta per il retest) - non giorni di calendario fino a Closed. Target <= 2 giorni lavorativi.",
-          "criticalHighBugPct": "Bug con severity Critical sul totale dei test case eseguiti; gli N/A sono inclusi nel denominatore. Target <= 0,5%.",
+          "criticalDefectRatePct": "Bug con severity Critical sul totale dei test case eseguiti; gli N/A sono inclusi nel denominatore. Target <= 0,5%.",
           "testPlanCorrectnessPct": "% di casi di test pianificati non marcati Not Applicable durante Execute. Target 95-100%.",
           "bugReopenRate": "% dei bug arrivati a Da verificare che sono stati riaperti almeno una volta dopo il retest. Ogni bug conta una sola volta. Target <= 7%.",
           "avgClosingTimeBusinessDays": "Giorni lavorativi medi (lun-ven) tra apertura e chiusura del bug. Sabato e domenica sono esclusi; le festività infrasettimanali sono conteggiate. Target <= 4 giorni lavorativi."

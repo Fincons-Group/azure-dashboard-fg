@@ -441,7 +441,7 @@
           "firstExecutionPassRateFunctionalSteps": "First Execution Pass Rate\nFunctional Test Steps",
           "firstExecutionPassRateUatSteps": "First Execution Pass Rate\nUAT Test Steps",
           "avgFixTimeBusinessDays": "Average Bug Fix Time",
-          "criticalHighBugPct": "Critical Defect Rate",
+          "criticalDefectRatePct": "Critical Defect Rate",
           "testPlanCorrectnessPct": "Test Plan Correctness\n/ Executability",
           "bugReopenRate": "Bug Re-open Rate",
           "avgClosingTimeBusinessDays": "Average Closing Time"
@@ -469,7 +469,7 @@
           "firstExecutionPassRateFunctionalSteps": "% of individual Functional steps that passed on their first execution, regardless of the final test-case outcome. N/A is included in the denominator. Target >= 95%.",
           "firstExecutionPassRateUatSteps": "% of individual UAT steps that passed on their first execution, regardless of the final test-case outcome. N/A is included in the denominator. Target >= 98%.",
           "avgFixTimeBusinessDays": "Average business days (Mon-Fri) between a bug being opened and its first transition into Resolved/Da verificare (fix ready for retest) - not calendar days to Closed. Target <= 2 business days.",
-          "criticalHighBugPct": "Critical-severity bugs divided by executed test cases; N/A is included in the denominator. Target <= 0.5%.",
+          "criticalDefectRatePct": "Critical-severity bugs divided by executed test cases; N/A is included in the denominator. Target <= 0.5%.",
           "testPlanCorrectnessPct": "% of planned test cases not marked Not Applicable during Execute. Target 95-100%.",
           "bugReopenRate": "% of bugs that reached Ready for retest and were reopened at least once after retest. Each bug counts once. Target <= 7%.",
           "avgClosingTimeBusinessDays": "Average business days (Mon-Fri) between bug creation and closure. Saturdays and Sundays are excluded; weekday public holidays are counted. Target <= 4 business days."

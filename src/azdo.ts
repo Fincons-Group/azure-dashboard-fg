@@ -591,18 +591,26 @@ export async function getTestRunStatistics(
     }
 }
 
+const projectsWithoutIterationDetails = new Set<string>();
+
 export async function getTestRunResults(
     runId: number,
     project?: string,
     options: { includeIterations?: boolean } = {}
 ) {
+    const results: any[] = [];
+    const currentConfig = getCurrentConfig();
+    const projectKey = `${currentConfig.org}/${project ?? currentConfig.project}`;
+    const includeIterations =
+        options.includeIterations === true &&
+        !projectsWithoutIterationDetails.has(projectKey);
+
     try {
-        const results: any[] = [];
-        const pageSize = options.includeIterations ? 200 : 1000;
+        const pageSize = 1000;
         let skip = 0;
 
         while (true) {
-            const details = options.includeIterations
+            const details = includeIterations
                 ? "&detailsToInclude=Iterations"
                 : "";
             const response = await clientFor(project).get(
@@ -616,20 +624,22 @@ export async function getTestRunResults(
 
         return results;
     } catch (error) {
-        // Azure can retain a deleted run in the list briefly. Skipping that
-        // stale run is safer than failing the complete KPI response.
+        // Azure can retain a deleted run in the list briefly. Preserve pages
+        // already fetched if a later page disappears; an initial 404 still
+        // returns [] and skips the stale run.
         if (axios.isAxiosError(error) && error.response?.status === 404) {
-            return [];
+            return results;
         }
 
         // Some Azure DevOps installations reject step-level expansion even
         // though ordinary result history is available. Preserve test-case
         // KPIs in that case; step KPIs correctly remain unavailable.
         if (
-            options.includeIterations &&
+            includeIterations &&
             axios.isAxiosError(error) &&
             error.response?.status === 400
         ) {
+            projectsWithoutIterationDetails.add(projectKey);
             return getTestRunResults(runId, project);
         }
 

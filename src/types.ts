@@ -698,12 +698,9 @@ export interface ReportExtraKpis {
   // days (not opened -> Closed in calendar days, which is the existing
   // mttrDays/avgClosureDays KPI). Null when no in-scope bug has resolved yet.
   avgFixTimeBusinessDays: number | null;
-  // Open bugs with severity Critical or High, as a % of total bugs -
-  // same denominator style as the existing Bug Re-open Rate.
-  criticalHighBugPct: number | null;
-  // % of planned test cases NOT blocked by a linked bug. A test case
-  // marked Blocked with no linked bug does not currently reduce this
-  // score - see computeReportExtraKpis in src/reportExtraKpis.ts.
+  // Critical-severity bugs divided by executed test cases (including N/A).
+  criticalDefectRatePct: number | null;
+  // % of planned test cases not marked NotApplicable during execution.
   testPlanCorrectnessPct: number;
   bugReopenRate: number | null;
   avgClosingTimeBusinessDays: number | null;

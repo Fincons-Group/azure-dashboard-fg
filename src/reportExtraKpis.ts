@@ -8,6 +8,7 @@ import { computePlanOverview } from "./planOverviewData.js";
 import {
   getFirstExecutionOutcomes,
   getFirstExecutionStepSummaries,
+  FINISHED_OUTCOMES,
 } from "./testRunHistoryData.js";
 import { classifyPlan } from "./planClassifier.js";
 import { businessDaysBetween } from "./businessDays.js";
@@ -60,7 +61,7 @@ export async function computeReportExtraKpis(
   const criticalDefectCount = report.effectiveDefects.filter(
     (bug) => bug.severity === "1 - Critical",
   ).length;
-  const criticalHighBugPct = executedTestCaseCount
+  const criticalDefectRatePct = executedTestCaseCount
     ? Math.round((criticalDefectCount / executedTestCaseCount) * 1000) / 10
     : null;
 
@@ -105,18 +106,6 @@ export async function computeReportExtraKpis(
     uat: { passed: 0, executed: 0, stepPassed: 0, stepExecuted: 0 },
   };
 
-  const finishedOutcomes = new Set([
-    "passed",
-    "failed",
-    "blocked",
-    "notapplicable",
-    "inconclusive",
-    "timeout",
-    "aborted",
-    "warning",
-    "error",
-  ]);
-
   for (const overview of overviews) {
     const kind = classifyPlan(overview.planName);
 
@@ -128,7 +117,7 @@ export async function computeReportExtraKpis(
       }
 
       const normalizedOutcome = firstExecution.outcome.toLowerCase();
-      if (finishedOutcomes.has(normalizedOutcome)) {
+      if (FINISHED_OUTCOMES.has(normalizedOutcome)) {
         buckets[kind].executed++;
       }
       if (normalizedOutcome === "passed") {
@@ -194,7 +183,7 @@ export async function computeReportExtraKpis(
       uatSteps: stepPassRateOf(buckets.uat),
     },
     avgFixTimeBusinessDays,
-    criticalHighBugPct,
+    criticalDefectRatePct,
     testPlanCorrectnessPct,
     bugReopenRate,
     avgClosingTimeBusinessDays,

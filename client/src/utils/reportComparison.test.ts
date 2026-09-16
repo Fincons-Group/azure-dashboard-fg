@@ -125,3 +125,12 @@ test("the follow-up identifies new, closed, reopened and critical bugs", () => {
     assert.match(text, /critici\/alti aperti 2 \(\+1\)/);
     assert.match(text, /senza data di risoluzione 2 \(\+1\)/);
 });
+
+test("Removed bugs use the same open-count rule as the status card", () => {
+    const data = report(4, 0);
+    data.stats.sprintDefectReport.effectiveDefects = [
+        { id: 10, title: "Removed", state: "Removed" },
+    ];
+    data.stats.sprintDefectReport.effectiveCount = 1;
+    assert.equal(makeReportSnapshot(data, filters).openBugs, 1);
+});

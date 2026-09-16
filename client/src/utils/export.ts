@@ -93,6 +93,15 @@ export type TranslateFn = (
   options?: Record<string, unknown>,
 ) => string;
 
+export function formatBusinessDaysKpi(
+  value: number | null | undefined,
+  t: TranslateFn,
+): string {
+  return value == null
+    ? "-"
+    : t("defectManagementPage.stats.days", { value });
+}
+
 export interface StatusReportCardEmailData {
   headerTitle: string;
   headerSubtitle: string;
@@ -553,7 +562,7 @@ export function buildStatusReportCardEmailBodyHtml(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
-    showExtraKpis = true,
+    showExtraKpis = false,
     extraKpis,
   } = data;
 
@@ -796,11 +805,7 @@ export function buildStatusReportCardEmailBodyHtml(
       "25%",
     ) +
     lightKpiTile(
-      extraKpis?.avgClosingTimeBusinessDays == null
-        ? "-"
-        : t("defectManagementPage.stats.days", {
-            value: extraKpis.avgClosingTimeBusinessDays,
-          }),
+      formatBusinessDaysKpi(extraKpis?.avgClosingTimeBusinessDays, t),
       9,
       t(
         "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
@@ -850,10 +855,10 @@ export function buildStatusReportCardEmailBodyHtml(
           "16%",
         ) +
         lightKpiTile(
-          formatExtraKpiPct(extraKpis.criticalHighBugPct),
+          formatExtraKpiPct(extraKpis.criticalDefectRatePct),
           3,
           t(
-            "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+            "defectManagementPage.sprintReport.statusCard.kpis.criticalDefectRatePct",
           ),
           "16%",
         ) +
@@ -1155,7 +1160,6 @@ export interface StatusCardKpis {
   toCloseOutOfScopeCount: number;
   stillOpen: number;
   reopenedPct: number;
-  avgClosureDays: number;
   bugsByDsi: number;
   bugsByUs: number;
   // Detected bugs whose Custom.Suite = "Test Business" (origin "Business").
@@ -1233,7 +1237,6 @@ export function computeStatusCardKpis(
   const reopenedPct = report.total
     ? Math.round((report.reopenedCount / report.total) * 1000) / 10
     : 0;
-  const avgClosureDays = Math.round(report.mttrDays ?? 0);
   const bugsByDsi = report.byOriginDetected["DSI"] ?? 0;
   const bugsByBusiness = report.byOriginDetected["Business"] ?? 0;
   // "Everything that's ours": total minus DSI minus Business. Business bugs
@@ -1267,7 +1270,6 @@ export function computeStatusCardKpis(
     toCloseOutOfScopeCount,
     stillOpen,
     reopenedPct,
-    avgClosureDays,
     bugsByDsi,
     bugsByUs,
     bugsByBusiness,
@@ -1497,12 +1499,7 @@ function buildPdfBugRow2KpiDefs(
       label: t(
         "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
       ),
-      value:
-        extraKpis?.avgClosingTimeBusinessDays == null
-          ? "-"
-          : t("defectManagementPage.stats.days", {
-              value: extraKpis.avgClosingTimeBusinessDays,
-            }),
+      value: formatBusinessDaysKpi(extraKpis?.avgClosingTimeBusinessDays, t),
     },
     {
       kpi: LIGHT_KPI[7],
@@ -1548,9 +1545,9 @@ function buildPdfExtraKpiDefs(
     {
       kpi: LIGHT_KPI[3],
       label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+        "defectManagementPage.sprintReport.statusCard.kpis.criticalDefectRatePct",
       ),
-      value: formatExtraKpiPct(extraKpis.criticalHighBugPct),
+      value: formatExtraKpiPct(extraKpis.criticalDefectRatePct),
     },
     {
       kpi: LIGHT_KPI[6],
@@ -1916,7 +1913,7 @@ export function buildStatusReportCardPdfDocument(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
-    showExtraKpis = true,
+    showExtraKpis = false,
     extraKpis,
   } = data;
 
@@ -2251,7 +2248,7 @@ const KPI_LEGEND_EXTRA: KpiLegendEntry[] = [
     helpKey: "firstExecutionPassRateUat",
   },
   { labelKey: "avgFixTimeBusinessDays", helpKey: "avgFixTimeBusinessDays" },
-  { labelKey: "criticalHighBugPct", helpKey: "criticalHighBugPct" },
+  { labelKey: "criticalDefectRatePct", helpKey: "criticalDefectRatePct" },
   { labelKey: "testPlanCorrectnessPct", helpKey: "testPlanCorrectnessPct" },
 ];
 
@@ -2816,12 +2813,7 @@ function buildPptxRow3KpiDefs(
       ),
     },
     {
-      value:
-        extraKpis?.avgClosingTimeBusinessDays == null
-          ? "-"
-          : t("defectManagementPage.stats.days", {
-              value: extraKpis.avgClosingTimeBusinessDays,
-            }),
+      value: formatBusinessDaysKpi(extraKpis?.avgClosingTimeBusinessDays, t),
       label: t(
         "defectManagementPage.sprintReport.statusCard.kpis.avgClosingTimeBusinessDays",
       ),
@@ -2864,9 +2856,9 @@ function buildPptxRow4KpiDefs(
       ),
     },
     {
-      value: formatExtraKpiPct(extraKpis.criticalHighBugPct),
+      value: formatExtraKpiPct(extraKpis.criticalDefectRatePct),
       label: t(
-        "defectManagementPage.sprintReport.statusCard.kpis.criticalHighBugPct",
+        "defectManagementPage.sprintReport.statusCard.kpis.criticalDefectRatePct",
       ),
     },
     {
@@ -3435,7 +3427,7 @@ export async function exportStatusReportCardToPptx(
     dashboardUrl,
     showOriginBreakdown = false,
     includeDsiSource = true,
-    showExtraKpis = true,
+    showExtraKpis = false,
     extraKpis,
   } = data;
 

@@ -57,7 +57,7 @@ export function makeReportSnapshot(data: DynamicSprintReportExcelData, filters: 
 
     const report = data.stats.sprintDefectReport;
     const openDefects = report.effectiveDefects.filter(
-        (bug) => bug.state !== "Closed" && bug.state !== "Removed"
+        (bug) => bug.state !== "Closed"
     );
     return {
         scopeKey: reportScopeKey(data, filters),
@@ -102,9 +102,18 @@ export function saveReportSnapshot(snapshot: ReportSnapshot): void {
     }
 }
 
+export function formatReportSnapshotTimestamp(
+    timestamp: string,
+    language: string,
+): string {
+    return new Date(timestamp).toLocaleString(
+        language.startsWith("it") ? "it-IT" : "en-GB"
+    );
+}
+
 export function buildFollowUpText(previous: ReportSnapshot, current: ReportSnapshot, language: string): string {
     const it = language.startsWith("it");
-    const date = new Date(previous.generatedAt).toLocaleString(it ? "it-IT" : "en-GB");
+    const date = formatReportSnapshotTimestamp(previous.generatedAt, language);
     const signed = (value: number) => `${value > 0 ? "+" : ""}${value}`;
     const testChanges = [
         [it ? "test superati" : "passed tests", current.outcomes.Passed - previous.outcomes.Passed],
@@ -119,7 +128,9 @@ export function buildFollowUpText(previous: ReportSnapshot, current: ReportSnaps
     const previousStates = previous.bugStates ?? {};
     const currentStates = current.bugStates ?? {};
     const hasBugHistory = Object.keys(previousStates).length > 0;
-    const isClosed = (state: string) => state === "Closed" || state === "Removed";
+    // Mirrors StatusReportCard/computeStatusCardKpis: every state except
+    // Closed, including Removed, contributes to the displayed open total.
+    const isClosed = (state: string) => state === "Closed";
     const newBugs = hasBugHistory
         ? Object.keys(currentStates).filter((id) => previousStates[id] == null).length
         : null;
