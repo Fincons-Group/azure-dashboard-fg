@@ -280,13 +280,24 @@ async function fetchAuthenticatedEmail(
             "/connectionData?api-version=7.1-preview.1"
         );
 
-        // AAD-backed identities carry the UPN/email under
-        // authenticatedUser.properties.Account rather than any top-level
-        // field - there's no dedicated "email" property on this response.
-        const email: string | undefined =
-            response.data?.authenticatedUser?.properties?.Account?.$value;
+        const email = extractAuthenticatedEmail(response.data);
 
-        return email ? email.trim().toLowerCase() : null;
+        if (!email) {
+            const authenticatedUser = response.data?.authenticatedUser;
+            console.error(
+                "Azure DevOps connectionData authenticated the PAT but did " +
+                    "not expose an email address for its owner:",
+                {
+                    org,
+                    hasUniqueName: !!authenticatedUser?.uniqueName,
+                    propertyNames: Object.keys(
+                        authenticatedUser?.properties ?? {}
+                    ),
+                }
+            );
+        }
+
+        return email;
     } catch (error) {
         console.error(
             "Failed to resolve the calling PAT's Azure DevOps identity " +
@@ -304,12 +315,80 @@ async function fetchAuthenticatedEmail(
     }
 }
 
-// Keyed by PAT (not by request) so the same PAT reused across many requests
-// only hits connectionData once per TTL - same shape as the dashboard caches
-// elsewhere (dashboardData.ts etc.), just keyed differently.
+function emailFromIdentityValue(value: unknown): string | null {
+    const rawValue =
+        typeof value === "string"
+            ? value
+            : value && typeof value === "object" && "$value" in value
+              ? (value as { $value?: unknown }).$value
+              : null;
+
+    if (typeof rawValue !== "string") {
+        return null;
+    }
+
+    const normalized = rawValue.trim().toLowerCase();
+    return normalized.includes("@") ? normalized : null;
+}
+
+export function extractAuthenticatedEmail(connectionData: unknown): string | null {
+    if (!connectionData || typeof connectionData !== "object") {
+        return null;
+    }
+
+    const authenticatedUser = (
+        connectionData as {
+            authenticatedUser?: Record<string, unknown>;
+        }
+    ).authenticatedUser;
+
+    if (!authenticatedUser || typeof authenticatedUser !== "object") {
+        return null;
+    }
+
+    const properties =
+        authenticatedUser.properties &&
+        typeof authenticatedUser.properties === "object"
+            ? (authenticatedUser.properties as Record<string, unknown>)
+            : {};
+    const preferredPropertyNames = ["Account", "Mail", "Email"];
+    const preferredProperties = preferredPropertyNames.map(
+        (name) => properties[name]
+    );
+    const otherEmailProperties = Object.entries(properties)
+        .filter(
+            ([name]) =>
+                !preferredPropertyNames.includes(name) &&
+                /(account|e-?mail|upn|principal)/i.test(name)
+        )
+        .map(([, value]) => value);
+    const candidates = [
+        ...preferredProperties,
+        ...otherEmailProperties,
+        authenticatedUser.mailAddress,
+        authenticatedUser.email,
+        authenticatedUser.mail,
+        authenticatedUser.uniqueName,
+        authenticatedUser.principalName,
+    ];
+
+    for (const candidate of candidates) {
+        const email = emailFromIdentityValue(candidate);
+
+        if (email) {
+            return email;
+        }
+    }
+
+    return null;
+}
+
+// Keyed by org and PAT so changing organization cannot reuse the result from
+// a previous connection. Failed identity lookups are deliberately not cached:
+// a transient Azure DevOps error must be recoverable through the Retry action.
 const domainCheckCache = new Map<
     string,
-    { allowed: boolean; email: string | null; timestamp: number }
+    { allowed: boolean; email: string; timestamp: number }
 >();
 const DOMAIN_CHECK_CACHE_MS = 10 * 60 * 1000;
 
@@ -319,7 +398,8 @@ const DOMAIN_CHECK_CACHE_MS = 10 * 60 * 1000;
 export async function assertAllowedDomain(): Promise<void> {
     const pat = requirePat();
     const org = requireOrg();
-    const cached = domainCheckCache.get(pat);
+    const cacheKey = `${org}|${pat}`;
+    const cached = domainCheckCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < DOMAIN_CHECK_CACHE_MS) {
         if (!cached.allowed) {
@@ -332,7 +412,13 @@ export async function assertAllowedDomain(): Promise<void> {
     const email = await fetchAuthenticatedEmail(org, pat);
     const allowed = !!email && email.endsWith(`@${ALLOWED_EMAIL_DOMAIN}`);
 
-    domainCheckCache.set(pat, { allowed, email, timestamp: Date.now() });
+    if (email) {
+        domainCheckCache.set(cacheKey, {
+            allowed,
+            email,
+            timestamp: Date.now(),
+        });
+    }
 
     if (!allowed) {
         throw new AzdoDomainError(email);
