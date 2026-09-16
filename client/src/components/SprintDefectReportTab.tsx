@@ -282,6 +282,8 @@ export function SprintDefectReportTab({
   includeDeadline = true,
   enableEmailPreface = false,
   enableEmailClosing = false,
+  suggestedEmailPreface = "",
+  onReportPublished,
   project,
   extraKpis,
 }: {
@@ -300,6 +302,11 @@ export function SprintDefectReportTab({
   // Lets the sender type a free-text note below the card preview, appended
   // after the report in the sent email only (mirrors enableEmailPreface).
   enableEmailClosing?: boolean;
+  // Offered after comparing two Excel report exports of the same scope.
+  suggestedEmailPreface?: string;
+  // Called only after a report export completes or Graph confirms delivery.
+  // The dynamic report page uses it to advance the comparison baseline.
+  onReportPublished?: () => void;
   // Scopes the plan/plan-overview lookups below to a specific Azure DevOps
   // project.
   project?: string;
@@ -401,6 +408,7 @@ export function SprintDefectReportTab({
   const [ccInput, setCcInput] = useState(DEFAULT_REPORT_CC.join(", "));
   const [fromDisplayName, setFromDisplayName] = useState("");
   const [emailPrefaceText, setEmailPrefaceText] = useState("");
+  const previousEmailSuggestionRef = useRef("");
   const [emailClosingText, setEmailClosingText] = useState("");
   const statusCardRef = useRef<HTMLDivElement>(null);
   const dashboardLinkRef = useRef<HTMLAnchorElement>(null);
@@ -413,6 +421,23 @@ export function SprintDefectReportTab({
   // Only height needs measuring - the card's own CSS pins its width to
   // STATUS_CARD_WIDTH, so it never varies; height does, with content.
   const [cardHeight, setCardHeight] = useState(0);
+
+  // Populate a newly available proposal automatically, while preserving text
+  // the sender has already edited. A later refresh may replace the automatic
+  // proposal only while the field still contains the previous proposal.
+  useEffect(() => {
+    const previousSuggestion = previousEmailSuggestionRef.current;
+    if (suggestedEmailPreface === previousSuggestion) {
+      return;
+    }
+
+    setEmailPrefaceText((current) =>
+      !current.trim() || current === previousSuggestion
+        ? suggestedEmailPreface
+        : current,
+    );
+    previousEmailSuggestionRef.current = suggestedEmailPreface;
+  }, [suggestedEmailPreface]);
 
   useEffect(() => {
     const previewEl = statusCardPreviewRef.current;
@@ -692,6 +717,7 @@ export function SprintDefectReportTab({
         },
         t,
       );
+      onReportPublished?.();
     } finally {
       setIsExportingCard(false);
     }
@@ -734,6 +760,7 @@ export function SprintDefectReportTab({
         },
         t,
       );
+      onReportPublished?.();
     } finally {
       setIsExportingPptx(false);
     }
@@ -757,6 +784,7 @@ export function SprintDefectReportTab({
       },
       t,
     );
+    onReportPublished?.();
   };
 
   const handleCopyStatusCardHtml = async () => {
@@ -783,6 +811,7 @@ export function SprintDefectReportTab({
 
   const emailReportMutation = useMutation({
     mutationFn: sendGraphMailReport,
+    onSuccess: () => onReportPublished?.(),
   });
 
   const toAddresses = parseAddressList(toInput);
@@ -919,6 +948,14 @@ export function SprintDefectReportTab({
               "defectManagementPage.sprintReport.statusCard.emailPrefaceLabel",
             )}
           </Text>
+          {suggestedEmailPreface && (
+            <Button
+              appearance="secondary"
+              onClick={() => setEmailPrefaceText(suggestedEmailPreface)}
+            >
+              {t("dynamicSprintReportPage.followUp.useSuggestion")}
+            </Button>
+          )}
           <Textarea
             className={styles.emailPrefaceTextarea}
             value={emailPrefaceText}

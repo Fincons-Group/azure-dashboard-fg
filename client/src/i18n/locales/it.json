@@ -472,7 +472,7 @@
           "criticalHighBugPct": "Bug con severity Critical sul totale dei test case eseguiti; gli N/A sono inclusi nel denominatore. Target <= 0,5%.",
           "testPlanCorrectnessPct": "% di casi di test pianificati non marcati Not Applicable durante Execute. Target 95-100%.",
           "bugReopenRate": "% dei bug arrivati a Da verificare che sono stati riaperti almeno una volta dopo il retest. Ogni bug conta una sola volta. Target <= 7%.",
-          "avgClosingTimeBusinessDays": "Giorni lavorativi medi tra apertura e chiusura del bug. Target <= 4 giorni lavorativi."
+          "avgClosingTimeBusinessDays": "Giorni lavorativi medi (lun-ven) tra apertura e chiusura del bug. Sabato e domenica sono esclusi; le festività infrasettimanali sono conteggiate. Target <= 4 giorni lavorativi."
         },
         "sectionHelp": {
           "suiteProgress": "Il \"% Eseguiti\" di ogni suite conta anche i casi Non Applicabile come eseguiti (viene escluso solo Da eseguire) - più ampio della KPI \"Casi di test eseguiti\" qui sopra, che esclude del tutto i Non Applicabile. Pass Rate = Passati ÷ (Totale meno Non Applicabile).",
@@ -507,6 +507,13 @@
     "defaultHeaderSubtitle": "Stato di esecuzione dei test",
     "extraKpisLoading": "Calcolo dei KPI dal dettaglio storico di Azure DevOps...",
     "extraKpisError": "Impossibile calcolare i KPI: {{message}}",
+    "followUp": {
+      "title": "Confronto con il report precedente",
+      "previous": "Ultimo report scaricato: {{date}}",
+      "firstReport": "Nessun report precedente per questo ambito. Scarica il file per usarlo come riferimento al prossimo confronto.",
+      "useInEmail": "Porta il testo nella scheda email",
+      "useSuggestion": "Usa il testo suggerito"
+    },
     "excel": {
       "exportButton": "Esporta Excel",
       "exporting": "Esportazione...",

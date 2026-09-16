@@ -472,7 +472,7 @@
           "criticalHighBugPct": "Critical-severity bugs divided by executed test cases; N/A is included in the denominator. Target <= 0.5%.",
           "testPlanCorrectnessPct": "% of planned test cases not marked Not Applicable during Execute. Target 95-100%.",
           "bugReopenRate": "% of bugs that reached Ready for retest and were reopened at least once after retest. Each bug counts once. Target <= 7%.",
-          "avgClosingTimeBusinessDays": "Average business days between bug creation and closure. Target <= 4 business days."
+          "avgClosingTimeBusinessDays": "Average business days (Mon-Fri) between bug creation and closure. Saturdays and Sundays are excluded; weekday public holidays are counted. Target <= 4 business days."
         },
         "sectionHelp": {
           "suiteProgress": "Each suite's own \"% Executed\" counts Not Applicable as executed too (only Not Run is excluded) - broader than the \"Test Cases Executed\" KPI above, which excludes Not Applicable entirely. Pass Rate = Passed Ã· (Total minus Not Applicable).",
@@ -507,6 +507,13 @@
         "defaultHeaderSubtitle": "Test execution status",
         "extraKpisLoading": "Calculating KPIs from Azure DevOps execution history...",
         "extraKpisError": "Unable to calculate KPIs: {{message}}",
+    "followUp": {
+      "title": "Comparison with the previous report",
+      "previous": "Last downloaded report: {{date}}",
+      "firstReport": "No previous report for this scope. Download the file to use it as the baseline for the next comparison.",
+      "useInEmail": "Take this text to the email section",
+      "useSuggestion": "Use suggested text"
+    },
     "excel": {
       "exportButton": "Export Excel",
       "exporting": "Exporting...",
