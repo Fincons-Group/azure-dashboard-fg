@@ -127,6 +127,12 @@ export interface AutomationTestCaseRow {
   iteration?: string;
   suiteName: string;
   isAutomated: boolean;
+  // Only set when the Test Case work item has been linked to its Playwright
+  // spec via Microsoft.VSTS.TCM.AutomatedTestName/AutomatedTestStorage (see
+  // src/scripts/tmp-mark-automated.ts) - most automated cases don't have
+  // these populated yet, so both stay undefined until that linkage exists.
+  automatedTestName?: string;
+  automatedTestStorage?: string;
 }
 
 export interface AutomationKpis {
@@ -161,6 +167,50 @@ export interface AutomationKpiResponse {
   kpis: AutomationKpis;
   coverageByModule: CoverageByModule[];
   flakyTests: FlakyTestRankItem[];
+}
+
+export interface TestCatalogRunEntry {
+  outcome: string;
+  completedDate: string;
+  browser?: string;
+}
+
+export interface TestCatalogErrorGroup {
+  message: string;
+  count: number;
+}
+
+// One row per real Playwright spec file, keyed by its repo-relative path
+// (e.g. "ui/dan/homepage/nrt-dan-....spec.ts") - listed "as they are" from
+// the tst-e2e checkout (see testSpecCatalogData.ts's git ls-files scan),
+// not just the subset already linked to an Azure DevOps Test Case. Only
+// specs with a real Automation linkage (Microsoft.VSTS.TCM.AutomatedTestName/
+// Storage, see src/scripts/tmp-mark-automated.ts) carry testCaseId/
+// testCaseTitle and ADO run history; specs with none still show up with
+// empty lastRuns/topErrors, since the point of this catalog is the real
+// file list, not just what happens to be wired up. NRT rows are the
+// exception - no ADO linkage exists for them yet, so their history comes
+// from the published testSuiteRuns/testSuiteRunsLocal Firestore data
+// instead (see docs/tst-e2e-reports-followups.md for why that data is
+// sparse/manual today). lastRuns is newest-first, capped at 5; topErrors is
+// derived from each failed run's error message, most common first.
+export interface TestCatalogRow {
+  specPath: string;
+  specFile: string;
+  testCaseId?: number;
+  testCaseTitle?: string;
+  // Distinct browser engines seen across lastRuns (e.g. ["chrome"]) - a
+  // quick-glance summary so the UI doesn't need to scan every run entry.
+  browsers: string[];
+  lastRuns: TestCatalogRunEntry[];
+  topErrors: TestCatalogErrorGroup[];
+}
+
+export interface TestSpecCatalogResponse {
+  configured: boolean;
+  nrt: TestCatalogRow[];
+  a11y: TestCatalogRow[];
+  security: TestCatalogRow[];
 }
 
 export interface DashboardStats {
@@ -814,7 +864,11 @@ export interface E2eHistoryResponse {
 // Server-side mirror of client/src/types.ts's TestSuiteRun and friends -
 // read straight off Firestore documents in firebaseTestSuitesData.ts, so
 // this needs to match that shape field-for-field. Keep the two in sync.
-export type TestSuiteKey = "nrt" | "a11y" | "dast";
+// "security" reuses NrtRunDetail (Playwright type:security-tagged spec
+// results, same pass/fail shape as "nrt") stored on the same TestSuiteRun.nrt
+// field. DAST (ZAP dynamic scan) was removed as a separate suite - the team
+// considers it redundant with the functional security coverage here.
+export type TestSuiteKey = "nrt" | "a11y" | "security";
 export type TestAppScope = "plurifond" | "frontOfficeAuto" | "all";
 export type TestEnvironment = "tst" | "pre" | "prd";
 export type TestRunStatus = "good" | "warn" | "bad";
@@ -839,6 +893,28 @@ export interface NrtTestResult {
   status: "passed" | "failed" | "skipped";
   durationMs: number;
   steps: NrtTestStep[];
+  // Playwright's result.error?.message for a failed test - undefined for
+  // passed/skipped and for runs published before this field existed.
+  errorMessage?: string;
+  // Which suite this spec's own type: tag puts it in (see tst-e2e's tag
+  // scheme) - "nrt" for untagged/type:nrt specs, "a11y" for
+  // type:accessibility, "security" for type:security. Every test in a given
+  // run doc's tests[] has the same kind as the doc's own `suite` - the
+  // publish script (see buildPlaywrightRuns) splits a single Playwright
+  // invocation into one doc per kind so they're never mixed.
+  kind?: "nrt" | "a11y" | "security";
+  // Parsed from the spec's own "[a11y8952]"/"[8977]" ADO test-case-id tag
+  // (see src/scripts/tmp-mark-automated.ts's tag scheme) - present only for
+  // specs that carry one.
+  testCaseId?: number;
+  // Browser engine the test ran under (e.g. "chrome"), parsed from
+  // Playwright's project name - undefined for entries published before this
+  // field existed.
+  browser?: string;
+  // Product this a11y/security spec belongs to, parsed from its own
+  // "team:front-office-auto-sp1"/"team:plurifonds-sp1" tag - NRT specs don't
+  // carry this tag and stay undefined (their run doc's own `app` is "all").
+  app?: TestAppScope;
 }
 
 export interface NrtRunDetail {
@@ -847,53 +923,12 @@ export interface NrtRunDetail {
   flaky: number;
   durationMs: number;
   domains: NrtDomainResult[];
+  // Same shape as `domains`, grouped by product (Front Office Auto /
+  // Plurifonds) instead - only a11y/security tests carry the team: tag this
+  // is built from (see NrtTestResult.app), so this is empty for nrt's own
+  // tests and for runs published before this field existed.
+  teams?: NrtDomainResult[];
   tests?: NrtTestResult[];
-}
-
-export interface A11yRuleViolation {
-  ruleId: string;
-  impact: "critical" | "serious" | "moderate" | "minor";
-  count: number;
-  description: string;
-}
-
-export interface A11yStepResult {
-  label: string;
-  violations: number;
-  incomplete: number;
-  critical: number;
-  serious: number;
-  moderate: number;
-  minor: number;
-  rules: A11yRuleViolation[];
-}
-
-export interface A11yRunDetail {
-  stepsScanned: number;
-  violations: number;
-  incomplete: number;
-  passes?: number;
-  critical: number;
-  serious: number;
-  moderate: number;
-  minor: number;
-  steps: A11yStepResult[];
-}
-
-export interface DastAlert {
-  risk: "High" | "Medium" | "Low" | "Informational";
-  title: string;
-  target: string;
-}
-
-export interface DastRunDetail {
-  endpointsScanned: number;
-  riskScore: number;
-  high: number;
-  medium: number;
-  low: number;
-  informational: number;
-  alerts: DastAlert[];
 }
 
 export interface TestSuiteRun {
@@ -907,11 +942,81 @@ export interface TestSuiteRun {
   status: TestRunStatus;
   reportFile: string;
   reportUrl?: string;
-  reportFileIt?: string;
-  reportUrlIt?: string;
   reportTool: string;
-  linkedRunId?: string;
   nrt?: NrtRunDetail;
-  a11y?: A11yRunDetail;
-  dast?: DastRunDetail;
+}
+
+export interface TestPlanSuiteSummary {
+  id: number;
+  name: string;
+  parentId?: number;
+}
+
+// Trend/health classification, ported from the "QA Control Center" ADO
+// dashboard widget this replicates (see qaControlCenterData.ts) - comparing
+// the recent half of the lookback window's daily execution counts against
+// the older half.
+export type QaTrendStatus = "up" | "down" | "stable" | "limitedData";
+
+export interface QaControlCenterTrendDay {
+  date: string; // ISO, day-truncated
+  count: number;
+  forecast: boolean;
+}
+
+export interface QaControlCenterTeamMember {
+  key: string;
+  name: string;
+  assigned: number;
+  remaining: number;
+  effortHours: number;
+  completionPct: number;
+}
+
+export interface QaControlCenterResponse {
+  planId: number;
+  planName: string;
+  suiteId: number;
+  suiteName: string;
+  generatedAt: string;
+
+  totalCases: number;
+  remainingCases: number;
+  unassignedCount: number;
+
+  passed: number;
+  failed: number;
+  blocked: number;
+  pending: number;
+  partial: number;
+  other: number;
+  notApplicable: number;
+  executedCases: number;
+  executionRatePct: number;
+  passRatePct: number;
+  healthThreshold: number;
+
+  todayCases: number;
+  yesterdayCases: number;
+  tomorrowForecast: number;
+  tomorrowIsWorkingDay: boolean;
+  historicalAveragePerDay: number;
+  historicalSamples: number;
+  trendStatus: QaTrendStatus;
+  trend: QaControlCenterTrendDay[];
+
+  remainingEffortHours: number;
+  calibrationFactor: number;
+  calibrationSamples: number;
+
+  team: QaControlCenterTeamMember[];
+
+  openBugs: number;
+  blockedByBug: number;
+  readyForRetest: number;
+  failedWithoutBug: number;
+
+  historyTruncated: boolean;
+  historyFallback: boolean;
+  historyError?: string;
 }

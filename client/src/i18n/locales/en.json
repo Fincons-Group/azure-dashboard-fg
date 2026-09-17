@@ -18,6 +18,9 @@
     "automationKpis": "Automation KPIs",
     "e2eHistory": "E2E History",
     "testSuites": "Test Suites",
+    "testPlans": "Test Plans",
+    "teamDashboard": "Team Dashboard",
+    "qaControlCenter": "QA Control Center",
     "bugs": "Bugs",
     "refresh": "Refresh Now",
     "refreshing": "Refreshing...",
@@ -39,6 +42,8 @@
     "title": "Settings",
     "showExtraKpisLabel": "Show additional KPIs",
     "showExtraKpisHint": "Controls the \"Additional KPIs\" section on the Sprint Report card - when off, it's hidden on screen and left out of every emailed/exported report (HTML, PDF, PPTX). Saved in this browser.",
+    "showExperimentalPagesLabel": "Show experimental pages",
+    "showExperimentalPagesHint": "Shows Cycle Time, E2E History, Automation KPIs, Team Dashboard, and QA Control Center in the sidebar - pages still being polished, hidden by default. Saved in this browser.",
     "close": "Close"
   },
   "azdoPatSteps": {
@@ -68,6 +73,9 @@
       "automation-kpis": "Real test-case automation coverage, success rate, and flaky tests for the Test Factory project.",
       "e2e-history": "Pass rate trend and recent run history from the tst-e2e Playwright suite, published via Firebase.",
       "test-suites": "NRT, accessibility and security gates in one hub - pick a suite to see its latest run and browse history.",
+      "test-plans": "Browse Azure DevOps test plans for any project - test cases, outcomes, and which run last touched each one.",
+      "team-dashboard": "Quick link to the Nuova Frontiera team dashboard in Azure DevOps (opens in a new tab - ADO blocks embedding it here).",
+      "qa-control-center": "Execution velocity, forecast, tester workload and bug risk for any test plan/suite - a native replica of the QA Control Center ADO dashboard widget.",
       "bugs": "Bugs pending QA verification and bugs opened today, both scoped to Fincons Group (@finconsgroup.com) team members."
     },
     "gotIt": "Got it"
@@ -193,10 +201,27 @@
     },
     "flakyTestsTitle_one": "Flaky test ({{count}})",
     "flakyTestsTitle_other": "Flaky tests ({{count}})",
+    "specCatalog": {
+      "title": "Automated spec files",
+      "loading": "Loading spec files...",
+      "notConfigured": "Set TEST_SUITES_REPORTS_DIR on the server to a tst-e2e checkout to list real spec files here.",
+      "empty": "No spec files found for this suite.",
+      "notLinked": "Not linked in Azure DevOps yet",
+      "tabs": {
+        "nrt": "NRT",
+        "a11y": "A11Y",
+        "security": "Security"
+      }
+    },
     "table": {
       "testCase": "Test case",
       "flakeCount": "Failures",
-      "lastFailed": "Last failed"
+      "lastFailed": "Last failed",
+      "specFile": "Spec file",
+      "browser": "Browser",
+      "lastRuns": "Last 5 runs",
+      "topErrors": "Most common errors",
+      "noErrors": "No recorded errors"
     }
   },
   "e2eHistoryPage": {
@@ -230,14 +255,8 @@
     "title": "Test Suites",
     "subtitle": "NRT, accessibility and security gates for the automation suite - pick a suite to see its latest run and browse history.",
     "notConfiguredTitle": "Not configured yet",
-    "notConfiguredBody": "Set FIREBASE_SERVICE_ACCOUNT_JSON on the server to start showing real NRT/A11Y/DAST run history here.",
+    "notConfiguredBody": "Set FIREBASE_SERVICE_ACCOUNT_JSON on the server to start showing real NRT/A11Y/Security run history here.",
     "eyebrow": "Automated quality gates",
-    "appLabel": "App",
-    "appOptions": {
-      "plurifond": "Plurifonds",
-      "frontOfficeAuto": "Front Office Auto",
-      "all": "All apps (full regression)"
-    },
     "envLabel": "Environment",
     "envOptions": {
       "tst": "TST",
@@ -248,10 +267,10 @@
       "overview": "Overview",
       "nrt": "NRT",
       "a11y": "A11Y",
-      "dast": "DAST"
+      "security": "Security"
     },
     "notWiredTitle": "Not wired up yet",
-    "notWiredBody": "There's no run history for {{app}} on {{env}} yet. Once its pipeline is onboarded, runs will show up here the same way Plurifonds' do.",
+    "notWiredBody": "There's no run history on {{env}} yet. Once its pipeline is onboarded, runs will show up here.",
     "suites": {
       "nrt": {
         "name": "NRT",
@@ -265,17 +284,16 @@
         "tool": "via axe-core",
         "desc": "axe-core scan of every routed step of the Plurifonds wizard, checked against WCAG 2.2 AA."
       },
-      "dast": {
-        "name": "DAST",
-        "full": "Dynamic App Security Testing",
-        "tool": "via OWASP ZAP",
-        "desc": "ZAP baseline + active scan of the staging environment, run weekly ahead of each release train."
+      "security": {
+        "name": "Security",
+        "full": "Security Functional Tests",
+        "tool": "via playwright-smart-reporter",
+        "desc": "Playwright specs tagged type:security - functional security checks."
       }
     },
     "ranAt": "Ran {{time}}",
     "viewReports": "View reports",
     "openReport": "Open {{file}}",
-    "openReportIt": "Open Italian summary ({{file}})",
     "renderedBy": "Rendered by {{tool}}",
     "linkedNoteNrt": "This run also carried the a11y-chrome project - see the A11Y tab for its findings.",
     "linkedNoteA11y": "Captured inside NRT run {{runId}} (a11y-chrome project ran alongside the vit specs).",
@@ -295,6 +313,8 @@
       "passedCol": "Passed",
       "totalCol": "Total",
       "flakyCol": "Flaky",
+      "teamsTitle": "Results by team",
+      "teamCol": "Team",
       "testsTitle": "Tests",
       "testStatus": {
         "passed": "Passed",
@@ -324,24 +344,101 @@
         "minor": "Minor"
       }
     },
-    "dast": {
-      "riskScore": "Risk score",
-      "openAlerts": "Open alerts",
-      "endpointsScanned": "Endpoints scanned",
-      "highRisk": "High risk",
-      "riskTitle": "Alerts by risk level",
-      "alertsTitle": "Alerts",
-      "risk": {
-        "High": "High",
-        "Medium": "Medium",
-        "Low": "Low",
-        "Informational": "Informational"
-      }
-    },
     "pastRuns": "Past runs",
     "totalRuns_one": "{{count}} run",
     "totalRuns_other": "{{count}} runs",
     "latest": "Latest"
+  },
+  "testPlansPage": {
+    "title": "Test Plans",
+    "subtitle": "Browse Azure DevOps test plans for the selected project and see which run last touched each test case.",
+    "pickProject": "Pick a project above to see its test plans.",
+    "searchPlansPlaceholder": "Search plans by name or ID...",
+    "loadingPlans": "Loading test plans...",
+    "noPlans": "No test plans found for this project.",
+    "selectPlanHint": "Select a test plan to see its test cases and run history.",
+    "loadingOverview": "Loading test plan...",
+    "openInAdo": "Open in Azure DevOps",
+    "stats": {
+      "totalTestCases": "Total test cases",
+      "totalBugs": "Linked bugs"
+    },
+    "testCasesTitle_one": "{{count}} of {{total}} test case",
+    "testCasesTitle_other": "{{count}} of {{total}} test cases",
+    "searchTestCasesPlaceholder": "Search by test case, suite, or run ID...",
+    "noTestCases": "No test cases found in this plan.",
+    "table": {
+      "testCase": "Test case",
+      "suite": "Suite",
+      "outcome": "Outcome",
+      "lastRun": "Last run",
+      "lastRunAt": "Last run at"
+    }
+  },
+  "teamDashboardPage": {
+    "title": "Team Dashboard",
+    "subtitle": "The Nuova Frontiera team dashboard lives in Azure DevOps and can't be embedded here.",
+    "cardTitle": "Nuova Frontiera Dashboard",
+    "cardBody": "Azure DevOps blocks its dashboards from being shown inside another site's page (X-Frame-Options: SAMEORIGIN), so it opens in a new tab instead of embedding here.",
+    "openButton": "Open in Azure DevOps"
+  },
+  "qaControlCenterPage": {
+    "title": "QA Control Center",
+    "subtitle": "Execution velocity, forecast, tester workload and bug risk for a test plan/suite - a native replica of the QA Control Center dashboard widget.",
+    "pickPlan": "Pick a test plan...",
+    "pickSuite": "Pick a test suite...",
+    "pickProject": "Pick a project above to get started.",
+    "pickPlanSuite": "Pick a test plan and suite above to see its execution velocity.",
+    "eyebrow": "QA governance",
+    "trend": {
+      "up": "Trending up",
+      "down": "Trending down",
+      "stable": "Stable",
+      "limitedData": "Limited data"
+    },
+    "kpi": {
+      "remaining": "Cases still to close",
+      "remainingDetail": "{{total}} total",
+      "today": "Executed today",
+      "yesterday": "Executed yesterday",
+      "forecast": "Forecast for tomorrow",
+      "forecastDetail": "weighted average {{average}} cases/day",
+      "forecastNonWorkingDay": "non-working day"
+    },
+    "completionTitle": "Execution progress",
+    "completionDetail": "Executed {{executed}} / {{total}} · Execution Rate {{executionRate}}% · Pass Rate {{passRate}}%",
+    "outcome": {
+      "passed": "passed",
+      "failed": "failed",
+      "blocked": "blocked",
+      "partial": "partial",
+      "other": "other",
+      "notApplicable": "N/A"
+    },
+    "hoursRemaining": "hours remaining",
+    "trendTitle": "Daily executions",
+    "trendHint": "unique test cases · * forecast",
+    "teamTitle": "Tester workload",
+    "noTeam": "No assignments yet.",
+    "unassignedTester": "Unassigned",
+    "team": {
+      "tester": "Tester",
+      "assigned": "Assigned",
+      "remaining": "Remaining",
+      "hours": "Hours",
+      "completion": "%"
+    },
+    "riskTitle": "Governance & risk",
+    "risk": {
+      "unassigned": "{{count}} unassigned",
+      "openBugs": "{{count}} open bugs",
+      "blockedByBug": "{{count}} blocked by bug",
+      "readyForRetest": "{{count}} ready for retest",
+      "failedWithoutBug": "{{count}} failed without bug"
+    },
+    "calibrationNote": "Adaptive estimate factor ×{{factor}} from {{samples}} observed manual cases.",
+    "historyTruncated": "history limited to the 100 most recent runs.",
+    "historyFallback": "full run history unavailable; counts based on each point's last result."
   },
   "planOverviewPage": {
     "exporting": "Exporting...",

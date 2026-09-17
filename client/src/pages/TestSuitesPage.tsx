@@ -11,7 +11,6 @@ import {
     Card,
     Dropdown,
     Option,
-    Switch,
     Tab,
     TabList,
     Text,
@@ -36,10 +35,7 @@ import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import { getApiBaseUrl, fetchTestSuites } from "../api/client";
 import type {
-    A11yRuleViolation,
-    DastAlert,
     NrtDomainResult,
-    TestAppScope,
     TestEnvironment,
     TestRunStatus,
     TestSuiteKey,
@@ -48,15 +44,14 @@ import type {
 
 type TabKey = "overview" | TestSuiteKey;
 
-const SUITE_ORDER: TestSuiteKey[] = ["nrt", "a11y", "dast"];
-const APP_OPTIONS: TestAppScope[] = ["plurifond", "frontOfficeAuto", "all"];
+const SUITE_ORDER: TestSuiteKey[] = ["nrt", "a11y", "security"];
 const ENV_OPTIONS: TestEnvironment[] = ["tst", "pre", "prd"];
 const TREND_RUN_COUNT = 6;
 
 const SUITE_ICONS: Record<TestSuiteKey, FluentIcon> = {
     nrt: ArrowRepeatAllRegular,
     a11y: AccessibilityCheckmarkRegular,
-    dast: ShieldCheckmarkRegular,
+    security: ShieldCheckmarkRegular,
 };
 
 // The scope bar (tabs + app/environment pickers) sits directly beneath
@@ -270,34 +265,6 @@ const useStyles = makeStyles({
         fontWeight: tokens.fontWeightRegular,
         color: tokens.colorNeutralForeground3,
     },
-    barRow: {
-        display: "flex",
-        alignItems: "center",
-        gap: tokens.spacingHorizontalS,
-    },
-    barLabel: {
-        width: "96px",
-        flexShrink: 0,
-        fontSize: tokens.fontSizeBase200,
-        color: tokens.colorNeutralForeground2,
-    },
-    barTrack: {
-        flex: 1,
-        height: "8px",
-        borderRadius: tokens.borderRadiusMedium,
-        backgroundColor: tokens.colorNeutralBackground3,
-        overflow: "hidden",
-    },
-    barFill: {
-        height: "100%",
-    },
-    barCount: {
-        width: "28px",
-        textAlign: "right",
-        fontSize: tokens.fontSizeBase200,
-        fontWeight: tokens.fontWeightSemibold,
-        flexShrink: 0,
-    },
     table: {
         width: "100%",
         borderCollapse: "collapse",
@@ -329,6 +296,15 @@ const useStyles = makeStyles({
         borderBottomWidth: "1px",
         borderBottomStyle: "solid",
         borderBottomColor: tokens.colorNeutralStroke2,
+    },
+    tableRowClickable: {
+        cursor: "pointer",
+        ":hover": {
+            backgroundColor: tokens.colorNeutralBackground1Hover,
+        },
+    },
+    tableRowSelected: {
+        backgroundColor: tokens.colorBrandBackground2,
     },
     trendBars: {
         display: "flex",
@@ -362,12 +338,6 @@ const useStyles = makeStyles({
         flexWrap: "wrap",
         marginBottom: "2px",
     },
-    findingId: {
-        fontSize: tokens.fontSizeBase200,
-        fontWeight: tokens.fontWeightSemibold,
-        color: tokens.colorBrandForeground1,
-        textDecorationLine: "none",
-    },
     findingTitle: {
         fontSize: tokens.fontSizeBase300,
         fontWeight: tokens.fontWeightRegular,
@@ -376,33 +346,6 @@ const useStyles = makeStyles({
     findingMeta: {
         fontSize: tokens.fontSizeBase200,
         color: tokens.colorNeutralForeground3,
-    },
-    stepBlock: {
-        paddingTop: tokens.spacingVerticalM,
-        marginTop: tokens.spacingVerticalM,
-        borderTopWidth: "1px",
-        borderTopStyle: "solid",
-        borderTopColor: tokens.colorNeutralStroke2,
-        ":first-of-type": {
-            paddingTop: 0,
-            marginTop: 0,
-            borderTopWidth: 0,
-        },
-    },
-    stepHeader: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: tokens.spacingHorizontalS,
-        marginBottom: tokens.spacingVerticalM,
-        padding: `${tokens.spacingVerticalSNudge} ${tokens.spacingHorizontalS}`,
-        backgroundColor: tokens.colorNeutralBackground3,
-        borderRadius: tokens.borderRadiusMedium,
-    },
-    stepLabel: {
-        fontSize: tokens.fontSizeBase400,
-        fontWeight: tokens.fontWeightBold,
-        color: tokens.colorNeutralForeground1,
     },
     testHeaderRow: {
         display: "flex",
@@ -442,6 +385,10 @@ const useStyles = makeStyles({
         textAlign: "left",
         border: "2px solid transparent",
         backgroundColor: "transparent",
+        // A plain <button> doesn't inherit the page's text color from the UA
+        // stylesheet (defaults to black), which read as unreadable against
+        // this card's dark background.
+        color: tokens.colorNeutralForeground1,
         borderRadius: tokens.borderRadiusMedium,
         padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalS}`,
         cursor: "pointer",
@@ -492,22 +439,6 @@ function statusToBadgeColor(status: TestRunStatus): "success" | "warning" | "dan
     return "danger";
 }
 
-function impactToBadgeColor(
-    impact: "critical" | "serious" | "moderate" | "minor"
-): "danger" | "severe" | "warning" | "informative" {
-    if (impact === "critical") return "danger";
-    if (impact === "serious") return "severe";
-    if (impact === "moderate") return "warning";
-    return "informative";
-}
-
-function riskToBadgeColor(risk: DastAlert["risk"]): "danger" | "warning" | "informative" | "subtle" {
-    if (risk === "High") return "danger";
-    if (risk === "Medium") return "warning";
-    if (risk === "Low") return "informative";
-    return "subtle";
-}
-
 function formatDateTime(iso: string): string {
     const d = new Date(iso);
     return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
@@ -517,11 +448,10 @@ function formatDateTime(iso: string): string {
 // see TestSuiteRun.reportUrl in types.ts) - points at whatever local tst-e2e
 // checkout's reports/ folder the server is statically serving under
 // /test-suites-reports (see TEST_SUITES_REPORTS_DIR in src/server.ts), a
-// dev-only convenience that 404s everywhere else. reportFile/reportFileIt
-// carry the path relative to reports/ (e.g. "runs/<id>/smart-report.html",
-// "a11y/index.html", "zap/<file>.html") - same convention
-// scripts/publish-local-test-runs.js writes - so this never re-derives a
-// per-suite subpath itself.
+// dev-only convenience that 404s everywhere else. reportFile carries the
+// path relative to reports/ (e.g. "runs/<id>/smart-report.html",
+// "a11y/index.html") - same convention scripts/publish-local-test-runs.js
+// writes - so this never re-derives a per-suite subpath itself.
 //
 // Must be an absolute URL against the API origin, not a plain "/..." path:
 // this is a real <a href>, not a fetch through apiFetch's proxy-aware base,
@@ -537,11 +467,6 @@ function openReportHref(run: TestSuiteRun): string {
     return run.reportUrl ?? reportHref(run.reportFile);
 }
 
-function openReportItHref(run: TestSuiteRun): string | undefined {
-    if (run.reportUrlIt) return run.reportUrlIt;
-    return run.reportFileIt ? reportHref(run.reportFileIt) : undefined;
-}
-
 function StatTile({ value, label }: { value: string | number; label: string }) {
     const styles = useStyles();
     return (
@@ -552,37 +477,12 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
     );
 }
 
-function SeverityBar({
-    label,
-    count,
-    max,
-    color,
-}: {
-    label: string;
-    count: number;
-    max: number;
-    color: string;
-}) {
-    const styles = useStyles();
-    const pct = max > 0 ? Math.max((count / max) * 100, count > 0 ? 4 : 0) : 0;
-
-    return (
-        <div className={styles.barRow}>
-            <span className={styles.barLabel}>{label}</span>
-            <div className={styles.barTrack}>
-                <div className={styles.barFill} style={{ width: `${pct}%`, backgroundColor: color }} />
-            </div>
-            <span className={styles.barCount}>{count}</span>
-        </div>
-    );
-}
 
 export function TestSuitesPage() {
     const { t } = useTranslation();
     const styles = useStyles();
 
     const [tab, setTab] = useState<TabKey>("overview");
-    const [appScope, setAppScope] = useState<TestAppScope>("plurifond");
     const [env, setEnv] = useState<TestEnvironment>("tst");
     const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
@@ -597,20 +497,29 @@ export function TestSuitesPage() {
         const map = new Map<TestSuiteKey, TestSuiteRun[]>();
         for (const suite of SUITE_ORDER) {
             const matching = runs
-                .filter((run) => run.suite === suite && run.app === appScope && run.env === env)
+                .filter((run) => run.suite === suite && run.env === env)
+                // An "nrt" run doc can carry nothing but untagged scaffolding
+                // (e.g. auth setup) when it was actually a local check
+                // pointed at only the a11y/security tag subset - every
+                // domain comes back "other" in that case. Its a11y/security
+                // results still matter (see AutomationKpiPage's spec
+                // catalog, which reads them from this same doc's tests[]),
+                // but showing it here as an NRT run reads as a false
+                // all-skipped "bad" result. Hidden from this tab only - the
+                // doc itself is untouched.
+                .filter(
+                    (run) =>
+                        suite !== "nrt" ||
+                        (run.nrt?.domains ?? []).some((d) => d.domain !== "other")
+                )
                 .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
             map.set(suite, matching);
         }
         return map;
-    }, [runs, appScope, env]);
+    }, [runs, env]);
 
     const handleTabSelect = (_event: SelectTabEvent, data: SelectTabData) => {
         setTab(data.value as TabKey);
-        setSelectedRunId(null);
-    };
-
-    const handleAppChange = (value: string) => {
-        setAppScope(value as TestAppScope);
         setSelectedRunId(null);
     };
 
@@ -652,20 +561,6 @@ export function TestSuitesPage() {
                 <div className={styles.scopeSelects}>
                     <Dropdown
                         className={styles.scopeDropdown}
-                        value={t(`testSuitesPage.appOptions.${appScope}`)}
-                        selectedOptions={[appScope]}
-                        onOptionSelect={(_, data) => data.optionValue && handleAppChange(data.optionValue)}
-                        aria-label={t("testSuitesPage.appLabel")}
-                    >
-                        {APP_OPTIONS.map((option) => (
-                            <Option key={option} value={option}>
-                                {t(`testSuitesPage.appOptions.${option}`)}
-                            </Option>
-                        ))}
-                    </Dropdown>
-
-                    <Dropdown
-                        className={styles.scopeDropdown}
                         value={t(`testSuitesPage.envOptions.${env}`)}
                         selectedOptions={[env]}
                         onOptionSelect={(_, data) => data.optionValue && handleEnvChange(data.optionValue)}
@@ -705,7 +600,6 @@ export function TestSuitesPage() {
                     runs={runsBySuite.get(tab) ?? []}
                     selectedRunId={selectedRunId}
                     onSelectRun={setSelectedRunId}
-                    appScope={appScope}
                     env={env}
                 />
             )}
@@ -765,14 +659,12 @@ function SuiteDetail({
     runs,
     selectedRunId,
     onSelectRun,
-    appScope,
     env,
 }: {
     suite: TestSuiteKey;
     runs: TestSuiteRun[];
     selectedRunId: string | null;
     onSelectRun: (id: string) => void;
-    appScope: TestAppScope;
     env: TestEnvironment;
 }) {
     const { t } = useTranslation();
@@ -789,7 +681,6 @@ function SuiteDetail({
                 <Text weight="semibold">{t("testSuitesPage.notWiredTitle")}</Text>
                 <Text className={styles.detailNote}>
                     {t("testSuitesPage.notWiredBody", {
-                        app: t(`testSuitesPage.appOptions.${appScope}`),
                         env: t(`testSuitesPage.envOptions.${env}`),
                     })}
                 </Text>
@@ -824,13 +715,6 @@ function SuiteDetail({
                             <span>&middot;</span>
                             <span>{formatDateTime(run.startedAt)}</span>
                         </div>
-                        {run.linkedRunId && (
-                            <Text className={styles.detailNote} block>
-                                {suite === "nrt"
-                                    ? t("testSuitesPage.linkedNoteNrt")
-                                    : t("testSuitesPage.linkedNoteA11y", { runId: run.linkedRunId })}
-                            </Text>
-                        )}
                     </div>
                 </div>
                 <div className={styles.reportCta}>
@@ -844,27 +728,13 @@ function SuiteDetail({
                     >
                         {t("testSuitesPage.openReport", { file: run.reportFile })}
                     </Button>
-                    {openReportItHref(run) && (
-                        <Button
-                            as="a"
-                            href={openReportItHref(run)}
-                            target="_blank"
-                            rel="noreferrer"
-                            appearance="secondary"
-                            icon={<OpenRegular />}
-                        >
-                            {t("testSuitesPage.openReportIt", { file: run.reportFileIt })}
-                        </Button>
-                    )}
                     <Text className={styles.detailNote}>{t("testSuitesPage.renderedBy", { tool: run.reportTool })}</Text>
                 </div>
             </div>
 
             <div className={styles.gridTwo}>
                 <div>
-                    {suite === "nrt" && run.nrt && <NrtDetail run={run} runs={runs} />}
-                    {suite === "a11y" && run.a11y && <A11yDetail detail={run.a11y} />}
-                    {suite === "dast" && run.dast && <DastDetail detail={run.dast} />}
+                    {run.nrt && <NrtDetail run={run} runs={runs} />}
                 </div>
                 <RunsList runs={runs} selectedId={run.id} onSelect={onSelectRun} />
             </div>
@@ -876,10 +746,21 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
     const { t } = useTranslation();
     const styles = useStyles();
     const detail = run.nrt!;
+    // a11y/security runs carry team: tag data instead of a meaningful
+    // domain breakdown (see buildTeamSummary) - prefer it over domains when
+    // present rather than showing both.
+    const hasTeams = (detail.teams?.length ?? 0) > 0;
     const pct = Math.round((detail.passed / detail.totalTests) * 1000) / 10;
     const durationLabel = `${Math.round(detail.durationMs / 60000)}m ${Math.round((detail.durationMs % 60000) / 1000)}s`;
 
     const trendRuns = runs.slice(0, TREND_RUN_COUNT).filter((r) => r.nrt).reverse();
+
+    // Clicking a row in the domain/team breakdown filters the Test list
+    // below to just that group - toggled off by clicking the same row again.
+    const [rowFilter, setRowFilter] = useState<string | null>(null);
+    const filteredTests = (detail.tests ?? []).filter(
+        (test) => !rowFilter || (hasTeams ? test.app : test.domain) === rowFilter
+    );
 
     return (
         <div>
@@ -917,13 +798,15 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
 
                 <Card className={styles.card}>
                     <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.nrt.domainsTitle")}</span>
+                        <span>{t(hasTeams ? "testSuitesPage.nrt.teamsTitle" : "testSuitesPage.nrt.domainsTitle")}</span>
                         <span className={styles.cardTitleHint}>{detail.totalTests}</span>
                     </div>
                     <table className={styles.table}>
                         <thead>
                             <tr>
-                                <th className={styles.tableHeadCell}>{t("testSuitesPage.nrt.domainCol")}</th>
+                                <th className={styles.tableHeadCell}>
+                                    {t(hasTeams ? "testSuitesPage.nrt.teamCol" : "testSuitesPage.nrt.domainCol")}
+                                </th>
                                 <th className={styles.tableHeadCell} style={{ textAlign: "right" }}>
                                     {t("testSuitesPage.nrt.passedCol")}
                                 </th>
@@ -936,11 +819,16 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {detail.domains.map((d: NrtDomainResult) => (
-                                <tr key={d.domain}>
-                                    <td className={styles.tableCell}>
-                                        {d.domain} — {d.label}
-                                    </td>
+                            {(hasTeams ? detail.teams! : detail.domains).map((d: NrtDomainResult) => (
+                                <tr
+                                    key={d.domain}
+                                    className={mergeClasses(
+                                        styles.tableRowClickable,
+                                        rowFilter === d.domain && styles.tableRowSelected
+                                    )}
+                                    onClick={() => setRowFilter((current) => (current === d.domain ? null : d.domain))}
+                                >
+                                    <td className={styles.tableCell}>{hasTeams ? d.label : d.domain}</td>
                                     <td className={styles.tableCellNum}>{d.passed}</td>
                                     <td className={styles.tableCellNum}>{d.total}</td>
                                     <td className={styles.tableCellNum}>{d.flaky}</td>
@@ -954,10 +842,12 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                     <Card className={styles.card}>
                         <div className={styles.cardTitle}>
                             <span>{t("testSuitesPage.nrt.testsTitle")}</span>
-                            <span className={styles.cardTitleHint}>{detail.tests.length}</span>
+                            <span className={styles.cardTitleHint}>
+                                {rowFilter ? `${filteredTests.length} / ${detail.tests.length}` : detail.tests.length}
+                            </span>
                         </div>
                         <Accordion collapsible>
-                            {detail.tests.map((test, i) => (
+                            {filteredTests.map((test, i) => (
                                 <AccordionItem key={`${test.title}-${i}`} value={i}>
                                     <AccordionHeader expandIconPosition="end">
                                         <div className={styles.testHeaderRow}>
@@ -967,6 +857,9 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                             <Text className={styles.testTitle}>{test.title}</Text>
                                             <Text className={styles.findingMeta} font="monospace">
                                                 {test.domain}
+                                            </Text>
+                                            <Text className={styles.findingMeta} font="monospace">
+                                                {test.file}
                                             </Text>
                                         </div>
                                     </AccordionHeader>
@@ -989,147 +882,6 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                         </Accordion>
                     </Card>
                 )}
-        </div>
-    );
-}
-
-function A11yDetail({ detail }: { detail: NonNullable<TestSuiteRun["a11y"]> }) {
-    const { t } = useTranslation();
-    const styles = useStyles();
-    const [onlyFailed, setOnlyFailed] = useState(false);
-    const max = Math.max(detail.critical, detail.serious, detail.moderate, detail.minor, 1);
-    const failedSteps = detail.steps.filter((s) => s.violations > 0 || s.incomplete > 0);
-    const visibleSteps = onlyFailed ? failedSteps : detail.steps;
-
-    return (
-        <div>
-                <div className={styles.statRow}>
-                    <StatTile value={detail.violations} label={t("testSuitesPage.a11y.violations")} />
-                    <StatTile value={detail.incomplete} label={t("testSuitesPage.a11y.incomplete")} />
-                    {detail.passes != null && <StatTile value={detail.passes} label={t("testSuitesPage.a11y.passes")} />}
-                    <StatTile value={detail.stepsScanned} label={t("testSuitesPage.a11y.stepsScanned")} />
-                </div>
-
-                {/* This summary only has the counts/rule ids axe-data-*.json
-                    carries - no screenshots or DOM context, which only the
-                    generated report itself has (see the "Open ..." button
-                    above). */}
-                <Text className={styles.detailNote} block>
-                    {t("testSuitesPage.a11y.moreInfoNote")}
-                </Text>
-
-                <Card className={styles.card}>
-                    <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.a11y.impactTitle")}</span>
-                    </div>
-                    <SeverityBar label={t("testSuitesPage.a11y.impact.critical")} count={detail.critical} max={max} color={tokens.colorPaletteRedForeground1} />
-                    <SeverityBar label={t("testSuitesPage.a11y.impact.serious")} count={detail.serious} max={max} color={tokens.colorPaletteRedForeground1} />
-                    <SeverityBar label={t("testSuitesPage.a11y.impact.moderate")} count={detail.moderate} max={max} color={tokens.colorPaletteMarigoldForeground1} />
-                    <SeverityBar label={t("testSuitesPage.a11y.impact.minor")} count={detail.minor} max={max} color={tokens.colorNeutralForeground3} />
-                </Card>
-
-                <Card className={styles.card}>
-                    <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.a11y.stepsTitle")}</span>
-                        <span className={styles.cardTitleHint}>
-                            {t("testSuitesPage.a11y.stepsShown", { shown: visibleSteps.length, total: detail.steps.length })}
-                        </span>
-                    </div>
-                    <Switch
-                        checked={onlyFailed}
-                        onChange={(_, data) => setOnlyFailed(data.checked)}
-                        label={t("testSuitesPage.a11y.onlyFailedSteps", { count: failedSteps.length })}
-                    />
-                    {visibleSteps.length === 0 && (
-                        <Text className={styles.detailNote}>{t("testSuitesPage.a11y.noFailedSteps")}</Text>
-                    )}
-                    {visibleSteps.map((step) => {
-                        const stepFailed = step.violations > 0 || step.incomplete > 0;
-                        return (
-                            <div key={step.label} className={styles.stepBlock}>
-                                <div className={styles.stepHeader}>
-                                    <Text className={styles.stepLabel} font="monospace">{step.label}</Text>
-                                    <Badge appearance="filled" color={stepFailed ? "danger" : "success"}>
-                                        {stepFailed
-                                            ? t("testSuitesPage.a11y.stepFailed", { violations: step.violations, incomplete: step.incomplete })
-                                            : t("testSuitesPage.a11y.stepClean")}
-                                    </Badge>
-                                </div>
-                                {step.rules.map((rule: A11yRuleViolation) => (
-                                    <div key={rule.ruleId} className={styles.findingRow}>
-                                        <div className={styles.findingTop}>
-                                            <a
-                                                className={styles.findingId}
-                                                href={`https://dequeuniversity.com/rules/axe/4.12/${rule.ruleId}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                {rule.ruleId}
-                                            </a>
-                                            <Badge appearance="filled" color={impactToBadgeColor(rule.impact)}>
-                                                {t(`testSuitesPage.a11y.impact.${rule.impact}`)}
-                                            </Badge>
-                                            <span className={styles.findingMeta}>&times; {rule.count}</span>
-                                        </div>
-                                        <Text className={styles.findingTitle} block>
-                                            {rule.description}
-                                        </Text>
-                                    </div>
-                                ))}
-                            </div>
-                        );
-                    })}
-                </Card>
-        </div>
-    );
-}
-
-function DastDetail({ detail }: { detail: NonNullable<TestSuiteRun["dast"]> }) {
-    const { t } = useTranslation();
-    const styles = useStyles();
-    const max = Math.max(detail.high, detail.medium, detail.low, detail.informational, 1);
-
-    return (
-        <div>
-                <div className={styles.statRow}>
-                    <StatTile value={detail.riskScore} label={t("testSuitesPage.dast.riskScore")} />
-                    <StatTile
-                        value={detail.high + detail.medium + detail.low + detail.informational}
-                        label={t("testSuitesPage.dast.openAlerts")}
-                    />
-                    <StatTile value={detail.endpointsScanned} label={t("testSuitesPage.dast.endpointsScanned")} />
-                    <StatTile value={detail.high} label={t("testSuitesPage.dast.highRisk")} />
-                </div>
-
-                <Card className={styles.card}>
-                    <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.dast.riskTitle")}</span>
-                    </div>
-                    <SeverityBar label={t("testSuitesPage.dast.risk.High")} count={detail.high} max={max} color={tokens.colorPaletteRedForeground1} />
-                    <SeverityBar label={t("testSuitesPage.dast.risk.Medium")} count={detail.medium} max={max} color={tokens.colorPaletteMarigoldForeground1} />
-                    <SeverityBar label={t("testSuitesPage.dast.risk.Low")} count={detail.low} max={max} color={tokens.colorNeutralForeground3} />
-                    <SeverityBar label={t("testSuitesPage.dast.risk.Informational")} count={detail.informational} max={max} color={tokens.colorNeutralForeground3} />
-                </Card>
-
-                <Card className={styles.card}>
-                    <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.dast.alertsTitle")}</span>
-                        <span className={styles.cardTitleHint}>{detail.alerts.length}</span>
-                    </div>
-                    {detail.alerts.map((alert: DastAlert, i: number) => (
-                        <div key={i} className={styles.findingRow}>
-                            <div className={styles.findingTop}>
-                                <Badge appearance="filled" color={riskToBadgeColor(alert.risk)}>
-                                    {t(`testSuitesPage.dast.risk.${alert.risk}`)}
-                                </Badge>
-                                <span className={styles.findingMeta}>{alert.target}</span>
-                            </div>
-                            <Text className={styles.findingTitle} block>
-                                {alert.title}
-                            </Text>
-                        </div>
-                    ))}
-                </Card>
         </div>
     );
 }

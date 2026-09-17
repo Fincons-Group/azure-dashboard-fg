@@ -43,7 +43,7 @@ const VERIFY_STATES = [
 ] as const;
 
 // "Overview" (every state combined, the previous default) plus one tab per
-// individual state - same Panoramica/NRT/A11Y/DAST pattern as TestSuitesPage.
+// individual state - same Panoramica/NRT/A11Y/Security pattern as TestSuitesPage.
 type VerifyStateTab = "overview" | (typeof VERIFY_STATES)[number];
 
 // Same domain the server itself gates every PAT against (ALLOWED_EMAIL_DOMAIN

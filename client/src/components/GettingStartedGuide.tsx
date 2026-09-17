@@ -17,7 +17,8 @@ import {
 } from "@fluentui/react-components";
 import { useTranslation } from "react-i18next";
 import { AzdoPatSteps } from "./AzdoPatSteps";
-import { NAV_ITEMS } from "../config/navItems";
+import { NAV_ITEMS, EXPERIMENTAL_NAV_KEYS } from "../config/navItems";
+import { useSettings } from "../hooks/useSettings";
 
 const useStyles = makeStyles({
     content: {
@@ -44,6 +45,10 @@ export function GettingStartedGuide({
 }) {
     const { t } = useTranslation();
     const styles = useStyles();
+    const { settings } = useSettings();
+    const visibleNavItems = NAV_ITEMS.filter(
+        (item) => settings.showExperimentalPages || !EXPERIMENTAL_NAV_KEYS.has(item.key)
+    );
 
     return (
         <Dialog
@@ -86,7 +91,7 @@ export function GettingStartedGuide({
                                 {t("onboardingGuide.navSectionTitle")}
                             </Title3>
                             <Accordion collapsible>
-                                {NAV_ITEMS.map((item) => (
+                                {visibleNavItems.map((item) => (
                                     <AccordionItem
                                         key={item.key}
                                         value={item.key}

@@ -616,6 +616,70 @@ export async function getTestPoints(
     return response.data.value;
 }
 
+// Unlike getTestPoints above, this includes every point-level detail (last
+// result outcome/date, tester, configuration) and every point under a
+// suite's child suites when recursive - what the QA Control Center replica
+// needs to build its per-tester/per-outcome model. Paged via the
+// x-ms-continuationtoken response header, same mechanism as
+// getTestRunsForPlan below (the testplan API doesn't support $skip here).
+export async function getTestPointsRecursive(
+    planId: number,
+    suiteId: number,
+    project?: string,
+    recursive = true
+) {
+    const points: any[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+        const response = await clientFor(project).get(
+            `/testplan/Plans/${planId}/Suites/${suiteId}/TestPoint?includePointDetails=true&returnIdentityRef=true&isRecursive=${recursive}&api-version=7.1${
+                continuationToken
+                    ? `&continuationToken=${encodeURIComponent(continuationToken)}`
+                    : ""
+            }`
+        );
+
+        points.push(...(response.data.value ?? []));
+        continuationToken = response.headers["x-ms-continuationtoken"];
+    } while (continuationToken);
+
+    return points;
+}
+
+// Test runs scoped to one plan within a date window (by last-updated date) -
+// unlike getTestRuns above (every run, project-wide, no filter), this is
+// what the QA Control Center replica walks in rolling windows to build
+// execution history without pulling the entire project's run list.
+export async function getTestRunsForPlan(
+    planId: number,
+    minDate: Date,
+    maxDate: Date,
+    project?: string
+) {
+    const runs: any[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+        const response = await clientFor(project).get(
+            `/test/runs?minLastUpdatedDate=${encodeURIComponent(
+                minDate.toISOString()
+            )}&maxLastUpdatedDate=${encodeURIComponent(
+                maxDate.toISOString()
+            )}&planIds=${planId}&$top=100&api-version=7.1${
+                continuationToken
+                    ? `&continuationToken=${encodeURIComponent(continuationToken)}`
+                    : ""
+            }`
+        );
+
+        runs.push(...(response.data.value ?? []));
+        continuationToken = response.headers["x-ms-continuationtoken"];
+    } while (continuationToken);
+
+    return runs;
+}
+
 // The runs list endpoint returns runs in ascending creation order with no
 // $orderby support, so a single capped page (e.g. $top=50) only ever returns
 // the oldest runs project-wide - newer runs past that page silently never
@@ -682,7 +746,7 @@ const projectsWithoutIterationDetails = new Set<string>();
 export async function getTestRunResults(
     runId: number,
     project?: string,
-    options: { includeIterations?: boolean } = {}
+    options: { includeIterations?: boolean; includePoints?: boolean } = {}
 ) {
     const results: any[] = [];
     const currentConfig = getCurrentConfig();
@@ -698,6 +762,8 @@ export async function getTestRunResults(
         while (true) {
             const details = includeIterations
                 ? "&detailsToInclude=Iterations"
+                : options.includePoints
+                ? "&detailsToInclude=Point"
                 : "";
             const response = await clientFor(project).get(
                 `/test/Runs/${runId}/results?api-version=7.1&$top=${pageSize}&$skip=${skip}${details}`

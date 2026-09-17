@@ -43,6 +43,17 @@ export function SettingsDialog({
                                 label={t("settingsDialog.showExtraKpisLabel")}
                             />
                         </Field>
+                        <Field
+                            hint={t("settingsDialog.showExperimentalPagesHint")}
+                        >
+                            <Switch
+                                checked={settings.showExperimentalPages}
+                                onChange={(_, data) =>
+                                    setSetting("showExperimentalPages", data.checked)
+                                }
+                                label={t("settingsDialog.showExperimentalPagesLabel")}
+                            />
+                        </Field>
                     </DialogContent>
                     <DialogActions>
                         <Button appearance="primary" onClick={onClose}>

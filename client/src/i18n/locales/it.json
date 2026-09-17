@@ -18,6 +18,9 @@
     "automationKpis": "KPI di Automazione",
     "e2eHistory": "Storico E2E",
     "testSuites": "Suite di Test",
+    "testPlans": "Piani di Test",
+    "teamDashboard": "Dashboard del Team",
+    "qaControlCenter": "QA Control Center",
     "bugs": "Bug",
     "refresh": "Aggiorna Ora",
     "refreshing": "Aggiornamento...",
@@ -39,6 +42,8 @@
     "title": "Impostazioni",
     "showExtraKpisLabel": "Mostra KPI aggiuntivi",
     "showExtraKpisHint": "Controlla la sezione \"KPI aggiuntivi\" nella card del Report Sprint - se disattivata, viene nascosta a schermo e omessa da ogni report inviato/esportato (HTML, PDF, PPTX). Salvato in questo browser.",
+    "showExperimentalPagesLabel": "Mostra pagine sperimentali",
+    "showExperimentalPagesHint": "Mostra nel menu Tempo di Ciclo, Storico E2E, KPI di Automazione, Dashboard del Team e QA Control Center - pagine ancora in fase di rifinitura, nascoste di default. Salvato in questo browser.",
     "close": "Chiudi"
   },
   "azdoPatSteps": {
@@ -68,6 +73,9 @@
       "automation-kpis": "Copertura di automazione reale sui test case, success rate e test instabili per il progetto Test Factory.",
       "e2e-history": "Andamento del success rate e storico delle esecuzioni recenti della suite Playwright tst-e2e, pubblicati via Firebase.",
       "test-suites": "NRT, accessibilità e sicurezza in un unico hub - scegli una suite per vedere l'ultima esecuzione e lo storico.",
+      "test-plans": "Sfoglia i piani di test di Azure DevOps per qualsiasi progetto - test case, esiti e quale esecuzione ha aggiornato per ultima ognuno.",
+      "team-dashboard": "Link rapido alla dashboard del team Nuova Frontiera in Azure DevOps (si apre in una nuova scheda - ADO ne blocca l'incorporamento qui).",
+      "qa-control-center": "Velocità di esecuzione, previsione, carico dei tester e rischio bug per qualsiasi piano/suite di test - una replica nativa del widget dashboard QA Control Center.",
       "bugs": "Bug in attesa di verifica QA e bug aperti oggi, entrambi filtrati sui membri del team Fincons Group (@finconsgroup.com)."
     },
     "gotIt": "Capito"
@@ -193,10 +201,27 @@
     },
     "flakyTestsTitle_one": "Test instabile ({{count}})",
     "flakyTestsTitle_other": "Test instabili ({{count}})",
+    "specCatalog": {
+      "title": "File di test automatizzati",
+      "loading": "Caricamento file di test...",
+      "notConfigured": "Imposta TEST_SUITES_REPORTS_DIR sul server con un checkout di tst-e2e per elencare qui i file di test reali.",
+      "empty": "Nessun file di test trovato per questa suite.",
+      "notLinked": "Non ancora collegato ad Azure DevOps",
+      "tabs": {
+        "nrt": "NRT",
+        "a11y": "A11Y",
+        "security": "Security"
+      }
+    },
     "table": {
       "testCase": "Test case",
       "flakeCount": "Fallimenti",
-      "lastFailed": "Ultimo fallimento"
+      "lastFailed": "Ultimo fallimento",
+      "specFile": "File di test",
+      "browser": "Browser",
+      "lastRuns": "Ultime 5 esecuzioni",
+      "topErrors": "Errori più comuni",
+      "noErrors": "Nessun errore registrato"
     }
   },
   "e2eHistoryPage": {
@@ -230,14 +255,8 @@
     "title": "Suite di Test",
     "subtitle": "NRT, accessibilità e sicurezza per la suite di automazione - scegli una suite per vedere l'ultima esecuzione e lo storico.",
     "notConfiguredTitle": "Non ancora configurato",
-    "notConfiguredBody": "Imposta FIREBASE_SERVICE_ACCOUNT_JSON sul server per iniziare a mostrare qui lo storico reale delle esecuzioni NRT/A11Y/DAST.",
+    "notConfiguredBody": "Imposta FIREBASE_SERVICE_ACCOUNT_JSON sul server per iniziare a mostrare qui lo storico reale delle esecuzioni NRT/A11Y/Security.",
     "eyebrow": "Quality gate automatizzati",
-    "appLabel": "App",
-    "appOptions": {
-      "plurifond": "Plurifonds",
-      "frontOfficeAuto": "Front Office Auto",
-      "all": "Tutte le app (regressione completa)"
-    },
     "envLabel": "Ambiente",
     "envOptions": {
       "tst": "TST",
@@ -248,10 +267,10 @@
       "overview": "Panoramica",
       "nrt": "NRT",
       "a11y": "A11Y",
-      "dast": "DAST"
+      "security": "Security"
     },
     "notWiredTitle": "Non ancora collegato",
-    "notWiredBody": "Non c'è ancora uno storico per {{app}} su {{env}}. Una volta collegata la pipeline, le esecuzioni appariranno qui come per Plurifonds.",
+    "notWiredBody": "Non c'è ancora uno storico su {{env}}. Una volta collegata la pipeline, le esecuzioni appariranno qui.",
     "suites": {
       "nrt": {
         "name": "NRT",
@@ -263,19 +282,18 @@
         "name": "A11Y",
         "full": "Audit di Accessibilità",
         "tool": "via axe-core",
-        "desc": "Scansione axe-core di ogni step del wizard Plurifonds, verificata secondo WCAG 2.2 AA."
+        "desc": "Scansione axe-core di ogni step del wizard Plurifonds, verificata secondo WCAG 2.1 AA."
       },
-      "dast": {
-        "name": "DAST",
-        "full": "Test di Sicurezza Dinamici",
-        "tool": "via OWASP ZAP",
-        "desc": "Scansione ZAP baseline + attiva sull'ambiente di staging, eseguita settimanalmente prima di ogni release."
+      "security": {
+        "name": "Security",
+        "full": "Test Funzionali di Sicurezza",
+        "tool": "via playwright-smart-reporter",
+        "desc": "Specifiche Playwright taggate type:security - controlli funzionali di sicurezza."
       }
     },
     "ranAt": "Eseguito {{time}}",
     "viewReports": "Vedi i report",
     "openReport": "Apri {{file}}",
-    "openReportIt": "Apri riepilogo in italiano ({{file}})",
     "renderedBy": "Generato da {{tool}}",
     "linkedNoteNrt": "Questa esecuzione ha incluso anche il progetto a11y-chrome - vedi la scheda A11Y per i risultati.",
     "linkedNoteA11y": "Catturato all'interno dell'esecuzione NRT {{runId}} (il progetto a11y-chrome è girato insieme alle specifiche vit).",
@@ -295,6 +313,8 @@
       "passedCol": "Superati",
       "totalCol": "Totali",
       "flakyCol": "Instabili",
+      "teamsTitle": "Risultati per team",
+      "teamCol": "Team",
       "testsTitle": "Test",
       "testStatus": {
         "passed": "Superato",
@@ -324,24 +344,101 @@
         "minor": "Minore"
       }
     },
-    "dast": {
-      "riskScore": "Punteggio di rischio",
-      "openAlerts": "Alert aperti",
-      "endpointsScanned": "Endpoint scansionati",
-      "highRisk": "Rischio alto",
-      "riskTitle": "Alert per livello di rischio",
-      "alertsTitle": "Alert",
-      "risk": {
-        "High": "Alto",
-        "Medium": "Medio",
-        "Low": "Basso",
-        "Informational": "Informativo"
-      }
-    },
     "pastRuns": "Esecuzioni precedenti",
     "totalRuns_one": "{{count}} esecuzione",
     "totalRuns_other": "{{count}} esecuzioni",
     "latest": "Ultima"
+  },
+  "testPlansPage": {
+    "title": "Piani di Test",
+    "subtitle": "Sfoglia i piani di test di Azure DevOps per il progetto selezionato e scopri quale esecuzione ha aggiornato per ultima ogni test case.",
+    "pickProject": "Seleziona un progetto sopra per vedere i suoi piani di test.",
+    "searchPlansPlaceholder": "Cerca piani per nome o ID...",
+    "loadingPlans": "Caricamento piani di test...",
+    "noPlans": "Nessun piano di test trovato per questo progetto.",
+    "selectPlanHint": "Seleziona un piano di test per vedere i suoi test case e lo storico esecuzioni.",
+    "loadingOverview": "Caricamento piano di test...",
+    "openInAdo": "Apri in Azure DevOps",
+    "stats": {
+      "totalTestCases": "Test case totali",
+      "totalBugs": "Bug collegati"
+    },
+    "testCasesTitle_one": "{{count}} di {{total}} test case",
+    "testCasesTitle_other": "{{count}} di {{total}} test case",
+    "searchTestCasesPlaceholder": "Cerca per test case, suite o ID esecuzione...",
+    "noTestCases": "Nessun test case trovato in questo piano.",
+    "table": {
+      "testCase": "Test case",
+      "suite": "Suite",
+      "outcome": "Esito",
+      "lastRun": "Ultima esecuzione",
+      "lastRunAt": "Data ultima esecuzione"
+    }
+  },
+  "teamDashboardPage": {
+    "title": "Dashboard del Team",
+    "subtitle": "La dashboard del team Nuova Frontiera si trova in Azure DevOps e non può essere incorporata qui.",
+    "cardTitle": "Dashboard Nuova Frontiera",
+    "cardBody": "Azure DevOps impedisce che le sue dashboard vengano mostrate all'interno della pagina di un altro sito (X-Frame-Options: SAMEORIGIN), quindi si apre in una nuova scheda invece di essere incorporata qui.",
+    "openButton": "Apri in Azure DevOps"
+  },
+  "qaControlCenterPage": {
+    "title": "QA Control Center",
+    "subtitle": "Velocità di esecuzione, previsione, carico dei tester e rischio bug per un piano/suite di test - una replica nativa del widget dashboard QA Control Center.",
+    "pickPlan": "Scegli un piano di test...",
+    "pickSuite": "Scegli una suite di test...",
+    "pickProject": "Seleziona un progetto sopra per iniziare.",
+    "pickPlanSuite": "Scegli un piano e una suite di test sopra per vedere la velocità di esecuzione.",
+    "eyebrow": "Governance QA",
+    "trend": {
+      "up": "In crescita",
+      "down": "In calo",
+      "stable": "Stabile",
+      "limitedData": "Dati limitati"
+    },
+    "kpi": {
+      "remaining": "Casi ancora da chiudere",
+      "remainingDetail": "{{total}} totali",
+      "today": "Eseguiti oggi",
+      "yesterday": "Eseguiti ieri",
+      "forecast": "Previsti domani",
+      "forecastDetail": "media pesata {{average}} casi/giorno",
+      "forecastNonWorkingDay": "giornata non lavorativa"
+    },
+    "completionTitle": "Avanzamento esecuzione",
+    "completionDetail": "Eseguiti {{executed}} / {{total}} · Execution Rate {{executionRate}}% · Pass Rate {{passRate}}%",
+    "outcome": {
+      "passed": "passed",
+      "failed": "failed",
+      "blocked": "blocked",
+      "partial": "parziali",
+      "other": "altri esiti",
+      "notApplicable": "N/A"
+    },
+    "hoursRemaining": "ore residue",
+    "trendTitle": "Esecuzioni giornaliere",
+    "trendHint": "test case unici · * previsione",
+    "teamTitle": "Carico per tester",
+    "noTeam": "Nessuna assegnazione.",
+    "unassignedTester": "Non assegnato",
+    "team": {
+      "tester": "Tester",
+      "assigned": "Ass.",
+      "remaining": "Resid.",
+      "hours": "Ore",
+      "completion": "%"
+    },
+    "riskTitle": "Governance e rischi",
+    "risk": {
+      "unassigned": "{{count}} non assegnati",
+      "openBugs": "{{count}} bug aperti",
+      "blockedByBug": "{{count}} bloccati da bug",
+      "readyForRetest": "{{count}} pronti al retest",
+      "failedWithoutBug": "{{count}} failed senza bug"
+    },
+    "calibrationNote": "Fattore di stima adattiva ×{{factor}} da {{samples}} casi manuali osservati.",
+    "historyTruncated": "storico limitato alle 100 esecuzioni più recenti.",
+    "historyFallback": "storico completo non disponibile; conteggio basato sull'ultimo esito."
   },
   "planOverviewPage": {
     "exporting": "Esportazione...",

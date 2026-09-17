@@ -8,14 +8,24 @@ import { FirebaseConfigError } from "./firebaseE2eData.js";
 import type { TestSuiteRun } from "./types.js";
 
 // scripts/publish-local-test-runs.js is, for now, the only thing that ever
-// writes here - there's no tst-e2e CI pipeline yet for the NRT/A11Y/DAST
+// writes here - there's no tst-e2e CI pipeline yet for the NRT/A11Y/Security
 // Test Suites hub (unlike e2eRuns above, see docs/e2e-firebase-integration-plan.md).
 // Once that pipeline exists it should publish to a real "testSuiteRuns"
 // collection instead, and this should read from that one - kept separate so
 // a stray local publish can never masquerade as real CI history.
+//
+// Structured as testSuiteRunsLocal/<kind>/runs/<runId> (one "folder" per
+// suite kind) rather than one flat collection keyed only by a `suite`
+// field - a single Playwright invocation can carry real content for more
+// than one kind (e.g. a run pointed at the a11y/security tag subset has no
+// real NRT content at all), and a flat collection with a computed `suite`
+// field on each doc made that ambiguous to query and easy to display
+// wrong. Publishing now writes one doc per kind that actually has content,
+// straight into its own folder - see splitRunsByKind in the publish script.
 const COLLECTION = "testSuiteRunsLocal";
+const KINDS = ["nrt", "a11y", "security"] as const;
 const CACHE_DURATION_MS = 5 * 60 * 1000;
-const MAX_RUNS = 200;
+const MAX_RUNS_PER_KIND = 200;
 
 let app: App | null = null;
 
@@ -56,15 +66,25 @@ export async function getTestSuiteRuns(): Promise<TestSuiteRun[]> {
         return cache.data;
     }
 
-    const snapshot = await getDb()
-        .collection(COLLECTION)
-        .orderBy("startedAt", "desc")
-        .limit(MAX_RUNS)
-        .get();
+    const db = getDb();
 
-    const runs = snapshot.docs.map(
-        (doc: QueryDocumentSnapshot) => doc.data() as TestSuiteRun
+    const snapshots = await Promise.all(
+        KINDS.map((kind) =>
+            db
+                .collection(COLLECTION)
+                .doc(kind)
+                .collection("runs")
+                .orderBy("startedAt", "desc")
+                .limit(MAX_RUNS_PER_KIND)
+                .get()
+        )
     );
+
+    const runs = snapshots
+        .flatMap((snapshot) =>
+            snapshot.docs.map((doc: QueryDocumentSnapshot) => doc.data() as TestSuiteRun)
+        )
+        .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 
     cache = { data: runs, timestamp: Date.now() };
 
