@@ -32,6 +32,15 @@ const E2eHistoryPage = lazy(() =>
 const TestSuitesPage = lazy(() =>
     import("./pages/TestSuitesPage").then((m) => ({ default: m.TestSuitesPage }))
 );
+const TestPlansPage = lazy(() =>
+    import("./pages/TestPlansPage").then((m) => ({ default: m.TestPlansPage }))
+);
+const TeamDashboardPage = lazy(() =>
+    import("./pages/TeamDashboardPage").then((m) => ({ default: m.TeamDashboardPage }))
+);
+const QaControlCenterPage = lazy(() =>
+    import("./pages/QaControlCenterPage").then((m) => ({ default: m.QaControlCenterPage }))
+);
 const BugsPage = lazy(() =>
     import("./pages/BugsPage").then((m) => ({ default: m.BugsPage }))
 );
@@ -72,6 +81,18 @@ function AppRoutes() {
                 <Route
                     path="/test-suites"
                     element={<TestSuitesPage />}
+                />
+                <Route
+                    path="/test-plans"
+                    element={<TestPlansPage />}
+                />
+                <Route
+                    path="/team-dashboard"
+                    element={<TeamDashboardPage />}
+                />
+                <Route
+                    path="/qa-control-center"
+                    element={<QaControlCenterPage />}
                 />
                 <Route path="/bugs" element={<BugsPage />} />
                 <Route

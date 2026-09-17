@@ -7,6 +7,9 @@ import {
     FlashAutoRegular,
     BeakerRegular,
     AppsListRegular,
+    ClipboardTaskListLtrRegular,
+    BoardRegular,
+    GaugeRegular,
     BugRegular,
 } from "@fluentui/react-icons";
 
@@ -16,6 +19,18 @@ export interface NavItemConfig {
     icon: FluentIcon;
     descriptionKey: string;
 }
+
+// Nav keys gated behind AppSettings.showExperimentalPages (see
+// settingsContext.ts) - off by default. Sidebar.tsx and GettingStartedGuide.tsx
+// both filter their own NAV_ITEMS-shaped lists against this same set so the
+// sidebar and the onboarding guide never disagree about what's visible.
+export const EXPERIMENTAL_NAV_KEYS = new Set([
+    "cycle-time",
+    "e2e-history",
+    "automation-kpis",
+    "team-dashboard",
+    "qa-control-center",
+]);
 
 // This branch ships the Sprint Report, the multi-scope Excel Export page,
 // the Test Factory Coverage Roadmap, its Cycle Time report, its Automation
@@ -64,6 +79,24 @@ export const NAV_ITEMS: NavItemConfig[] = [
         labelKey: "nav.testSuites",
         icon: AppsListRegular,
         descriptionKey: "onboardingGuide.navSections.test-suites",
+    },
+    {
+        key: "test-plans",
+        labelKey: "nav.testPlans",
+        icon: ClipboardTaskListLtrRegular,
+        descriptionKey: "onboardingGuide.navSections.test-plans",
+    },
+    {
+        key: "team-dashboard",
+        labelKey: "nav.teamDashboard",
+        icon: BoardRegular,
+        descriptionKey: "onboardingGuide.navSections.team-dashboard",
+    },
+    {
+        key: "qa-control-center",
+        labelKey: "nav.qaControlCenter",
+        icon: GaugeRegular,
+        descriptionKey: "onboardingGuide.navSections.qa-control-center",
     },
     {
         key: "bugs",

@@ -12,10 +12,18 @@ export interface AppSettings {
     // because it's meant to apply the same way across every report send,
     // not be re-decided each time.
     showExtraKpis: boolean;
+    // Whether the nav pages listed in EXPERIMENTAL_NAV_KEYS
+    // (config/navItems.ts) show in the Sidebar and the Getting Started
+    // guide - Cycle Time, E2E History, Automation KPIs, Team Dashboard, QA
+    // Control Center. Off by default: these ship on main but aren't ready
+    // for everyone yet, and this per-browser toggle (not an env var) lets
+    // anyone opt in locally to preview them without a separate deploy.
+    showExperimentalPages: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
     showExtraKpis: false,
+    showExperimentalPages: false,
 };
 
 export const SettingsContext = createContext<{

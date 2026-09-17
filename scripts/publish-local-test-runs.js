@@ -14,7 +14,7 @@
 //
 // Usage: E2E_LOCAL_PUBLISH=true node scripts/publish-local-test-runs.js
 // Add PUBLISH_REPORTS_TO_FIREBASE=true too to also upload each run's report
-// file(s) to Firebase Storage and set reportUrl/reportUrlIt on the document -
+// file(s) to Firebase Storage and set reportUrl on the document -
 // a separate opt-in since it's real storage-quota usage, not just a safety
 // confirmation (see .env.example). Requires the Firebase project to be on
 // the Blaze plan.
@@ -28,6 +28,13 @@ import { getStorage } from "firebase-admin/storage";
 
 const LOCAL_COLLECTION = "testSuiteRunsLocal";
 const PUBLISH_REPORTS = process.env.PUBLISH_REPORTS_TO_FIREBASE === "true";
+// Optional allowlist so a laptop with dozens of accumulated local runs under
+// reports/json can publish just a handful by id (matching the .json
+// filename without its extension) instead of everything sitting there -
+// unset (the default) keeps publishing every run found, same as before.
+const ONLY_RUN_IDS = process.env.ONLY_RUN_IDS
+    ? new Set(process.env.ONLY_RUN_IDS.split(",").map((s) => s.trim()).filter(Boolean))
+    : null;
 
 if (process.env.E2E_LOCAL_PUBLISH !== "true") {
     console.error(
@@ -78,15 +85,20 @@ function envFromId(id) {
     return ["tst", "pre", "prd"].includes(parts[3]) ? parts[3] : "tst";
 }
 
+// A run pointed at only the a11y/security tag subset (a legitimate local
+// check) has zero real domain-tagged NRT tests - nothing to call "bad"
+// about, so it reads as "good" rather than a false failure of all-skipped
+// setup steps.
+//
+// Status comes from an actual count of failed tests, not from
+// `passed < totalTests` - totalTests also includes skipped tests, which
+// aren't failures, so that comparison used to flag any run with even one
+// skip (but zero real failures) as "bad".
 function nrtStatus(detail) {
-    if (detail.passed < detail.totalTests - detail.flaky) return "bad";
+    if (detail.totalTests === 0) return "good";
+    const failed = (detail.tests || []).filter((t) => t.status === "failed").length;
+    if (failed > 0) return "bad";
     if (detail.flaky > 0) return "warn";
-    return "good";
-}
-
-function a11yStatus(detail) {
-    if (detail.critical > 0) return "bad";
-    if (detail.serious > 0) return "warn";
     return "good";
 }
 
@@ -98,66 +110,176 @@ function specDomain(tags) {
     return tag ? tag.slice("domain:".length) : "other";
 }
 
-// A11Y specs (tagged type:accessibility, e.g. comparto-step-a11y.spec.ts)
-// execute inside the same Playwright run as the NRT specs - see the
-// a11y-chrome project in playwright.config.ts - but they're a different
-// suite in this UI (see TestSuiteKey), not an NRT domain. Untagged specs
-// (tags: [], e.g. the auth setup) have no type tag at all and stay in, since
-// they're real NRT scaffolding, not a different suite's tests.
+// A11Y/Security specs (tagged type:accessibility/type:security, e.g.
+// comparto-step-a11y.spec.ts) execute inside the same Playwright run as the
+// NRT specs - see the a11y-chrome project in playwright.config.ts - but
+// they're a different suite in this UI (see TestSuiteKey), not an NRT
+// domain. Untagged specs (tags: [], e.g. the auth setup) have no type tag
+// at all and count as "nrt", since they're real NRT scaffolding, not a
+// different suite's tests.
 function specType(tags) {
     const tag = (tags || []).find((t) => t.startsWith("type:"));
     return tag ? tag.slice("type:".length) : null;
 }
-function isNrtSpec(tags) {
+
+// Which suite (nrt/a11y/security) a spec's results belong to - each kind
+// gets published as its own isolated run doc (see buildPlaywrightRuns), even
+// when several kinds come from the same Playwright invocation/.json file.
+function specKind(tags) {
     const type = specType(tags);
-    return type === null || type === "nrt";
+    if (type === "accessibility") return "a11y";
+    if (type === "security") return "security";
+    return "nrt";
 }
 
-function testStatus(result) {
-    if (!result) return "skipped";
-    if (result.status === "passed") return "passed";
-    if (result.status === "skipped") return "skipped";
+// The spec's own ADO test-case-id tag, e.g. "[a11y8952]" or "[8977]" (see
+// src/scripts/tmp-mark-automated.ts's tag scheme) - undefined when absent.
+function testCaseIdFromTags(tags) {
+    const tag = (tags || []).find((t) => /^\[(?:a11y)?\d+\]$/.test(t));
+    if (!tag) return undefined;
+    const match = tag.match(/(\d+)/);
+    return match ? Number(match[1]) : undefined;
+}
+
+// Playwright project names here look like "<domain>-chrome" or "a11y-chrome"
+// (see playwright.config.ts's per-domain project list) - the browser engine
+// is always the last "-"-separated segment. "chrome-setup" (the auth setup
+// project) isn't a real browser result and is left as undefined.
+const KNOWN_BROWSERS = new Set(["chrome", "chromium", "firefox", "webkit", "edge"]);
+function browserFromProjectName(projectName) {
+    const parts = (projectName || "").split("-");
+    const last = parts[parts.length - 1];
+    return KNOWN_BROWSERS.has(last) ? last : undefined;
+}
+
+// a11y/security specs (not NRT ones) carry a team: tag naming which product
+// they belong to, e.g. "team:front-office-auto-sp1" - the "-spN" suffix is
+// a sprint number within that same team, not a different team, so it's
+// stripped before mapping to the dashboard's TestAppScope values.
+function appFromTeamTag(tags) {
+    const tag = (tags || []).find((t) => t.startsWith("team:"));
+    if (!tag) return undefined;
+    const team = tag.slice("team:".length).replace(/-sp\d+$/, "");
+    if (team === "front-office-auto") return "frontOfficeAuto";
+    if (team === "plurifonds") return "plurifond";
+    return undefined;
+}
+
+// Playwright's per-test `status` (on the test object itself, not a result)
+// is the aggregated outcome across every retry attempt - "flaky" means it
+// failed at least once but passed on a later retry, and counts as passed
+// here since that's the real final result. Looking only at results[0], as
+// this used to, reports the first (possibly failed-then-retried) attempt
+// instead of the true outcome.
+function testStatus(test) {
+    if (!test) return "skipped";
+    if (test.status === "skipped") return "skipped";
+    if (test.status === "expected" || test.status === "flaky") return "passed";
     return "failed";
+}
+
+// Real wall-clock time spent on a test is the sum of every attempt
+// (including retries), not just the first one - a flaky test that failed
+// fast then passed on retry still cost the time of both attempts.
+function testDuration(test) {
+    return Math.round((test?.results || []).reduce((sum, r) => sum + (r.duration ?? 0), 0));
+}
+
+// Playwright's JSON reporter puts a failure's message on result.error.message
+// (older/simple failures) or result.errors[0].message (newer multi-error
+// shape) - message text carries ANSI color codes for terminal output, so
+// they're stripped before this ever reaches the dashboard's plain-text UI.
+function testErrorMessage(result) {
+    const message = result?.error?.message ?? result?.errors?.[0]?.message;
+    return typeof message === "string" && message.trim()
+        ? message.replace(/\x1b\[[0-9;]*m/g, "").trim()
+        : undefined;
 }
 
 // The suites tree nests arbitrarily (a top-level suite per spec file, then
 // nested suites per describe block) before reaching specs - walk it
-// recursively rather than assuming a fixed depth.
-function collectTests(suites, domains) {
+// recursively rather than assuming a fixed depth. Collects every spec
+// regardless of kind (nrt/a11y/security) - callers filter by kind for
+// whichever stats/catalog they're building, see buildNrtRuns below.
+function collectTests(suites) {
     const tests = [];
     for (const suite of suites || []) {
         for (const spec of suite.specs || []) {
-            if (!isNrtSpec(spec.tags)) continue;
+            const kind = specKind(spec.tags);
             const domain = specDomain(spec.tags);
+            const testCaseId = testCaseIdFromTags(spec.tags);
+            const app = appFromTeamTag(spec.tags);
             for (const test of spec.tests || []) {
-                const result = (test.results || [])[0];
+                // The last attempt is the one that determines the final
+                // outcome - its error/steps are what's worth showing (an
+                // earlier failed attempt's error is stale once a retry
+                // passed).
+                const results = test.results || [];
+                const lastResult = results[results.length - 1];
+                const errorMessage = testErrorMessage(lastResult);
+                const browser = browserFromProjectName(test.projectName);
                 tests.push({
                     title: spec.title,
                     domain,
                     file: suite.file,
-                    status: testStatus(result),
-                    durationMs: Math.round(result?.duration ?? 0),
-                    steps: (result?.steps || []).map((s) => ({
+                    status: testStatus(test),
+                    durationMs: testDuration(test),
+                    steps: (lastResult?.steps || []).map((s) => ({
                         title: s.title,
                         durationMs: Math.round(s.duration),
                     })),
+                    kind,
+                    ...(errorMessage ? { errorMessage } : {}),
+                    ...(testCaseId ? { testCaseId } : {}),
+                    ...(browser ? { browser } : {}),
+                    ...(app ? { app } : {}),
                 });
-                domains.add(domain);
             }
         }
-        collectTests(suite.suites, domains).forEach((t) => tests.push(t));
+        collectTests(suite.suites).forEach((t) => tests.push(t));
     }
     return tests;
 }
 
-function buildDomainSummary(tests, allDomains) {
-    return [...allDomains].sort().map((domain) => {
+// tests here should already be pre-filtered to one kind (see buildNrtRuns) -
+// domains are derived straight from that set rather than needing a
+// separately-tracked Set.
+function buildDomainSummary(tests) {
+    const domains = [...new Set(tests.map((t) => t.domain))];
+
+    return domains.sort().map((domain) => {
         const domainTests = tests.filter((t) => t.domain === domain);
         return {
             domain,
             label: domain,
             total: domainTests.length,
             passed: domainTests.filter((t) => t.status === "passed").length,
+            flaky: 0,
+        };
+    });
+}
+
+// Friendly display names for the app scopes appFromTeamTag resolves - unlike
+// buildDomainSummary's domain codes (no known full-name source anywhere in
+// tst-e2e, see appFromTeamTag), the team tag only ever resolves to one of
+// these two products, so a real label is known and used instead of
+// repeating the raw scope value.
+const APP_LABELS = { frontOfficeAuto: "Front Office Auto", plurifond: "Plurifonds" };
+
+// Same shape/idea as buildDomainSummary, grouped by the team: tag's app
+// scope instead of domain - only a11y/security tests carry one (see
+// appFromTeamTag), so this comes back empty for nrt's own tests, same as an
+// old run published before the app field existed.
+function buildTeamSummary(tests) {
+    const apps = [...new Set(tests.map((t) => t.app).filter(Boolean))];
+
+    return apps.sort().map((app) => {
+        const appTests = tests.filter((t) => t.app === app);
+        return {
+            domain: app,
+            label: APP_LABELS[app] ?? app,
+            total: appTests.length,
+            passed: appTests.filter((t) => t.status === "passed").length,
             flaky: 0,
         };
     });
@@ -183,52 +305,78 @@ async function uploadReport(bucket, localPath, destPath) {
     return `https://storage.googleapis.com/${bucket.name}/${destPath}`;
 }
 
-async function buildNrtRuns(bucket) {
+// tests here is already the one kind's own subset (see buildPlaywrightRuns) -
+// full isolation, never a mix of kinds, per the team's own steer: nrt/a11y/
+// security never share a test, in Firestore or in memory.
+function buildDetail(statsFlaky, tests) {
+    return {
+        totalTests: tests.length,
+        passed: tests.filter((t) => t.status === "passed").length,
+        // stats.flaky is a run-wide count that could in principle include a
+        // retry from a test outside this kind's subset - left as-is rather
+        // than recomputed per-test, since a test's retry history isn't
+        // captured in collectTests().
+        flaky: statsFlaky,
+        // Sum of this kind's own tests only - not the whole run's
+        // stats.duration, which would include a11y/security time on the nrt
+        // doc and vice versa, breaking the isolation the folder split exists
+        // for.
+        durationMs: tests.reduce((sum, t) => sum + t.durationMs, 0),
+        domains: buildDomainSummary(tests),
+        teams: buildTeamSummary(tests),
+        tests,
+    };
+}
+
+// One Playwright invocation can carry real content for more than one suite
+// kind (e.g. type:security or type:accessibility-tagged specs run alongside
+// the domain-tagged NRT ones) - this builds one TestSuiteRun per kind that
+// actually has content, each destined for its own
+// testSuiteRunsLocal/<kind>/runs folder (see firebaseTestSuitesData.ts).
+// Each doc's tests[] holds ONLY that kind's own specs - nrt/a11y/security
+// never share a test between them, even though they may come from the same
+// underlying .json report file.
+async function buildPlaywrightRuns(bucket) {
     const jsonDir = path.join(reportsDir, "json");
     let files = [];
     try {
         files = readdirSync(jsonDir).filter((f) => f.endsWith(".json"));
     } catch {
-        console.warn(`No json/ folder under ${reportsDir} - skipping NRT runs.`);
+        console.warn(`No json/ folder under ${reportsDir} - skipping NRT/A11Y/Security runs.`);
         return [];
     }
 
-    return Promise.all(files.map(async (file) => {
+    const runsPerFile = await Promise.all(files.map(async (file) => {
         const id = file.replace(/\.json$/, "");
-        const { stats, suites } = JSON.parse(readFileSync(path.join(jsonDir, file), "utf8"));
-        const startedAt = new Date(stats.startTime);
+        const parsed = JSON.parse(readFileSync(path.join(jsonDir, file), "utf8"));
+        // Derived report variants (e.g. "<id>-by-team.json", which points back
+        // at its own source via `sourceReport` instead of Playwright's own
+        // stats/suites shape) live in the same json/ folder but aren't a
+        // primary run to publish - skip them rather than crash on a shape
+        // they were never meant to have.
+        if (!parsed.stats || !parsed.suites) {
+            console.warn(`  (skipping ${file}, not a Playwright run report)`);
+            return [];
+        }
+        const { stats, suites } = parsed;
+        const startedAt = new Date(stats.startTime).toISOString();
 
-        const domainsSeen = new Set();
-        // Only type:nrt (or untagged) specs - stats.expected/skipped/unexpected
-        // below would include type:accessibility specs like
-        // comparto-step-a11y.spec.ts too, since Playwright's own stats block
-        // doesn't know about this UI's suite split.
-        const tests = collectTests(suites, domainsSeen);
-
-        const detail = {
-            totalTests: tests.length,
-            passed: tests.filter((t) => t.status === "passed").length,
-            // stats.flaky is a run-wide count that could in principle include a
-            // non-NRT spec's retry - left as-is rather than recomputed per-test,
-            // since a test's retry history isn't captured in collectTests().
-            flaky: stats.flaky,
-            durationMs: Math.round(stats.duration),
-            domains: buildDomainSummary(tests, domainsSeen),
-            tests,
+        const tests = collectTests(suites);
+        const testsByKind = {
+            nrt: tests.filter((t) => t.kind === "nrt"),
+            a11y: tests.filter((t) => t.kind === "a11y"),
+            security: tests.filter((t) => t.kind === "security"),
         };
 
-        const run = {
+        const base = {
             id,
-            suite: "nrt",
             app: "all",
             env: envFromId(id),
             branch,
             commitSha,
-            startedAt: startedAt.toISOString(),
-            status: nrtStatus(detail),
+            startedAt,
             reportFile: `runs/${id}/smart-report.html`,
             reportTool: "Playwright + SmartReport",
-            nrt: detail,
         };
 
         if (PUBLISH_REPORTS && bucket) {
@@ -243,7 +391,7 @@ async function buildNrtRuns(bucket) {
             // Firestore's Admin SDK rejects an explicit `undefined` field on
             // .set() by default - only assign when the upload actually
             // produced a URL.
-            if (reportUrl) run.reportUrl = reportUrl;
+            if (reportUrl) base.reportUrl = reportUrl;
             // Siblings smart-report.html itself links to (PDF download
             // buttons) - uploaded alongside so those relative links resolve
             // once hosted, same as they do when viewed locally.
@@ -252,106 +400,26 @@ async function buildNrtRuns(bucket) {
             }
         }
 
-        return run;
-    }));
-}
+        // nrt is always published (even with 0 tests, e.g. an a11y/security-
+        // only local check) so the Test Suites page's own domain-based
+        // filter can tell "nothing but scaffolding ran" apart from "no run
+        // happened at all" - see TestSuitesPage.tsx's runsBySuite filter.
+        // a11y/security only publish when they actually have content.
+        const nrtDetail = buildDetail(stats.flaky, testsByKind.nrt);
+        const runs = [
+            { ...base, suite: "nrt", status: nrtStatus(nrtDetail), nrt: nrtDetail },
+        ];
 
-async function buildA11yRuns(bucket) {
-    const a11yDir = path.join(reportsDir, "a11y");
-    let entries = [];
-    try {
-        entries = readdirSync(a11yDir).filter((name) =>
-            statSync(path.join(a11yDir, name)).isDirectory()
-        );
-    } catch {
-        console.warn(`No a11y/ folder under ${reportsDir} - skipping a11y runs.`);
-        return [];
-    }
-
-    // a11y/index.html is ONE merged report across every scanned step,
-    // regardless of how many spec folders axe ran across (each folder here
-    // is one spec's scan targets, not a separate "run") - so this builds
-    // ONE TestSuiteRun by flattening every folder's axe-data-*.json into a
-    // single steps array, instead of one run per folder pointing at the
-    // same merged report N times over.
-    const steps = [];
-    for (const folder of entries) {
-        const dir = path.join(a11yDir, folder);
-        const stepFiles = readdirSync(dir).filter(
-            (f) => f.startsWith("axe-data-") && f.endsWith(".json")
-        );
-
-        for (const file of stepFiles) {
-            const data = JSON.parse(readFileSync(path.join(dir, file), "utf8"));
-            const tally = { critical: 0, serious: 0, moderate: 0, minor: 0 };
-            for (const v of data.violations) tally[v.impact] += 1;
-
-            steps.push({
-                label: data.label,
-                violations: data.violations.length,
-                incomplete: data.incomplete.length,
-                ...tally,
-                rules: data.violations.map((v) => ({
-                    ruleId: v.id,
-                    impact: v.impact,
-                    count: 1,
-                    description: v.help,
-                })),
-                timestamp: data.timestamp,
-            });
+        for (const kind of ["a11y", "security"]) {
+            if (testsByKind[kind].length === 0) continue;
+            const detail = buildDetail(stats.flaky, testsByKind[kind]);
+            runs.push({ ...base, suite: kind, status: nrtStatus(detail), nrt: detail });
         }
-    }
 
-    if (steps.length === 0) return [];
+        return runs;
+    }));
 
-    steps.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    const startedAt = steps[0].timestamp;
-    const id = `a11y_${startedAt.replace(/[-:]/g, "").replace(/\.\d+Z$/, "").replace("T", "_")}`;
-
-    const detail = {
-        stepsScanned: steps.length,
-        violations: steps.reduce((sum, s) => sum + s.violations, 0),
-        incomplete: steps.reduce((sum, s) => sum + s.incomplete, 0),
-        critical: steps.reduce((sum, s) => sum + s.critical, 0),
-        serious: steps.reduce((sum, s) => sum + s.serious, 0),
-        moderate: steps.reduce((sum, s) => sum + s.moderate, 0),
-        minor: steps.reduce((sum, s) => sum + s.minor, 0),
-        // timestamp was only needed to order/derive startedAt above - not
-        // part of the A11yStepResult shape.
-        steps: steps.map(({ timestamp, ...step }) => step),
-    };
-
-    const run = {
-        id,
-        suite: "a11y",
-        app: "plurifond",
-        env: "tst",
-        branch,
-        commitSha,
-        startedAt,
-        status: a11yStatus(detail),
-        reportFile: "a11y/index.html",
-        reportTool: "axe-core",
-        a11y: detail,
-    };
-
-    if (PUBLISH_REPORTS && bucket) {
-        const reportUrl = await uploadReport(
-            bucket,
-            path.join(a11yDir, "index.html"),
-            "test-suites-reports/a11y/index.html"
-        );
-        if (reportUrl) run.reportUrl = reportUrl;
-    }
-
-    return [run];
-}
-
-// ZAP only produces HTML reports here (no JSON summary), so there's nothing
-// structured to parse into a DastRunDetail yet without scraping the HTML -
-// left out rather than faked. Revisit once tst-e2e's ZAP step emits JSON too.
-function buildDastRuns() {
-    return [];
+    return runsPerFile.flat();
 }
 
 const serviceAccount = JSON.parse(serviceAccountRaw);
@@ -370,20 +438,24 @@ if (PUBLISH_REPORTS) {
     console.log(`Report uploads enabled - publishing to gs://${bucket.name}/test-suites-reports/`);
 }
 
-const runs = [
-    ...(await buildNrtRuns(bucket)),
-    ...(await buildA11yRuns(bucket)),
-    ...buildDastRuns(),
-];
+let runs = await buildPlaywrightRuns(bucket);
+
+if (ONLY_RUN_IDS) {
+    runs = runs.filter((run) => ONLY_RUN_IDS.has(run.id));
+}
 
 if (runs.length === 0) {
     console.log("Nothing to publish.");
     process.exit(0);
 }
 
+// One "folder" (subcollection) per suite kind - testSuiteRunsLocal/<suite>/runs/<id>
+// - see firebaseTestSuitesData.ts for why this replaced one flat collection
+// keyed only by a `suite` field.
 for (const run of runs) {
-    await db.collection(LOCAL_COLLECTION).doc(run.id).set(run);
-    console.log(`Wrote ${LOCAL_COLLECTION}/${run.id} (${run.suite})`);
+    const ref = db.collection(LOCAL_COLLECTION).doc(run.suite).collection("runs").doc(run.id);
+    await ref.set(run);
+    console.log(`Wrote ${LOCAL_COLLECTION}/${run.suite}/runs/${run.id}`);
 }
 
 console.log(`\nPublished ${runs.length} run(s) to ${LOCAL_COLLECTION}.`);

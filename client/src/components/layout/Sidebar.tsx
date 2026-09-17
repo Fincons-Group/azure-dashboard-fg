@@ -15,6 +15,9 @@ import {
     FlashAutoRegular,
     BeakerRegular,
     AppsListRegular,
+    ClipboardTaskListLtrRegular,
+    BoardRegular,
+    GaugeRegular,
     BugRegular,
     ChevronLeftRegular,
     ChevronRightRegular,
@@ -28,6 +31,8 @@ import {
     RAIL_FG,
     RAIL_FG_ACTIVE,
 } from "../../layoutConstants";
+import { EXPERIMENTAL_NAV_KEYS } from "../../config/navItems";
+import { useSettings } from "../../hooks/useSettings";
 
 const ACTIVE_ACCENT = "#0EA5A0";
 
@@ -170,9 +175,9 @@ type NavItem = {
 
 // This branch ships the Sprint Report, the multi-scope Excel Export page,
 // the Test Factory Coverage Roadmap, its Cycle Time report, its real
-// test-case Automation KPIs, E2E History, the NRT/A11Y/DAST Test Suites
-// hub, and the Bugs page - so no per-user visibility toggle, no automation
-// group, no badge query.
+// test-case Automation KPIs, E2E History, the NRT/A11Y/Security Test Suites
+// hub, and the Bugs page. Items in EXPERIMENTAL_NAV_KEYS (config/navItems.ts)
+// are filtered out below unless AppSettings.showExperimentalPages is on.
 const NAV_ITEMS: NavItem[] = [
     {
         key: "dynamic-sprint-report",
@@ -215,6 +220,24 @@ const NAV_ITEMS: NavItem[] = [
         labelKey: "nav.testSuites",
         to: "/test-suites",
         icon: AppsListRegular,
+    },
+    {
+        key: "test-plans",
+        labelKey: "nav.testPlans",
+        to: "/test-plans",
+        icon: ClipboardTaskListLtrRegular,
+    },
+    {
+        key: "team-dashboard",
+        labelKey: "nav.teamDashboard",
+        to: "/team-dashboard",
+        icon: BoardRegular,
+    },
+    {
+        key: "qa-control-center",
+        labelKey: "nav.qaControlCenter",
+        to: "/qa-control-center",
+        icon: GaugeRegular,
     },
     {
         key: "bugs",
@@ -277,6 +300,10 @@ export function Sidebar({
 }) {
     const styles = useStyles();
     const { t } = useTranslation();
+    const { settings } = useSettings();
+    const visibleNavItems = NAV_ITEMS.filter(
+        (item) => settings.showExperimentalPages || !EXPERIMENTAL_NAV_KEYS.has(item.key)
+    );
 
     return (
         <nav
@@ -314,7 +341,7 @@ export function Sidebar({
             </NavLink>
 
             <div className={styles.nav}>
-                {NAV_ITEMS.map((item) => (
+                {visibleNavItems.map((item) => (
                     <NavRow key={item.key} item={item} collapsed={collapsed} />
                 ))}
             </div>

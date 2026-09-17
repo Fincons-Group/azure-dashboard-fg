@@ -15,12 +15,17 @@ const CACHE_DURATION_MS = 5 * 60 * 1000;
 export interface FirstExecutionOutcome {
     outcome: string;
     completedDate: string;
+    // Only carried on outcomes returned by getAllOutcomesByTestCase, for the
+    // "most common errors" test-catalog view - undefined for passed results
+    // and for every other call site here, which never reads it.
+    errorMessage?: string;
 }
 
 interface ResultTuple {
     testCaseId: number;
     outcome: string;
     completedDate: string;
+    errorMessage?: string;
     steps: Array<{
         id: string;
         outcome: string;
@@ -57,6 +62,15 @@ function resultCompletedDate(result: any): string | undefined {
         result.dateCompleted ??
         result.lastUpdatedDate
     );
+}
+
+// TestCaseResult.errorMessage is the standard Azure DevOps Test Results API
+// field for a failure's message text - blank/whitespace-only strings (common
+// on non-failure outcomes) are normalized to undefined rather than kept as
+// noise in the "most common errors" grouping.
+function resultErrorMessage(result: any): string | undefined {
+    const message = result.errorMessage;
+    return typeof message === "string" && message.trim() ? message.trim() : undefined;
 }
 
 const RUN_RESULT_CONCURRENCY = 10;
@@ -131,7 +145,13 @@ async function getResultTuples(
                             .filter((step: any) => step.id && step.outcome)
                 );
 
-                tuples.push({ testCaseId, outcome, completedDate, steps });
+                tuples.push({
+                    testCaseId,
+                    outcome,
+                    completedDate,
+                    errorMessage: resultErrorMessage(result),
+                    steps,
+                });
             }
         }
 
@@ -240,9 +260,9 @@ export async function getAllOutcomesByTestCase(
     const tuples = await getResultTuples(project);
     const byTestCase = new Map<number, FirstExecutionOutcome[]>();
 
-    for (const { testCaseId, outcome, completedDate } of tuples) {
+    for (const { testCaseId, outcome, completedDate, errorMessage } of tuples) {
         const bucket = byTestCase.get(testCaseId) ?? [];
-        bucket.push({ outcome, completedDate });
+        bucket.push({ outcome, completedDate, errorMessage });
         byTestCase.set(testCaseId, bucket);
     }
 

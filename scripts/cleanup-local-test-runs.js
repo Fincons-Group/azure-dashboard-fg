@@ -12,6 +12,9 @@ import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 const LOCAL_COLLECTION = "testSuiteRunsLocal";
+// One "folder" (subcollection) per suite kind - see
+// src/firebaseTestSuitesData.ts and publish-local-test-runs.js's write loop.
+const KINDS = ["nrt", "a11y", "security"];
 
 const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 if (!serviceAccountRaw) {
@@ -22,15 +25,23 @@ if (!serviceAccountRaw) {
 const app = initializeApp({ credential: cert(JSON.parse(serviceAccountRaw)) });
 const db = getFirestore(app);
 
-const snapshot = await db.collection(LOCAL_COLLECTION).get();
+let totalDeleted = 0;
 
-if (snapshot.empty) {
-    console.log(`${LOCAL_COLLECTION} is already empty.`);
-    process.exit(0);
+for (const kind of KINDS) {
+    const snapshot = await db.collection(LOCAL_COLLECTION).doc(kind).collection("runs").get();
+
+    if (snapshot.empty) continue;
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+
+    console.log(`Deleted ${snapshot.size} doc(s) from ${LOCAL_COLLECTION}/${kind}/runs.`);
+    totalDeleted += snapshot.size;
 }
 
-const batch = db.batch();
-snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-await batch.commit();
-
-console.log(`Deleted ${snapshot.size} doc(s) from ${LOCAL_COLLECTION}.`);
+console.log(
+    totalDeleted === 0
+        ? `${LOCAL_COLLECTION} is already empty.`
+        : `\nDeleted ${totalDeleted} doc(s) total from ${LOCAL_COLLECTION}.`
+);

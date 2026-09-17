@@ -9,6 +9,7 @@ import {
     getIterations,
     getAreaPaths,
     getProjects,
+    getSuites,
     runWithAzdoConfig,
 } from "./azdo.js";
 import {
@@ -41,6 +42,10 @@ import {
     getAutomationKpis,
     clearAutomationKpiCache,
 } from "./automationKpiData.js";
+import {
+    getQaControlCenter,
+    clearQaControlCenterCache,
+} from "./qaControlCenterData.js";
 import { computeReportExtraKpis } from "./reportExtraKpis.js";
 import {
     getE2eRunHistory,
@@ -51,6 +56,10 @@ import {
     getTestSuiteRuns,
     clearTestSuiteRunsCache,
 } from "./firebaseTestSuitesData.js";
+import {
+    getSpecCatalog,
+    clearSpecCatalogCache,
+} from "./testSpecCatalogData.js";
 import {
     sendBugsCreatedTodayReport,
     sendVerificaCheck,
@@ -75,7 +84,7 @@ if (process.env.E2E_REPORTS_DIR) {
     app.use("/e2e-reports", express.static(process.env.E2E_REPORTS_DIR));
 }
 
-// Same dev convenience as E2E_REPORTS_DIR above, for the NRT/A11Y/DAST Test
+// Same dev convenience as E2E_REPORTS_DIR above, for the NRT/A11Y/Security Test
 // Suites hub: point this at a local tst-e2e checkout's `reports/` folder
 // (the parent of its runs/, a11y/, and zap/ subfolders) so TestSuitesPage's
 // "Open ..." links resolve to the real smart-report.html / a11y/index.html /
@@ -201,6 +210,49 @@ app.get("/api/plans/:planId/overview", async (req, res) => {
     }
 });
 
+app.get("/api/plans/:planId/suites", async (req, res) => {
+    try {
+        const planId = Number(req.params.planId);
+        const project = req.query.project as string | undefined;
+        const suites = await getSuites(planId, project);
+
+        res.json(
+            suites.map((suite: any) => ({
+                id: suite.id,
+                name: suite.name,
+                parentId: suite.parentSuite?.id,
+            }))
+        );
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+// Replicates the "QA Control Center" ADO dashboard widget (see
+// qaControlCenterData.ts for the full port) - ADO blocks that dashboard from
+// being framed here (X-Frame-Options: SAMEORIGIN, see TeamDashboardPage.tsx),
+// so this renders the same execution-velocity/forecast/workload model
+// natively instead, for any plan+suite rather than the one fixed instance.
+app.get("/api/qa-control-center", async (req, res) => {
+    try {
+        const planId = Number(req.query.planId);
+        const suiteId = Number(req.query.suiteId);
+        const project = req.query.project as string | undefined;
+        const includeChildren = req.query.includeChildren !== "false";
+
+        if (!planId || !suiteId) {
+            res.status(400).json({ message: "planId and suiteId are required." });
+            return;
+        }
+
+        res.json(
+            await getQaControlCenter(planId, suiteId, project, includeChildren)
+        );
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
 // Companion endpoint to /api/defects + /api/plans/:planId/overview for the
 // Sprint Report's additional KPIs - kept as its own route (rather than
 // folded into either response) because firstExecutionPassRate requires
@@ -309,6 +361,19 @@ app.get("/api/test-suites", async (_req, res) => {
     }
 });
 
+// "As they are" spec-file inventory (see testSpecCatalogData.ts) - NRT/A11Y/
+// Security tabs of real Playwright spec files from the tst-e2e checkout,
+// each with whatever run history/errors are available. "configured" here
+// means TEST_SUITES_REPORTS_DIR is set (needed to locate the checkout for
+// the file scan), independent of the Firebase/ADO gates the rows use.
+app.get("/api/test-spec-catalog", async (req, res) => {
+    try {
+        res.json(await getSpecCatalog(req.query.project as string | undefined));
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
 app.get("/api/defects", async (req, res) => {
     try {
         const project = req.query.project as string | undefined;
@@ -391,6 +456,8 @@ app.post("/api/refresh", (_, res) => {
     clearAutomationKpiCache();
     clearE2eHistoryCache();
     clearTestSuiteRunsCache();
+    clearSpecCatalogCache();
+    clearQaControlCenterCache();
 
     res.status(200).json({ refreshed: true });
 });
