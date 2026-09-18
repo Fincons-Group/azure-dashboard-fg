@@ -16,6 +16,7 @@ import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import { ModuleCoverageBarChart } from "../components/AutomationKpiCharts";
+import { RunHistoryStrip, type RunHistoryPoint } from "../components/RunHistoryStrip";
 import { fetchAutomationKpis, fetchTestSpecCatalog } from "../api/client";
 import type { TestCatalogRow } from "../types";
 
@@ -111,16 +112,6 @@ const useStyles = makeStyles({
         fontSize: "11px",
         color: tokens.colorNeutralForeground3,
     },
-    runsStrip: {
-        display: "flex",
-        gap: "4px",
-    },
-    runDot: {
-        width: "10px",
-        height: "10px",
-        borderRadius: tokens.borderRadiusCircular,
-        flexShrink: 0,
-    },
     errorsCell: {
         display: "flex",
         flexDirection: "column",
@@ -153,15 +144,6 @@ const useStyles = makeStyles({
 // pages are: this KPI is inherently scoped to that project, not driven by
 // the shared ScopeBar project selector.
 const PROJECT = "Test Factory";
-
-// "Blocked"/"NotApplicable"/etc. all fall back to neutral - only pass/fail
-// need their own color for this strip to read at a glance.
-function runDotColor(outcome: string): string {
-    const normalized = outcome.toLowerCase();
-    if (normalized === "passed") return tokens.colorPaletteGreenForeground1;
-    if (normalized === "failed") return tokens.colorPaletteRedForeground1;
-    return tokens.colorNeutralForeground3;
-}
 
 export function AutomationKpiPage() {
     const { t } = useTranslation();
@@ -422,29 +404,15 @@ function SpecCatalogCard() {
                                         {row.browsers.length === 0 ? "—" : row.browsers.join(", ")}
                                     </td>
                                     <td className={styles.tableCell}>
-                                        {row.lastRuns.length === 0 ? (
-                                            "—"
-                                        ) : (
-                                            <div className={styles.runsStrip}>
-                                                {[...row.lastRuns]
-                                                    .reverse()
-                                                    .map((run, i) => (
-                                                        <span
-                                                            key={i}
-                                                            className={styles.runDot}
-                                                            style={{
-                                                                backgroundColor:
-                                                                    runDotColor(run.outcome),
-                                                            }}
-                                                            title={`${run.outcome}${
-                                                                run.browser ? ` (${run.browser})` : ""
-                                                            } - ${new Date(
-                                                                run.completedDate
-                                                            ).toLocaleString()}`}
-                                                        />
-                                                    ))}
-                                            </div>
-                                        )}
+                                        <RunHistoryStrip
+                                            points={row.lastRuns.map(
+                                                (run): RunHistoryPoint => ({
+                                                    outcome: run.outcome,
+                                                    date: run.completedDate,
+                                                    detail: run.browser,
+                                                })
+                                            )}
+                                        />
                                     </td>
                                     <td className={styles.tableCell}>
                                         {row.topErrors.length === 0 ? (

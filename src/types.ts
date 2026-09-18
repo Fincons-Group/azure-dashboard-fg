@@ -182,18 +182,21 @@ export interface TestCatalogErrorGroup {
 
 // One row per real Playwright spec file, keyed by its repo-relative path
 // (e.g. "ui/dan/homepage/nrt-dan-....spec.ts") - listed "as they are" from
-// the tst-e2e checkout (see testSpecCatalogData.ts's git ls-files scan),
-// not just the subset already linked to an Azure DevOps Test Case. Only
-// specs with a real Automation linkage (Microsoft.VSTS.TCM.AutomatedTestName/
-// Storage, see src/scripts/tmp-mark-automated.ts) carry testCaseId/
-// testCaseTitle and ADO run history; specs with none still show up with
-// empty lastRuns/topErrors, since the point of this catalog is the real
-// file list, not just what happens to be wired up. NRT rows are the
-// exception - no ADO linkage exists for them yet, so their history comes
-// from the published testSuiteRuns/testSuiteRunsLocal Firestore data
-// instead (see docs/tst-e2e-reports-followups.md for why that data is
-// sparse/manual today). lastRuns is newest-first, capped at 5; topErrors is
-// derived from each failed run's error message, most common first.
+// the tst-e2e checkout (see firebaseSpecCatalogData.ts, published by
+// scripts/publish-spec-catalog.js), not just the subset already linked to an
+// Azure DevOps Test Case. Only specs with a real Automation linkage
+// (Microsoft.VSTS.TCM.AutomatedTestName/Storage, see
+// src/scripts/tmp-mark-automated.ts) carry testCaseId/testCaseTitle and ADO
+// run history; specs with none still show up with empty lastRuns/topErrors,
+// since the point of this catalog is the real file list, not just what
+// happens to be wired up. NRT rows are the exception - no ADO linkage exists
+// for them yet, so their history comes from the published
+// testSuiteRuns/testSuiteRunsLocal Firestore data instead (see
+// docs/tst-e2e-reports-followups.md for why that data is sparse/manual
+// today). lastRuns is newest-first and holds every occurrence found (bounded
+// only by getTestSuiteRuns' own 200-run-per-kind cap, not truncated here);
+// topErrors is derived from each failed run's error message, most common
+// first.
 export interface TestCatalogRow {
   specPath: string;
   specFile: string;
