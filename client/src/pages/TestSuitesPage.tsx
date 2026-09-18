@@ -33,9 +33,11 @@ import {
 import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
+import { RunHistoryStrip, type RunHistoryPoint } from "../components/RunHistoryStrip";
 import { getApiBaseUrl, fetchTestSuites } from "../api/client";
 import type {
     NrtDomainResult,
+    NrtTestResult,
     TestEnvironment,
     TestRunStatus,
     TestSuiteKey,
@@ -375,6 +377,16 @@ const useStyles = makeStyles({
         gap: tokens.spacingHorizontalM,
         fontSize: tokens.fontSizeBase300,
     },
+    testHistorySection: {
+        marginTop: tokens.spacingVerticalM,
+        paddingTop: tokens.spacingVerticalM,
+        borderTopWidth: "1px",
+        borderTopStyle: "solid",
+        borderTopColor: tokens.colorNeutralStroke2,
+        display: "flex",
+        flexDirection: "column",
+        gap: tokens.spacingVerticalXS,
+    },
     runsList: {
         display: "flex",
         flexDirection: "column",
@@ -465,6 +477,43 @@ function reportHref(file: string): string {
 
 function openReportHref(run: TestSuiteRun): string {
     return run.reportUrl ?? reportHref(run.reportFile);
+}
+
+// Only the last dozen or so runs shown inline next to each test's row (a
+// quick-glance sparkline) - the full list (every run, unbounded) is shown in
+// that test's own expanded panel instead, see historyForTest below.
+const INLINE_HISTORY_RUN_COUNT = 12;
+
+interface TestHistoryPoint extends RunHistoryPoint {
+    runId: string;
+    durationMs: number;
+}
+
+// Cross-run history for one test, derived entirely from `runs` (already
+// fetched for this suite+env, up to 200 per firebaseTestSuiteRunsData.ts) -
+// no separate API call or backend change needed. Matched by file+title+
+// browser so a test that runs on more than one browser gets its own history
+// per browser, not one blended strip. `runs` is already newest-first (see
+// runsBySuite in TestSuitesPage), so the result is too.
+function historyForTest(test: NrtTestResult, runs: TestSuiteRun[]): TestHistoryPoint[] {
+    const points: TestHistoryPoint[] = [];
+
+    for (const run of runs) {
+        const match = (run.nrt?.tests ?? []).find(
+            (t) => t.file === test.file && t.title === test.title && t.browser === test.browser
+        );
+        if (match) {
+            points.push({
+                runId: run.id,
+                outcome: match.status,
+                date: run.startedAt,
+                detail: match.browser,
+                durationMs: match.durationMs,
+            });
+        }
+    }
+
+    return points;
 }
 
 function StatTile({ value, label }: { value: string | number; label: string }) {
@@ -847,7 +896,9 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                             </span>
                         </div>
                         <Accordion collapsible>
-                            {filteredTests.map((test, i) => (
+                            {filteredTests.map((test, i) => {
+                                const history = historyForTest(test, runs);
+                                return (
                                 <AccordionItem key={`${test.title}-${i}`} value={i}>
                                     <AccordionHeader expandIconPosition="end">
                                         <div className={styles.testHeaderRow}>
@@ -861,6 +912,7 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                             <Text className={styles.findingMeta} font="monospace">
                                                 {test.file}
                                             </Text>
+                                            <RunHistoryStrip points={history.slice(0, INLINE_HISTORY_RUN_COUNT)} />
                                         </div>
                                     </AccordionHeader>
                                     <AccordionPanel>
@@ -876,9 +928,47 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                                 ))}
                                             </ol>
                                         )}
+
+                                        {history.length > 0 && (
+                                            <div className={styles.testHistorySection}>
+                                                <Text weight="semibold" size={200}>
+                                                    {t("testSuitesPage.nrt.historyTitle", { count: history.length })}
+                                                </Text>
+                                                <table className={styles.table}>
+                                                    <thead>
+                                                        <tr>
+                                                            <th className={styles.tableHeadCell}>{t("testSuitesPage.nrt.historyDateCol")}</th>
+                                                            <th className={styles.tableHeadCell}>{t("testSuitesPage.nrt.historyOutcomeCol")}</th>
+                                                            <th className={styles.tableHeadCell} style={{ textAlign: "right" }}>
+                                                                {t("testSuitesPage.nrt.historyDurationCol")}
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {history.map((point) => (
+                                                            <tr key={point.runId}>
+                                                                <td className={styles.tableCell}>{formatDateTime(point.date)}</td>
+                                                                <td className={styles.tableCell}>
+                                                                    <Badge
+                                                                        appearance="filled"
+                                                                        color={statusToBadgeColor(
+                                                                            point.outcome === "failed" ? "bad" : point.outcome === "skipped" ? "warn" : "good"
+                                                                        )}
+                                                                    >
+                                                                        {t(`testSuitesPage.nrt.testStatus.${point.outcome}`)}
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className={styles.tableCellNum}>{(point.durationMs / 1000).toFixed(1)}s</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
                                     </AccordionPanel>
                                 </AccordionItem>
-                            ))}
+                                );
+                            })}
                         </Accordion>
                     </Card>
                 )}

@@ -204,7 +204,7 @@
     "specCatalog": {
       "title": "Automated spec files",
       "loading": "Loading spec files...",
-      "notConfigured": "Set TEST_SUITES_REPORTS_DIR on the server to a tst-e2e checkout to list real spec files here.",
+      "notConfigured": "Run \"npm run e2e:publish-spec-catalog\" from a tst-e2e checkout to publish the real spec file list here.",
       "empty": "No spec files found for this suite.",
       "notLinked": "Not linked in Azure DevOps yet",
       "tabs": {
@@ -219,7 +219,7 @@
       "lastFailed": "Last failed",
       "specFile": "Spec file",
       "browser": "Browser",
-      "lastRuns": "Last 5 runs",
+      "lastRuns": "Run history",
       "topErrors": "Most common errors",
       "noErrors": "No recorded errors"
     }
@@ -321,7 +321,12 @@
         "failed": "Failed",
         "skipped": "Skipped"
       },
-      "noSteps": "No steps recorded for this test."
+      "noSteps": "No steps recorded for this test.",
+      "historyTitle_one": "Run history ({{count}})",
+      "historyTitle_other": "Run history ({{count}})",
+      "historyDateCol": "Date",
+      "historyOutcomeCol": "Outcome",
+      "historyDurationCol": "Duration"
     },
     "a11y": {
       "violations": "Violations",

@@ -204,7 +204,7 @@
     "specCatalog": {
       "title": "File di test automatizzati",
       "loading": "Caricamento file di test...",
-      "notConfigured": "Imposta TEST_SUITES_REPORTS_DIR sul server con un checkout di tst-e2e per elencare qui i file di test reali.",
+      "notConfigured": "Esegui \"npm run e2e:publish-spec-catalog\" da un checkout di tst-e2e per pubblicare qui l'elenco dei file di test reali.",
       "empty": "Nessun file di test trovato per questa suite.",
       "notLinked": "Non ancora collegato ad Azure DevOps",
       "tabs": {
@@ -219,7 +219,7 @@
       "lastFailed": "Ultimo fallimento",
       "specFile": "File di test",
       "browser": "Browser",
-      "lastRuns": "Ultime 5 esecuzioni",
+      "lastRuns": "Storico esecuzioni",
       "topErrors": "Errori più comuni",
       "noErrors": "Nessun errore registrato"
     }
@@ -321,7 +321,12 @@
         "failed": "Fallito",
         "skipped": "Saltato"
       },
-      "noSteps": "Nessuno step registrato per questo test."
+      "noSteps": "Nessuno step registrato per questo test.",
+      "historyTitle_one": "Storico esecuzioni ({{count}})",
+      "historyTitle_other": "Storico esecuzioni ({{count}})",
+      "historyDateCol": "Data",
+      "historyOutcomeCol": "Esito",
+      "historyDurationCol": "Durata"
     },
     "a11y": {
       "violations": "Violazioni",

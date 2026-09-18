@@ -364,8 +364,9 @@ app.get("/api/test-suites", async (_req, res) => {
 // "As they are" spec-file inventory (see testSpecCatalogData.ts) - NRT/A11Y/
 // Security tabs of real Playwright spec files from the tst-e2e checkout,
 // each with whatever run history/errors are available. "configured" here
-// means TEST_SUITES_REPORTS_DIR is set (needed to locate the checkout for
-// the file scan), independent of the Firebase/ADO gates the rows use.
+// means the spec-path list has been published to Firestore (see
+// scripts/publish-spec-catalog.js) - independent of the Azure DevOps gate
+// this route sits behind, which only affects the title-enrichment lookup.
 app.get("/api/test-spec-catalog", async (req, res) => {
     try {
         res.json(await getSpecCatalog(req.query.project as string | undefined));

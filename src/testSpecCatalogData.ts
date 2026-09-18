@@ -1,56 +1,23 @@
-import { execFileSync } from "node:child_process";
-import path from "node:path";
 import { buildAutomationTestCaseRows } from "./automationKpiData.js";
 import { getTestSuiteRuns } from "./firebaseTestSuitesData.js";
 import { FirebaseConfigError } from "./firebaseE2eData.js";
+import { getSpecFilePaths, type SpecKind } from "./firebaseSpecCatalogData.js";
 import { dedupe } from "./inflight.js";
 import type { TestCatalogErrorGroup, TestCatalogRow, TestSpecCatalogResponse } from "./types.js";
 
 // "As they are" per NuovaFrontiera's own steer: this catalog is keyed off
-// the real Playwright spec files in the tst-e2e checkout (git ls-files),
-// not just whatever happens to already be linked to an Azure DevOps Test
-// Case or published to Firestore - a spec with no history yet still shows
-// up, since the point is a complete inventory to track against, the same
-// idea as a Metabase-style "spec file x last 5 runs" table.
-const RUN_HISTORY_N = 5;
+// the real Playwright spec files in the tst-e2e checkout, not just whatever
+// happens to already be linked to an Azure DevOps Test Case - a spec with no
+// history yet still shows up, since the point is a complete inventory to
+// track against, the same idea as a Metabase-style "spec file x every run"
+// table. The spec-path list itself comes from Firestore (published by
+// scripts/publish-spec-catalog.js from a real tst-e2e checkout) rather than
+// a live git-ls-files scan on this server - there's no tst-e2e checkout on
+// the hosted (Render) deployment to scan.
 const TOP_ERRORS_N = 3;
-
-type SpecKind = "nrt" | "a11y" | "security";
-
-// Mirrors tst-e2e's own src/tests/<kind> layout - "ui" is where every
-// domain-tagged NRT spec lives (see src/scripts/tmp-mark-automated.ts's
-// equivalent listSpecFiles for a11y/security).
-const KIND_SUBDIR: Record<SpecKind, string> = {
-    nrt: "ui",
-    a11y: "a11y",
-    security: "security",
-};
 
 function specFileName(specPath: string): string {
     return specPath.split(/[\\/]/).pop() ?? specPath;
-}
-
-// Same git-ls-files approach as tmp-mark-automated.ts, and for the same
-// reason: this OneDrive-synced checkout's fs.readdirSync returns an
-// inconsistent partial listing across runs (Files On-Demand placeholder
-// quirk), while git ls-files reads the tracked-file list from the index.
-function listSpecFiles(repoRoot: string, kind: SpecKind): string[] {
-    try {
-        const output = execFileSync(
-            "git",
-            ["-C", repoRoot, "ls-files", "--", `src/tests/${KIND_SUBDIR[kind]}/**/*.spec.ts`],
-            { encoding: "utf8" }
-        );
-
-        return output
-            .split("\n")
-            .map((l) => l.trim())
-            .filter(Boolean)
-            .map((rel) => rel.replace(/^src\/tests\//, ""));
-    } catch (error) {
-        console.error(`Failed to list ${kind} spec files under ${repoRoot}:`, error);
-        return [];
-    }
 }
 
 interface Occurrence {
@@ -134,9 +101,14 @@ async function buildCatalog(
                 testCaseTitle:
                     (testCaseId && titleByTestCaseId.get(testCaseId)) || occurrences[0]?.testTitle,
                 browsers,
-                lastRuns: occurrences
-                    .slice(0, RUN_HISTORY_N)
-                    .map(({ outcome, completedDate, browser }) => ({ outcome, completedDate, browser })),
+                // Every occurrence found, not just a handful - getTestSuiteRuns
+                // itself already caps at MAX_RUNS_PER_KIND (200) runs per kind,
+                // so this is naturally bounded without an extra slice here.
+                lastRuns: occurrences.map(({ outcome, completedDate, browser }) => ({
+                    outcome,
+                    completedDate,
+                    browser,
+                })),
                 topErrors: topErrorsFrom(occurrences, kind === "nrt" ? "failed" : "Failed"),
             };
         })
@@ -151,15 +123,18 @@ function resolveProjectKey(project?: string): string {
 }
 
 async function buildSpecCatalog(project?: string): Promise<TestSpecCatalogResponse> {
-    const reportsDir = process.env.TEST_SUITES_REPORTS_DIR;
+    let specPathsByKind: Record<SpecKind, string[]> | null;
 
-    if (!reportsDir) {
-        return { configured: false, nrt: [], a11y: [], security: [] };
+    try {
+        specPathsByKind = await getSpecFilePaths();
+    } catch (error) {
+        if (!(error instanceof FirebaseConfigError)) throw error;
+        specPathsByKind = null;
     }
 
-    // Same derivation as scripts/publish-local-test-runs.js: reportsDir is
-    // <tst-e2e checkout>/reports, so its parent is the checkout root.
-    const repoRoot = path.dirname(reportsDir);
+    if (!specPathsByKind) {
+        return { configured: false, nrt: [], a11y: [], security: [] };
+    }
 
     // Best-effort title enrichment only - the real per-spec history and
     // testCaseId both come from the published run data above regardless of
@@ -168,9 +143,9 @@ async function buildSpecCatalog(project?: string): Promise<TestSpecCatalogRespon
     const titleByTestCaseId = new Map(rows.map((r) => [r.testCaseId, r.testCaseTitle]));
 
     const [nrt, a11y, security] = await Promise.all([
-        buildCatalog(listSpecFiles(repoRoot, "nrt"), "nrt", titleByTestCaseId),
-        buildCatalog(listSpecFiles(repoRoot, "a11y"), "a11y", titleByTestCaseId),
-        buildCatalog(listSpecFiles(repoRoot, "security"), "security", titleByTestCaseId),
+        buildCatalog(specPathsByKind.nrt, "nrt", titleByTestCaseId),
+        buildCatalog(specPathsByKind.a11y, "a11y", titleByTestCaseId),
+        buildCatalog(specPathsByKind.security, "security", titleByTestCaseId),
     ]);
 
     return { configured: true, nrt, a11y, security };
