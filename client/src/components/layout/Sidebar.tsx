@@ -154,6 +154,14 @@ const useStyles = makeStyles({
         padding: tokens.spacingHorizontalS,
         flexShrink: 0,
     },
+    version: {
+        display: "block",
+        textAlign: "center",
+        color: RAIL_FG,
+        opacity: 0.6,
+        fontSize: tokens.fontSizeBase100,
+        paddingBottom: tokens.spacingVerticalXS,
+    },
     collapseButton: {
         color: RAIL_FG,
         width: "100%",
@@ -347,6 +355,11 @@ export function Sidebar({
             </div>
 
             <div className={styles.footer}>
+                {!collapsed && (
+                    <Text as="span" className={styles.version}>
+                        {t("common.version", { version: __APP_VERSION__ })}
+                    </Text>
+                )}
                 <Tooltip
                     content={t(
                         collapsed ? "nav.expandSidebar" : "nav.collapseSidebar"

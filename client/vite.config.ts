@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -7,6 +8,12 @@ import react from '@vitejs/plugin-react'
 // to an empty string. An explicit default here is what makes the token
 // disappear cleanly for same-origin builds that don't set this var.
 process.env.VITE_API_BASE_URL ??= ''
+
+// Root package.json's version, not client/package.json's (that one's never
+// bumped - see client/package.json) - baked into the client bundle at build
+// time so the UI (Sidebar.tsx) can show which release it was built from
+// without a runtime API call, matching the version scripts/release.js bumps.
+const appVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version
 
 // Univer (embedded spreadsheet on the Excel Export page) is a plugin-mode
 // setup: the app imports ~17 @univerjs/* packages plus their `/facade` and
@@ -64,6 +71,9 @@ const UNIVER_LOCALES = [
 // https://vite.dev/config/
 export default defineConfig(() => ({
   base: process.env.VITE_PUBLIC_BASE_PATH ?? '/',
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [react()],
   server: {
     port: 3000,
