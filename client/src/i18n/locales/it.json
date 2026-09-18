@@ -1,6 +1,7 @@
 {
   "common": {
-    "title": "QA Dashboard"
+    "title": "QA Dashboard",
+    "version": "v{{version}}"
   },
   "pagination": {
     "range": "{{rangeStart}}-{{rangeEnd}} di {{total}}",
