@@ -3,6 +3,7 @@ import {
     getFirestore,
     type Firestore,
     type QueryDocumentSnapshot,
+    type QuerySnapshot,
 } from "firebase-admin/firestore";
 import { FirebaseConfigError } from "./firebaseE2eData.js";
 import type { TestSuiteRun } from "./types.js";
@@ -81,10 +82,10 @@ export async function getTestSuiteRuns(): Promise<TestSuiteRun[]> {
     );
 
     const runs = snapshots
-        .flatMap((snapshot) =>
+        .flatMap((snapshot: QuerySnapshot) =>
             snapshot.docs.map((doc: QueryDocumentSnapshot) => doc.data() as TestSuiteRun)
         )
-        .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+        .sort((a: TestSuiteRun, b: TestSuiteRun) => b.startedAt.localeCompare(a.startedAt));
 
     cache = { data: runs, timestamp: Date.now() };
 
