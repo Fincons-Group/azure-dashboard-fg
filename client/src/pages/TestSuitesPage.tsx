@@ -33,10 +33,11 @@ import {
 import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
-import { RunHistoryStrip, type RunHistoryPoint } from "../components/RunHistoryStrip";
+import type { RunHistoryPoint } from "../components/RunHistoryStrip";
 import { getApiBaseUrl, fetchTestSuites, fetchSignedReportUrl } from "../api/client";
 import type {
     NrtDomainResult,
+    NrtRunDetail,
     NrtTestResult,
     TestEnvironment,
     TestRunStatus,
@@ -56,21 +57,16 @@ const SUITE_ICONS: Record<TestSuiteKey, FluentIcon> = {
     security: ShieldCheckmarkRegular,
 };
 
-// The scope bar (tabs + app/environment pickers) sits directly beneath
-// PageLayout's TopBar (sticky at top:0) and ScopeBar (sticky at
-// top:NAV_HEIGHT, showing at least the Project chip). 140px is their
-// combined rendered height, measured in-browser (TopBar 65px + ScopeBar's
-// collapsed row 75px) - there's no shared constant for ScopeBar's height to
-// derive this from. Re-measure if either bar's layout changes.
-const SCOPE_BAR_TOP = "140px";
-
 const useStyles = makeStyles({
     subtitle: {
         color: tokens.colorNeutralForeground3,
     },
     stickyBar: {
         position: "sticky",
-        top: SCOPE_BAR_TOP,
+        // Set by PageLayout from TopBar+ScopeBar's actual measured height
+        // (see its ResizeObserver) - falls back to a rough estimate before
+        // that first measurement lands.
+        top: "var(--app-header-height, 140px)",
         zIndex: 8,
         display: "flex",
         flexWrap: "wrap",
@@ -208,6 +204,12 @@ const useStyles = makeStyles({
         flexWrap: "wrap",
         color: tokens.colorNeutralForeground3,
         fontSize: tokens.fontSizeBase200,
+    },
+    detailBranch: {
+        maxWidth: "320px",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
     },
     detailNote: {
         fontSize: tokens.fontSizeBase200,
@@ -439,11 +441,43 @@ const useStyles = makeStyles({
         fontSize: tokens.fontSizeBase200,
         fontWeight: tokens.fontWeightSemibold,
     },
+    runBadges: {
+        display: "flex",
+        alignItems: "center",
+        gap: tokens.spacingHorizontalXS,
+    },
+    runLatestTag: {
+        color: tokens.colorBrandForeground1,
+    },
     runBranch: {
         fontSize: tokens.fontSizeBase200,
         color: tokens.colorNeutralForeground2,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
     },
 });
+
+// setup/*.setup.ts specs are Playwright auth scaffolding ("authenticate as
+// ..."), not test cases a QA reviewer is checking - they run before the real
+// specs and always pass/skip by construction, so counting them only dilutes
+// a run's pass rate and inflates its total. NrtRunDetail.totalTests/.passed
+// come straight from the run doc and still include them (that's a
+// report-generation concern upstream in tst-e2e, out of scope here), so
+// every pass-rate/total-tests display in this page is derived from the
+// already-filtered test list instead of trusting those fields directly.
+// Once the reporter stops emitting setup specs into totalTests/passed, this
+// filter becomes a no-op and can stay in place harmlessly.
+function realNrtTests(detail: NrtRunDetail): NrtTestResult[] {
+    return (detail.tests ?? []).filter((test) => !test.file.startsWith("setup/"));
+}
+
+function nrtPassRate(detail: NrtRunDetail): number {
+    const tests = realNrtTests(detail);
+    if (tests.length === 0) return 0;
+    const passed = tests.filter((test) => test.status === "passed").length;
+    return Math.round((passed / tests.length) * 1000) / 10;
+}
 
 function statusToBadgeColor(status: TestRunStatus): "success" | "warning" | "danger" {
     if (status === "good") return "success";
@@ -497,11 +531,6 @@ async function openTestSuiteReport(run: TestSuiteRun): Promise<void> {
     const url = await fetchSignedReportUrl(run.reportUrl);
     if (win) win.location.href = url;
 }
-
-// Only the last dozen or so runs shown inline next to each test's row (a
-// quick-glance sparkline) - the full list (every run, unbounded) is shown in
-// that test's own expanded panel instead, see historyForTest below.
-const INLINE_HISTORY_RUN_COUNT = 12;
 
 interface TestHistoryPoint extends RunHistoryPoint {
     runId: string;
@@ -598,6 +627,35 @@ export function TestSuitesPage() {
 
     return (
         <PageLayout title={t("testSuitesPage.title")} hideAreaSprintScope wide>
+            {data && data.configured && (
+                <div className={styles.stickyBar}>
+                    <TabList selectedValue={tab} onTabSelect={handleTabSelect}>
+                        <Tab value="overview">{t("testSuitesPage.tabs.overview")}</Tab>
+                        {SUITE_ORDER.map((suite) => (
+                            <Tab key={suite} value={suite}>
+                                {t(`testSuitesPage.tabs.${suite}`)}
+                            </Tab>
+                        ))}
+                    </TabList>
+
+                    <div className={styles.scopeSelects}>
+                        <Dropdown
+                            className={styles.scopeDropdown}
+                            value={t(`testSuitesPage.envOptions.${env}`)}
+                            selectedOptions={[env]}
+                            onOptionSelect={(_, data) => data.optionValue && handleEnvChange(data.optionValue)}
+                            aria-label={t("testSuitesPage.envLabel")}
+                        >
+                            {ENV_OPTIONS.map((option) => (
+                                <Option key={option} value={option}>
+                                    {t(`testSuitesPage.envOptions.${option}`)}
+                                </Option>
+                            ))}
+                        </Dropdown>
+                    </div>
+                </div>
+            )}
+
             <Text className={styles.subtitle}>{t("testSuitesPage.subtitle")}</Text>
 
             {isLoading && <LoadingCardGrid />}
@@ -616,33 +674,6 @@ export function TestSuitesPage() {
 
             {data && data.configured && (
             <>
-            <div className={styles.stickyBar}>
-                <TabList selectedValue={tab} onTabSelect={handleTabSelect}>
-                    <Tab value="overview">{t("testSuitesPage.tabs.overview")}</Tab>
-                    {SUITE_ORDER.map((suite) => (
-                        <Tab key={suite} value={suite}>
-                            {t(`testSuitesPage.tabs.${suite}`)}
-                        </Tab>
-                    ))}
-                </TabList>
-
-                <div className={styles.scopeSelects}>
-                    <Dropdown
-                        className={styles.scopeDropdown}
-                        value={t(`testSuitesPage.envOptions.${env}`)}
-                        selectedOptions={[env]}
-                        onOptionSelect={(_, data) => data.optionValue && handleEnvChange(data.optionValue)}
-                        aria-label={t("testSuitesPage.envLabel")}
-                    >
-                        {ENV_OPTIONS.map((option) => (
-                            <Option key={option} value={option}>
-                                {t(`testSuitesPage.envOptions.${option}`)}
-                            </Option>
-                        ))}
-                    </Dropdown>
-                </div>
-            </div>
-
             {tab === "overview" && (
                 <>
                     <span className={styles.eyebrow}>{t("testSuitesPage.eyebrow")}</span>
@@ -770,17 +801,17 @@ function SuiteDetail({
                             <Badge appearance="filled" color={statusToBadgeColor(run.status)}>
                                 {t(`testSuitesPage.status.${run.status}`)}
                             </Badge>
-                            <Text font="monospace" size={200}>
+                            <Text font="monospace" size={200} className={styles.detailBranch} title={run.branch}>
                                 {run.branch}
                             </Text>
-                            <span>&middot;</span>
-                            <Text font="monospace" size={200}>
-                                {run.commitSha}
-                            </Text>
-                            <span>&middot;</span>
-                            <Text font="monospace" size={200}>
-                                {run.id}
-                            </Text>
+                            {run.commitSha && (
+                                <>
+                                    <span>&middot;</span>
+                                    <Text font="monospace" size={200} title={run.commitSha}>
+                                        {run.commitSha.slice(0, 7)}
+                                    </Text>
+                                </>
+                            )}
                             <span>&middot;</span>
                             <span>{formatDateTime(run.startedAt)}</span>
                         </div>
@@ -824,15 +855,19 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
     // domain breakdown (see buildTeamSummary) - prefer it over domains when
     // present rather than showing both.
     const hasTeams = (detail.teams?.length ?? 0) > 0;
-    const pct = Math.round((detail.passed / detail.totalTests) * 1000) / 10;
     const durationLabel = `${Math.round(detail.durationMs / 60000)}m ${Math.round((detail.durationMs % 60000) / 1000)}s`;
 
     const trendRuns = runs.slice(0, TREND_RUN_COUNT).filter((r) => r.nrt).reverse();
 
+    // See realNrtTests/nrtPassRate above for why these exclude setup/*
+    // scaffolding specs instead of trusting detail.totalTests/.passed.
+    const realTests = realNrtTests(detail);
+    const pct = nrtPassRate(detail);
+
     // Clicking a row in the domain/team breakdown filters the Test list
     // below to just that group - toggled off by clicking the same row again.
     const [rowFilter, setRowFilter] = useState<string | null>(null);
-    const filteredTests = (detail.tests ?? []).filter(
+    const filteredTests = realTests.filter(
         (test) => !rowFilter || (hasTeams ? test.app : test.domain) === rowFilter
     );
 
@@ -840,7 +875,7 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
         <div>
                 <div className={styles.statRow}>
                     <StatTile value={`${pct}%`} label={t("testSuitesPage.nrt.passRate")} />
-                    <StatTile value={detail.totalTests} label={t("testSuitesPage.nrt.totalTests")} />
+                    <StatTile value={realTests.length} label={t("testSuitesPage.nrt.totalTests")} />
                     <StatTile value={detail.flaky} label={t("testSuitesPage.nrt.flaky")} />
                     <StatTile value={durationLabel} label={t("testSuitesPage.nrt.duration")} />
                 </div>
@@ -851,7 +886,8 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                     </div>
                     <div className={styles.trendBars}>
                         {trendRuns.map((r) => {
-                            const rPct = Math.max((r.nrt!.passed / r.nrt!.totalTests) * 100, 8);
+                            const rRatePct = nrtPassRate(r.nrt!);
+                            const rPct = Math.max(rRatePct, 8);
                             const color =
                                 r.status === "bad"
                                     ? tokens.colorPaletteRedForeground1
@@ -863,7 +899,7 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                     key={r.id}
                                     className={styles.trendBar}
                                     style={{ height: `${rPct}%`, backgroundColor: color }}
-                                    title={`${Math.round((r.nrt!.passed / r.nrt!.totalTests) * 1000) / 10}%`}
+                                    title={`${rRatePct}%`}
                                 />
                             );
                         })}
@@ -912,12 +948,12 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                     </table>
                 </Card>
 
-                {detail.tests && detail.tests.length > 0 && (
+                {realTests.length > 0 && (
                     <Card className={styles.card}>
                         <div className={styles.cardTitle}>
                             <span>{t("testSuitesPage.nrt.testsTitle")}</span>
                             <span className={styles.cardTitleHint}>
-                                {rowFilter ? `${filteredTests.length} / ${detail.tests.length}` : detail.tests.length}
+                                {rowFilter ? `${filteredTests.length} / ${realTests.length}` : realTests.length}
                             </span>
                         </div>
                         <Accordion collapsible>
@@ -934,13 +970,12 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                             <Text className={styles.findingMeta} font="monospace">
                                                 {test.domain}
                                             </Text>
-                                            <Text className={styles.findingMeta} font="monospace">
-                                                {test.file}
-                                            </Text>
-                                            <RunHistoryStrip points={history.slice(0, INLINE_HISTORY_RUN_COUNT)} />
                                         </div>
                                     </AccordionHeader>
                                     <AccordionPanel>
+                                        <Text className={styles.findingMeta} font="monospace" block>
+                                            {test.file}
+                                        </Text>
                                         {test.steps.length === 0 ? (
                                             <Text className={styles.detailNote}>{t("testSuitesPage.nrt.noSteps")}</Text>
                                         ) : (
@@ -1029,18 +1064,24 @@ function RunsList({
                     >
                         <div className={styles.runTop}>
                             <span className={styles.runDate}>{formatDateTime(run.startedAt)}</span>
-                            {i === 0 ? (
-                                <Badge appearance="filled" color="brand">
-                                    {t("testSuitesPage.latest")}
-                                </Badge>
-                            ) : (
+                            <div className={styles.runBadges}>
+                                {i === 0 && (
+                                    <Text size={200} weight="semibold" className={styles.runLatestTag}>
+                                        {t("testSuitesPage.latest")}
+                                    </Text>
+                                )}
                                 <Badge appearance="filled" color={statusToBadgeColor(run.status)}>
                                     {t(`testSuitesPage.status.${run.status}`)}
                                 </Badge>
-                            )}
+                            </div>
                         </div>
-                        <Text font="monospace" className={styles.runBranch}>
-                            {run.branch} &middot; {run.commitSha}
+                        <Text
+                            font="monospace"
+                            className={styles.runBranch}
+                            title={run.commitSha ? `${run.branch} · ${run.commitSha}` : run.branch}
+                        >
+                            {run.branch}
+                            {run.commitSha ? ` · ${run.commitSha.slice(0, 7)}` : ""}
                         </Text>
                     </button>
                 ))}
