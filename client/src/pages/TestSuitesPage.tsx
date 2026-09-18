@@ -479,14 +479,21 @@ function reportHref(file: string): string {
 // a gated API path, not a link (see its comment in types.ts) - it has to be
 // fetched (carrying the usual PAT header) before there's a URL to open. The
 // blank window opens synchronously on click, before that await, so browsers
-// don't treat the later navigation as an unrequested popup.
+// don't treat the later navigation as an unrequested popup - it can't pass
+// "noopener" as a window.open() feature and keep a reference to navigate
+// later, though: browsers return null from window.open() specifically when
+// noopener is set (the whole point of the flag is that no such reference
+// ever exists), which left the blank tab permanently blank. window.opener
+// is nulled out manually instead, right after opening, which blocks the
+// same reverse-tabnabbing risk without losing the reference.
 async function openTestSuiteReport(run: TestSuiteRun): Promise<void> {
     if (!run.reportUrl) {
         window.open(reportHref(run.reportFile), "_blank", "noopener");
         return;
     }
 
-    const win = window.open("", "_blank", "noopener");
+    const win = window.open("", "_blank");
+    if (win) win.opener = null;
     const url = await fetchSignedReportUrl(run.reportUrl);
     if (win) win.location.href = url;
 }
