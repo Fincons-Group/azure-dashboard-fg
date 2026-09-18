@@ -5,6 +5,7 @@ import {
     type QueryDocumentSnapshot,
     type QuerySnapshot,
 } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { FirebaseConfigError } from "./firebaseE2eData.js";
 import type { TestSuiteRun } from "./types.js";
 
@@ -29,6 +30,7 @@ const CACHE_DURATION_MS = 5 * 60 * 1000;
 const MAX_RUNS_PER_KIND = 200;
 
 let app: App | null = null;
+let projectId: string | null = null;
 
 // Same lazy + memoized init as firebaseE2eData.ts's getApp() - reuses
 // whichever module (this one or firebaseE2eData.ts) initializes the Firebase
@@ -51,6 +53,8 @@ function getApp(): App {
             const serviceAccount = JSON.parse(raw);
             app = initializeApp({ credential: cert(serviceAccount) });
         }
+
+        projectId = JSON.parse(raw).project_id;
     }
 
     return app;
@@ -58,6 +62,38 @@ function getApp(): App {
 
 function getDb(): Firestore {
     return getFirestore(getApp());
+}
+
+// Same bucket naming as scripts/publish-local-test-runs.js - confirmed
+// against the real project that "<project_id>.appspot.com" is the right
+// one, not the newer "<project_id>.firebasestorage.app" convention.
+function getBucket() {
+    getApp();
+    return getStorage(getApp()).bucket(`${projectId}.appspot.com`);
+}
+
+// Report files are uploaded privately (no public ACL - see
+// publish-local-test-runs.js) so a compromised/leaked link can't serve them
+// forever. This mints a fresh signed URL, good for a few minutes, each time
+// GET /api/test-suites-reports/runs/:runId/:filename (itself gated behind
+// assertAllowedDomain() like every other /api route) is called - never a
+// permanent one. Returns null when the object doesn't exist (nothing was
+// ever published for that run/file), which the route turns into a 404.
+export async function getSignedReportFileUrl(
+    runId: string,
+    filename: string
+): Promise<string | null> {
+    const file = getBucket().file(`test-suites-reports/runs/${runId}/${filename}`);
+    const [exists] = await file.exists();
+
+    if (!exists) return null;
+
+    const [url] = await file.getSignedUrl({
+        action: "read",
+        expires: Date.now() + 5 * 60 * 1000,
+    });
+
+    return url;
 }
 
 let cache: { data: TestSuiteRun[]; timestamp: number } | null = null;

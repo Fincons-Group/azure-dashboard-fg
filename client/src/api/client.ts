@@ -228,6 +228,15 @@ export function fetchTestSuites(): Promise<TestSuitesResponse> {
     return getJson("/api/test-suites");
 }
 
+// apiPath is TestSuiteRun.reportUrl itself (a gated /api/test-suites-reports/...
+// path, not a direct link) - this carries the usual PAT header to it and
+// gets back a short-lived signed Storage URL to actually open, see that
+// field's comment in types.ts.
+export async function fetchSignedReportUrl(apiPath: string): Promise<string> {
+    const { url } = await getJson<{ url: string }>(apiPath);
+    return url;
+}
+
 export function fetchDefects(
     filters?: DefectFilters,
     project?: string

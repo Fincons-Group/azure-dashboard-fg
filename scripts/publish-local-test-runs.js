@@ -25,6 +25,7 @@ import path from "node:path";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { warnIfStorageUsageIsHigh } from "./lib/storage-usage.js";
 
 const LOCAL_COLLECTION = "testSuiteRunsLocal";
 const PUBLISH_REPORTS = process.env.PUBLISH_REPORTS_TO_FIREBASE === "true";
@@ -285,24 +286,25 @@ function buildTeamSummary(tests) {
     });
 }
 
-// Uploads one local file to Storage at destPath and makes it publicly
-// readable (a fixed ACL grant via the Admin SDK, independent of Firestore's
-// security rules - see docs/e2e-firebase-integration-plan.md Part A, which
-// only locks down Firestore, not Storage). Missing files (e.g. a PDF variant
-// that wasn't generated) are skipped with a warning rather than failing the
-// whole run.
+// Uploads one local file to Storage at destPath, left with Storage's default
+// private ACL - never made public. The server mints short-lived signed URLs
+// on demand instead (see getSignedReportFileUrl in firebaseTestSuitesData.ts
+// and GET /api/test-suites-reports in server.ts), so a leaked/shared link
+// can't serve the file forever the way a permanent public URL would. Missing
+// files (e.g. a PDF variant that wasn't generated) are skipped with a
+// warning rather than failing the whole run. Returns whether the upload
+// happened, so callers only point reportUrl at files that actually made it.
 async function uploadReport(bucket, localPath, destPath) {
     try {
         statSync(localPath);
     } catch {
         console.warn(`  (skipping upload, not found: ${localPath})`);
-        return undefined;
+        return false;
     }
 
     await bucket.upload(localPath, { destination: destPath });
-    await bucket.file(destPath).makePublic();
 
-    return `https://storage.googleapis.com/${bucket.name}/${destPath}`;
+    return true;
 }
 
 // tests here is already the one kind's own subset (see buildPlaywrightRuns) -
@@ -383,18 +385,22 @@ async function buildPlaywrightRuns(bucket) {
             const runDir = path.join(reportsDir, "runs", id);
             const destDir = `test-suites-reports/runs/${id}`;
 
-            const reportUrl = await uploadReport(
+            const htmlUploaded = await uploadReport(
                 bucket,
                 path.join(runDir, "smart-report.html"),
                 `${destDir}/smart-report.html`
             );
-            // Firestore's Admin SDK rejects an explicit `undefined` field on
-            // .set() by default - only assign when the upload actually
-            // produced a URL.
-            if (reportUrl) base.reportUrl = reportUrl;
+            // reportUrl is the gated API path the client fetches a signed
+            // URL from (see TestSuiteRun.reportUrl in src/types.ts) - only
+            // set it once the HTML the button actually opens is confirmed
+            // uploaded.
+            if (htmlUploaded) base.reportUrl = `/api/test-suites-reports/runs/${id}/smart-report.html`;
             // Siblings smart-report.html itself links to (PDF download
-            // buttons) - uploaded alongside so those relative links resolve
-            // once hosted, same as they do when viewed locally.
+            // buttons) - uploaded alongside so they exist in Storage too.
+            // Note: those links are plain relative hrefs baked into the
+            // HTML, so once smart-report.html is opened via its own signed
+            // URL, clicking one 403s (it isn't itself a signed URL) - a
+            // known follow-up, not fixed by this upload alone.
             for (const pdf of ["smart-report.pdf", "smart-report-dark.pdf", "smart-report-minimal.pdf"]) {
                 await uploadReport(bucket, path.join(runDir, pdf), `${destDir}/${pdf}`);
             }
@@ -459,3 +465,7 @@ for (const run of runs) {
 }
 
 console.log(`\nPublished ${runs.length} run(s) to ${LOCAL_COLLECTION}.`);
+
+if (PUBLISH_REPORTS) {
+    await warnIfStorageUsageIsHigh(bucket);
+}

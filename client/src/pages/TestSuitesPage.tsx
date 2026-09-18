@@ -34,7 +34,7 @@ import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import { RunHistoryStrip, type RunHistoryPoint } from "../components/RunHistoryStrip";
-import { getApiBaseUrl, fetchTestSuites } from "../api/client";
+import { getApiBaseUrl, fetchTestSuites, fetchSignedReportUrl } from "../api/client";
 import type {
     NrtDomainResult,
     NrtTestResult,
@@ -475,8 +475,20 @@ function reportHref(file: string): string {
     return `${getApiBaseUrl()}/test-suites-reports/${file}`;
 }
 
-function openReportHref(run: TestSuiteRun): string {
-    return run.reportUrl ?? reportHref(run.reportFile);
+// Local-dev fallback (no reportUrl) opens straight away. A real reportUrl is
+// a gated API path, not a link (see its comment in types.ts) - it has to be
+// fetched (carrying the usual PAT header) before there's a URL to open. The
+// blank window opens synchronously on click, before that await, so browsers
+// don't treat the later navigation as an unrequested popup.
+async function openTestSuiteReport(run: TestSuiteRun): Promise<void> {
+    if (!run.reportUrl) {
+        window.open(reportHref(run.reportFile), "_blank", "noopener");
+        return;
+    }
+
+    const win = window.open("", "_blank", "noopener");
+    const url = await fetchSignedReportUrl(run.reportUrl);
+    if (win) win.location.href = url;
 }
 
 // Only the last dozen or so runs shown inline next to each test's row (a
@@ -720,6 +732,7 @@ function SuiteDetail({
     const styles = useStyles();
     const Icon = SUITE_ICONS[suite];
     const run = runs.find((r) => r.id === selectedRunId) ?? runs[0] ?? null;
+    const [reportError, setReportError] = useState(false);
 
     if (!run) {
         return (
@@ -768,15 +781,20 @@ function SuiteDetail({
                 </div>
                 <div className={styles.reportCta}>
                     <Button
-                        as="a"
-                        href={openReportHref(run)}
-                        target="_blank"
-                        rel="noreferrer"
                         appearance="primary"
                         icon={<OpenRegular />}
+                        onClick={() => {
+                            setReportError(false);
+                            openTestSuiteReport(run).catch(() => setReportError(true));
+                        }}
                     >
                         {t("testSuitesPage.openReport", { file: run.reportFile })}
                     </Button>
+                    {reportError && (
+                        <Text className={styles.detailNote} style={{ color: tokens.colorPaletteRedForeground1 }}>
+                            {t("testSuitesPage.openReportError")}
+                        </Text>
+                    )}
                     <Text className={styles.detailNote}>{t("testSuitesPage.renderedBy", { tool: run.reportTool })}</Text>
                 </div>
             </div>
