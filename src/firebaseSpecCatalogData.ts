@@ -1,5 +1,5 @@
 import { initializeApp, cert, getApps, type App } from "firebase-admin/app";
-import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getFirestore, type DocumentSnapshot, type Firestore } from "firebase-admin/firestore";
 import { FirebaseConfigError } from "./firebaseE2eData.js";
 
 // scripts/publish-spec-catalog.js is, for now, the only thing that ever
@@ -58,7 +58,7 @@ export async function getSpecFilePaths(): Promise<Record<SpecKind, string[]> | n
     const db = getDb();
     const snapshots = await Promise.all(KINDS.map((kind) => db.collection(COLLECTION).doc(kind).get()));
 
-    if (snapshots.every((snapshot) => !snapshot.exists)) {
+    if (snapshots.every((snapshot: DocumentSnapshot) => !snapshot.exists)) {
         return null;
     }
 
