@@ -30,6 +30,7 @@
     "release": "node scripts/release.js",
     "e2e:publish-local": "node scripts/publish-local-test-runs.js",
     "e2e:cleanup-local": "node scripts/cleanup-local-test-runs.js",
+    "e2e:storage-usage": "node scripts/check-storage-usage.js",
     "e2e:publish-spec-catalog": "node scripts/publish-spec-catalog.js"
   },
   "dependencies": {

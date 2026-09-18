@@ -55,6 +55,7 @@ import {
 import {
     getTestSuiteRuns,
     clearTestSuiteRunsCache,
+    getSignedReportFileUrl,
 } from "./firebaseTestSuitesData.js";
 import {
     getSpecCatalog,
@@ -357,6 +358,40 @@ app.get("/api/test-suites", async (_req, res) => {
             return;
         }
 
+        sendApiError(res, error);
+    }
+});
+
+// Backs TestSuiteRun.reportUrl (see its comment in types.ts) - sits behind
+// /api's assertAllowedDomain() gate above like every other route, so it
+// needs the same PAT header as any other API call, not just a knowable URL.
+// Returns a fresh short-lived signed URL rather than redirecting straight to
+// Storage, since the client can't follow a redirect through a plain <a
+// href> without losing that PAT-based gate - see TestSuitesPage.tsx's
+// report button.
+const REPORT_FILENAME_ALLOWLIST = new Set([
+    "smart-report.html",
+    "smart-report.pdf",
+    "smart-report-dark.pdf",
+    "smart-report-minimal.pdf",
+]);
+
+app.get("/api/test-suites-reports/runs/:runId/:filename", async (req, res) => {
+    if (!REPORT_FILENAME_ALLOWLIST.has(req.params.filename)) {
+        res.status(404).json({ message: "Unknown report file." });
+        return;
+    }
+
+    try {
+        const url = await getSignedReportFileUrl(req.params.runId, req.params.filename);
+
+        if (!url) {
+            res.status(404).json({ message: "Report not found." });
+            return;
+        }
+
+        res.json({ url });
+    } catch (error: any) {
         sendApiError(res, error);
     }
 });

@@ -944,6 +944,11 @@ export interface TestSuiteRun {
   startedAt: string;
   status: TestRunStatus;
   reportFile: string;
+  // Not a direct link - the underlying Storage object is private (see
+  // scripts/publish-local-test-runs.js). This is the gated
+  // /api/test-suites-reports/runs/<id>/<file> path the client fetches (with
+  // its usual PAT header) to get back a short-lived signed URL, rather than
+  // a permanent public one - see GET /api/test-suites-reports in server.ts.
   reportUrl?: string;
   reportTool: string;
   nrt?: NrtRunDetail;

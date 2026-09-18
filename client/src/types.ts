@@ -791,10 +791,12 @@ export interface TestSuiteRun {
   // every other deployment. reportUrl below is the real, hosted path once
   // one exists.
   reportFile: string;
-  // Absolute URL to the same report once it's actually hosted somewhere
-  // public (Firebase Storage/Hosting) - not populated by
-  // scripts/publish-local-test-runs.js yet, only by the eventual real CI
-  // pipeline. Preferred over reportFile/reportHref() when present.
+  // Not a direct link - the report is uploaded privately to Firebase
+  // Storage (see scripts/publish-local-test-runs.js), so this is instead
+  // the gated /api/test-suites-reports/runs/<id>/<file> path to fetch (with
+  // the usual PAT header) for a short-lived signed URL. Preferred over
+  // reportFile/reportHref() when present - see openTestSuiteReport in
+  // TestSuitesPage.tsx.
   reportUrl?: string;
   reportTool: string;
   nrt?: NrtRunDetail;

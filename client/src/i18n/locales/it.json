@@ -294,6 +294,7 @@
     "ranAt": "Eseguito {{time}}",
     "viewReports": "Vedi i report",
     "openReport": "Apri {{file}}",
+    "openReportError": "Impossibile aprire il report - riprova tra un momento.",
     "renderedBy": "Generato da {{tool}}",
     "linkedNoteNrt": "Questa esecuzione ha incluso anche il progetto a11y-chrome - vedi la scheda A11Y per i risultati.",
     "linkedNoteA11y": "Catturato all'interno dell'esecuzione NRT {{runId}} (il progetto a11y-chrome è girato insieme alle specifiche vit).",
