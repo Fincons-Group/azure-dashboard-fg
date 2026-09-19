@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
-    Badge,
     Card,
     Tab,
     TabList,
@@ -15,9 +14,11 @@ import {
 import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
+import { StatusTag } from "../components/StatusTag";
 import { ModuleCoverageBarChart } from "../components/AutomationKpiCharts";
 import { RunHistoryStrip, type RunHistoryPoint } from "../components/RunHistoryStrip";
 import { fetchAutomationKpis, fetchTestSpecCatalog } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
 import type { TestCatalogRow } from "../types";
 
 const useStyles = makeStyles({
@@ -40,6 +41,8 @@ const useStyles = makeStyles({
         borderTopWidth: "3px",
         borderTopStyle: "solid",
         borderTopColor: tokens.colorBrandStroke1,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     statValue: {
         fontSize: "24px",
@@ -55,6 +58,12 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
+    },
+    tableCard: {
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     chartTitle: {
         fontSize: "14px",
@@ -131,9 +140,6 @@ const useStyles = makeStyles({
         flexWrap: "wrap",
         gap: tokens.spacingHorizontalS,
         padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalM} 0`,
-    },
-    notLinkedBadge: {
-        alignSelf: "flex-start",
     },
 });
 
@@ -222,7 +228,7 @@ export function AutomationKpiPage() {
                         </Card>
                     )}
 
-                    <Card>
+                    <Card className={styles.tableCard}>
                         <Text className={styles.tableCardTitle}>
                             {t("automationKpiPage.flakyTestsTitle", {
                                 count: data.flakyTests.length,
@@ -309,7 +315,7 @@ function SpecCatalogCard() {
     const rows: TestCatalogRow[] = data ? data[kind] : [];
 
     return (
-        <Card>
+        <Card className={styles.tableCard}>
             <div className={styles.catalogHead}>
                 <Text className={styles.tableCardTitle} style={{ padding: 0 }}>
                     {t("automationKpiPage.specCatalog.title")}
@@ -389,14 +395,9 @@ function SpecCatalogCard() {
                                                 </span>
                                             )}
                                             {kind !== "nrt" && !row.testCaseId && (
-                                                <Badge
-                                                    className={styles.notLinkedBadge}
-                                                    appearance="tint"
-                                                    color="informative"
-                                                    size="small"
-                                                >
+                                                <StatusTag tone="neutral">
                                                     {t("automationKpiPage.specCatalog.notLinked")}
-                                                </Badge>
+                                                </StatusTag>
                                             )}
                                         </div>
                                     </td>

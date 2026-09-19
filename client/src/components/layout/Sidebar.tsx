@@ -19,6 +19,7 @@ import {
     BoardRegular,
     GaugeRegular,
     BugRegular,
+    PulseRegular,
     ChevronLeftRegular,
     ChevronRightRegular,
     type FluentIcon,
@@ -30,11 +31,10 @@ import {
     RAIL_BG,
     RAIL_FG,
     RAIL_FG_ACTIVE,
+    RAIL_ACCENT,
 } from "../../layoutConstants";
 import { EXPERIMENTAL_NAV_KEYS } from "../../config/navItems";
 import { useSettings } from "../../hooks/useSettings";
-
-const ACTIVE_ACCENT = "#0EA5A0";
 
 const useStyles = makeStyles({
     sidebar: {
@@ -67,7 +67,8 @@ const useStyles = makeStyles({
     },
     logoBadge: {
         backgroundColor: "#ffffff",
-        borderRadius: tokens.borderRadiusMedium,
+        borderRadius: "10px",
+        boxShadow: tokens.shadow4,
         padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalS}`,
         display: "flex",
         alignItems: "center",
@@ -96,9 +97,40 @@ const useStyles = makeStyles({
     nav: {
         display: "flex",
         flexDirection: "column",
-        gap: tokens.spacingVerticalXXS,
+        gap: tokens.spacingVerticalM,
         padding: tokens.spacingHorizontalS,
         flexGrow: 1,
+        overflowY: "auto",
+        // Default browser scrollbars are light-on-white by design and look
+        // broken sitting directly on the dark rail - a slim, semi-transparent
+        // thumb with no visible track reads as intentional instead.
+        scrollbarWidth: "thin",
+        scrollbarColor: "rgba(255, 255, 255, 0.18) transparent",
+        "::-webkit-scrollbar": {
+            width: "6px",
+        },
+        "::-webkit-scrollbar-track": {
+            backgroundColor: "transparent",
+        },
+        "::-webkit-scrollbar-thumb": {
+            backgroundColor: "rgba(255, 255, 255, 0.18)",
+            borderRadius: tokens.borderRadiusCircular,
+        },
+    },
+    navGroup: {
+        display: "flex",
+        flexDirection: "column",
+        gap: tokens.spacingVerticalXXS,
+    },
+    navGroupLabel: {
+        fontSize: tokens.fontSizeBase100,
+        fontWeight: tokens.fontWeightSemibold,
+        color: RAIL_FG,
+        opacity: 0.6,
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        padding: `0 ${tokens.spacingHorizontalS}`,
+        marginBottom: "2px",
     },
     navItem: {
         position: "relative",
@@ -123,19 +155,20 @@ const useStyles = makeStyles({
     },
     navItemActive: {
         color: RAIL_FG_ACTIVE,
-        backgroundColor: "rgba(14, 165, 160, 0.12)",
+        backgroundColor: "rgba(14, 165, 160, 0.14)",
     },
     navIndicator: {
         position: "absolute",
-        left: 0,
-        top: "4px",
-        bottom: "4px",
-        width: "3px",
-        borderRadius: tokens.borderRadiusSmall,
+        left: "-2px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        width: "5px",
+        height: "5px",
+        borderRadius: tokens.borderRadiusCircular,
         backgroundColor: "transparent",
     },
     navIndicatorActive: {
-        backgroundColor: ACTIVE_ACCENT,
+        backgroundColor: RAIL_ACCENT,
     },
     navIcon: {
         display: "flex",
@@ -160,6 +193,7 @@ const useStyles = makeStyles({
         color: RAIL_FG,
         opacity: 0.6,
         fontSize: tokens.fontSizeBase100,
+        whiteSpace: "nowrap",
         paddingBottom: tokens.spacingVerticalXS,
     },
     collapseButton: {
@@ -181,77 +215,113 @@ type NavItem = {
     icon: FluentIcon;
 };
 
+type NavGroup = {
+    key: string;
+    labelKey: string;
+    items: NavItem[];
+};
+
 // This branch ships the Sprint Report, the multi-scope Excel Export page,
 // the Test Factory Coverage Roadmap, its Cycle Time report, its real
 // test-case Automation KPIs, E2E History, the NRT/A11Y/Security Test Suites
 // hub, and the Bugs page. Items in EXPERIMENTAL_NAV_KEYS (config/navItems.ts)
 // are filtered out below unless AppSettings.showExperimentalPages is on.
-const NAV_ITEMS: NavItem[] = [
+const NAV_GROUPS: NavGroup[] = [
     {
-        key: "dynamic-sprint-report",
-        labelKey: "nav.dynamicSprintReport",
-        to: "/dynamic-sprint-report",
-        icon: DocumentTextRegular,
+        key: "overview",
+        labelKey: "nav.group.overview",
+        items: [
+            {
+                key: "qa-control-center",
+                labelKey: "nav.qaControlCenter",
+                to: "/qa-control-center",
+                icon: GaugeRegular,
+            },
+            {
+                key: "quality-pulse",
+                labelKey: "nav.qualityPulse",
+                to: "/quality-pulse",
+                icon: PulseRegular,
+            },
+        ],
     },
     {
-        key: "excel-export",
-        labelKey: "nav.excelExport",
-        to: "/excel-export",
-        icon: DocumentTableRegular,
+        key: "reports",
+        labelKey: "nav.group.reports",
+        items: [
+            {
+                key: "dynamic-sprint-report",
+                labelKey: "nav.dynamicSprintReport",
+                to: "/dynamic-sprint-report",
+                icon: DocumentTextRegular,
+            },
+            {
+                key: "excel-export",
+                labelKey: "nav.excelExport",
+                to: "/excel-export",
+                icon: DocumentTableRegular,
+            },
+            {
+                key: "coverage-roadmap",
+                labelKey: "nav.coverageRoadmap",
+                to: "/coverage-roadmap",
+                icon: TableRegular,
+            },
+            {
+                key: "cycle-time",
+                labelKey: "nav.cycleTime",
+                to: "/cycle-time",
+                icon: ArrowTrendingRegular,
+            },
+            {
+                key: "automation-kpis",
+                labelKey: "nav.automationKpis",
+                to: "/automation-kpis",
+                icon: FlashAutoRegular,
+            },
+            {
+                key: "e2e-history",
+                labelKey: "nav.e2eHistory",
+                to: "/e2e-history",
+                icon: BeakerRegular,
+            },
+        ],
     },
     {
-        key: "coverage-roadmap",
-        labelKey: "nav.coverageRoadmap",
-        to: "/coverage-roadmap",
-        icon: TableRegular,
+        key: "quality",
+        labelKey: "nav.group.quality",
+        items: [
+            {
+                key: "test-suites",
+                labelKey: "nav.testSuites",
+                to: "/test-suites",
+                icon: AppsListRegular,
+            },
+            {
+                key: "bugs",
+                labelKey: "nav.bugs",
+                to: "/bugs",
+                icon: BugRegular,
+            },
+        ],
     },
     {
-        key: "cycle-time",
-        labelKey: "nav.cycleTime",
-        to: "/cycle-time",
-        icon: ArrowTrendingRegular,
-    },
-    {
-        key: "automation-kpis",
-        labelKey: "nav.automationKpis",
-        to: "/automation-kpis",
-        icon: FlashAutoRegular,
-    },
-    {
-        key: "e2e-history",
-        labelKey: "nav.e2eHistory",
-        to: "/e2e-history",
-        icon: BeakerRegular,
-    },
-    {
-        key: "test-suites",
-        labelKey: "nav.testSuites",
-        to: "/test-suites",
-        icon: AppsListRegular,
-    },
-    {
-        key: "test-plans",
-        labelKey: "nav.testPlans",
-        to: "/test-plans",
-        icon: ClipboardTaskListLtrRegular,
-    },
-    {
-        key: "team-dashboard",
-        labelKey: "nav.teamDashboard",
-        to: "/team-dashboard",
-        icon: BoardRegular,
-    },
-    {
-        key: "qa-control-center",
-        labelKey: "nav.qaControlCenter",
-        to: "/qa-control-center",
-        icon: GaugeRegular,
-    },
-    {
-        key: "bugs",
-        labelKey: "nav.bugs",
-        to: "/bugs",
-        icon: BugRegular,
+        key: "team",
+        labelKey: "nav.group.team",
+        items: [
+            {
+                key: "test-plans",
+                labelKey: "nav.testPlans",
+                to: "/test-plans",
+                icon: ClipboardTaskListLtrRegular,
+            },
+            {
+                key: "team-dashboard",
+                labelKey: "nav.teamDashboard",
+                to: "/team-dashboard",
+                icon: BoardRegular,
+            },
+        ],
     },
 ];
 
@@ -309,9 +379,12 @@ export function Sidebar({
     const styles = useStyles();
     const { t } = useTranslation();
     const { settings } = useSettings();
-    const visibleNavItems = NAV_ITEMS.filter(
-        (item) => settings.showExperimentalPages || !EXPERIMENTAL_NAV_KEYS.has(item.key)
-    );
+    const visibleNavGroups = NAV_GROUPS.map((group) => ({
+        ...group,
+        items: group.items.filter(
+            (item) => settings.showExperimentalPages || !EXPERIMENTAL_NAV_KEYS.has(item.key)
+        ),
+    })).filter((group) => group.items.length > 0);
 
     return (
         <nav
@@ -349,17 +422,22 @@ export function Sidebar({
             </NavLink>
 
             <div className={styles.nav}>
-                {visibleNavItems.map((item) => (
-                    <NavRow key={item.key} item={item} collapsed={collapsed} />
+                {visibleNavGroups.map((group) => (
+                    <div key={group.key} className={styles.navGroup}>
+                        {!collapsed && (
+                            <span className={styles.navGroupLabel}>{t(group.labelKey)}</span>
+                        )}
+                        {group.items.map((item) => (
+                            <NavRow key={item.key} item={item} collapsed={collapsed} />
+                        ))}
+                    </div>
                 ))}
             </div>
 
             <div className={styles.footer}>
-                {!collapsed && (
-                    <Text as="span" className={styles.version}>
-                        {t("common.version", { version: __APP_VERSION__ })}
-                    </Text>
-                )}
+                <Text as="span" className={styles.version}>
+                    {t("common.version", { version: __APP_VERSION__ })}
+                </Text>
                 <Tooltip
                     content={t(
                         collapsed ? "nav.expandSidebar" : "nav.collapseSidebar"

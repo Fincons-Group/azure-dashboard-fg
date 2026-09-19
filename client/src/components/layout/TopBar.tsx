@@ -7,7 +7,7 @@ import {
     makeStyles,
     tokens,
 } from "@fluentui/react-components";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ArrowSyncRegular,
     QuestionCircleRegular,
@@ -49,9 +49,28 @@ const useStyles = makeStyles({
         backgroundColor: RAIL_BG,
         color: RAIL_FG_ACTIVE,
     },
+    titleGroup: {
+        display: "flex",
+        alignItems: "center",
+        gap: tokens.spacingHorizontalS,
+        minWidth: 0,
+    },
     title: {
         margin: 0,
         color: RAIL_FG_ACTIVE,
+    },
+    liveDot: {
+        width: "7px",
+        height: "7px",
+        borderRadius: tokens.borderRadiusCircular,
+        backgroundColor: "#3DD68C",
+        boxShadow: "0 0 0 3px rgba(61, 214, 140, 0.2)",
+        flexShrink: 0,
+    },
+    syncedLabel: {
+        fontSize: tokens.fontSizeBase200,
+        color: RAIL_FG,
+        whiteSpace: "nowrap",
     },
     controls: {
         display: "flex",
@@ -67,12 +86,18 @@ const useStyles = makeStyles({
     },
     refreshButton: {
         color: RAIL_FG_ACTIVE,
+        borderRadius: "9px",
         ":hover": {
             color: RAIL_FG_ACTIVE,
             backgroundColor: "rgba(255, 255, 255, 0.06)",
         },
     },
 });
+
+// Below one minute we show "just now" rather than "0m ago", which reads oddly.
+function minutesAgo(fromMs: number, nowMs: number): number {
+    return Math.max(0, Math.floor((nowMs - fromMs) / 60000));
+}
 
 export function TopBar({ title }: { title: string }) {
     const styles = useStyles();
@@ -94,11 +119,36 @@ export function TopBar({ title }: { title: string }) {
         },
     });
 
+    // Ticks once a minute purely to keep the "synced Xm ago" label fresh -
+    // the timestamp itself comes straight from the mutation, no extra state.
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), 60_000);
+        return () => clearInterval(id);
+    }, []);
+
+    const syncedMinutesAgo =
+        refreshMutation.isSuccess && refreshMutation.submittedAt
+            ? minutesAgo(refreshMutation.submittedAt, now)
+            : null;
+
     return (
         <div className={styles.bar}>
-            <Title1 as="h1" className={styles.title}>
-                {title}
-            </Title1>
+            <div className={styles.titleGroup}>
+                <Title1 as="h1" className={styles.title}>
+                    {title}
+                </Title1>
+                {syncedMinutesAgo != null && (
+                    <>
+                        <span className={styles.liveDot} aria-hidden="true" />
+                        <Text as="span" className={styles.syncedLabel}>
+                            {syncedMinutesAgo === 0
+                                ? t("nav.syncedJustNow")
+                                : t("nav.syncedAgo", { minutes: syncedMinutesAgo })}
+                        </Text>
+                    </>
+                )}
+            </div>
 
             <div className={styles.controls}>
                 {refreshMutation.isError && (

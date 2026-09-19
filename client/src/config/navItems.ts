@@ -11,6 +11,7 @@ import {
     BoardRegular,
     GaugeRegular,
     BugRegular,
+    PulseRegular,
 } from "@fluentui/react-icons";
 
 export interface NavItemConfig {
@@ -30,6 +31,7 @@ export const EXPERIMENTAL_NAV_KEYS = new Set([
     "automation-kpis",
     "team-dashboard",
     "qa-control-center",
+    "quality-pulse",
 ]);
 
 // This branch ships the Sprint Report, the multi-scope Excel Export page,
@@ -97,6 +99,12 @@ export const NAV_ITEMS: NavItemConfig[] = [
         labelKey: "nav.qaControlCenter",
         icon: GaugeRegular,
         descriptionKey: "onboardingGuide.navSections.qa-control-center",
+    },
+    {
+        key: "quality-pulse",
+        labelKey: "nav.qualityPulse",
+        icon: PulseRegular,
+        descriptionKey: "onboardingGuide.navSections.quality-pulse",
     },
     {
         key: "bugs",

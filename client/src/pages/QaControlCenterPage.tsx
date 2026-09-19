@@ -6,16 +6,24 @@ import {
     Card,
     Dropdown,
     Option,
+    Tab,
+    TabList,
     Text,
     Title2,
     makeStyles,
+    mergeClasses,
     tokens,
+    type SelectTabData,
+    type SelectTabEvent,
 } from "@fluentui/react-components";
 import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
+import { StatusTag } from "../components/StatusTag";
+import type { StatusTone } from "../components/statusTone";
 import { useScope } from "../hooks/useScope";
 import { fetchPlans, fetchPlanSuites, fetchQaControlCenter } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
 import type { QaControlCenterTrendDay, QaTrendStatus } from "../types";
 
 const useStyles = makeStyles({
@@ -65,6 +73,8 @@ const useStyles = makeStyles({
         borderTopWidth: "3px",
         borderTopStyle: "solid",
         borderTopColor: tokens.colorBrandStroke1,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     statTileGood: { borderTopColor: tokens.colorPaletteGreenForeground1 },
     statTileWarning: { borderTopColor: tokens.colorPaletteMarigoldForeground1 },
@@ -87,6 +97,8 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     cardTitle: {
         fontSize: tokens.fontSizeBase300,
@@ -129,99 +141,50 @@ const useStyles = makeStyles({
         alignItems: "start",
     },
     trendChart: {
-        display: "grid",
-        gridTemplateColumns: "repeat(7, 1fr)",
-        gap: tokens.spacingHorizontalXS,
-        alignItems: "end",
-        height: "120px",
         marginTop: tokens.spacingVerticalS,
     },
-    trendCol: {
+    teamList: {
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "flex-end",
-        height: "100%",
-        gap: "4px",
     },
-    trendValue: {
-        fontSize: tokens.fontSizeBase200,
-        fontWeight: tokens.fontWeightSemibold,
-    },
-    trendBarWrap: {
-        width: "100%",
-        height: "76px",
+    teamRow: {
         display: "flex",
-        alignItems: "flex-end",
+        alignItems: "center",
+        gap: tokens.spacingHorizontalS,
+        padding: `${tokens.spacingVerticalS} 0`,
+        borderTopWidth: "1px",
+        borderTopStyle: "solid",
+        borderTopColor: tokens.colorNeutralStroke2,
     },
-    trendBar: {
-        width: "100%",
-        borderRadius: "4px 4px 0 0",
-        minHeight: "3px",
-        background: `linear-gradient(180deg, #00b7c3, ${tokens.colorBrandForeground1})`,
+    teamRowFirst: {
+        borderTopStyle: "none",
     },
-    trendBarForecast: {
-        width: "100%",
-        borderRadius: "4px 4px 0 0",
-        minHeight: "3px",
-        border: `1px dashed ${tokens.colorBrandStroke1}`,
-        backgroundColor: tokens.colorNeutralBackground3,
+    teamAvatar: {
+        width: "28px",
+        height: "28px",
+        borderRadius: tokens.borderRadiusCircular,
+        backgroundColor: tokens.colorBrandBackground2,
+        color: tokens.colorBrandForeground2,
+        fontSize: "11px",
+        fontWeight: 700,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
     },
-    trendLabel: {
-        fontSize: tokens.fontSizeBase100,
-        color: tokens.colorNeutralForeground3,
-        textTransform: "capitalize",
-    },
-    table: {
-        width: "100%",
-        borderCollapse: "collapse",
-    },
-    tableHeadCell: {
-        textAlign: "right",
-        padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalS}`,
-        fontSize: tokens.fontSizeBase100,
+    teamName: {
+        fontSize: tokens.fontSizeBase300,
         fontWeight: tokens.fontWeightSemibold,
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-        color: tokens.colorNeutralForeground3,
-        borderBottomWidth: "1px",
-        borderBottomStyle: "solid",
-        borderBottomColor: tokens.colorNeutralStroke2,
     },
-    tableHeadCellFirst: {
-        textAlign: "left",
-    },
-    tableCell: {
-        textAlign: "right",
-        padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalS}`,
+    teamMeta: {
         fontSize: tokens.fontSizeBase200,
-        borderBottomWidth: "1px",
-        borderBottomStyle: "solid",
-        borderBottomColor: tokens.colorNeutralStroke2,
-    },
-    tableCellFirst: {
-        textAlign: "left",
-        fontWeight: tokens.fontWeightSemibold,
+        color: tokens.colorNeutralForeground3,
     },
     riskRow: {
         display: "flex",
         flexWrap: "wrap",
-        gap: tokens.spacingHorizontalS,
-    },
-    riskPill: {
-        backgroundColor: tokens.colorNeutralBackground3,
-        borderRadius: tokens.borderRadiusCircular,
-        padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
-        fontSize: tokens.fontSizeBase200,
-        fontWeight: tokens.fontWeightSemibold,
-    },
-    riskPillBad: {
-        backgroundColor: "#fdecef",
-        color: "#a4262c",
-    },
-    riskPillWarn: {
-        backgroundColor: "#fff7dc",
-        color: "#8a5700",
+        columnGap: tokens.spacingHorizontalL,
+        rowGap: tokens.spacingVerticalS,
     },
     footer: {
         fontSize: tokens.fontSizeBase200,
@@ -251,6 +214,136 @@ function formatHours(value: number): string {
 function dayLabel(iso: string): string {
     const d = new Date(iso);
     return d.toLocaleDateString(undefined, { weekday: "short" });
+}
+
+function initials(name: string): string {
+    return name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("");
+}
+
+// Thresholds are a display judgment call (how "on track" a tester looks),
+// not a scored metric from the API - kept local to this one presentation.
+function completionTone(pct: number): StatusTone {
+    if (pct >= 80) return "success";
+    if (pct >= 40) return "warning";
+    return "danger";
+}
+
+// A single connected SVG chart in place of the old per-day CSS bars, so the
+// forecast day reads as a dashed continuation of the real trend rather than
+// a same-weight bar - all coordinates (including value/day labels) share one
+// SVG coordinate space, which keeps everything pixel-aligned without trying
+// to line up separate HTML label rows against chart columns.
+function TrendChart({ trend }: { trend: QaControlCenterTrendDay[] }) {
+    const max = Math.max(1, ...trend.map((d) => d.count));
+    const width = 700;
+    const plotTop = 34;
+    const plotBottom = 118;
+    const plotHeight = plotBottom - plotTop;
+    const stepX = trend.length > 1 ? width / (trend.length - 1) : 0;
+
+    const points = trend.map((day, i) => ({
+        x: i * stepX,
+        y: plotBottom - (day.count / max) * plotHeight,
+        day,
+    }));
+
+    const realPoints = points.filter((p) => !p.day.forecast);
+    const lastReal = realPoints[realPoints.length - 1];
+    const forecastPoints = points.filter((p) => p.day.forecast);
+
+    const realPath = realPoints.map((p) => `${p.x},${p.y}`).join(" ");
+    const areaPath =
+        realPoints.length > 0
+            ? `0,${plotBottom} ${realPath} ${lastReal.x},${plotBottom}`
+            : "";
+    const forecastPath =
+        lastReal && forecastPoints.length > 0
+            ? [lastReal, ...forecastPoints].map((p) => `${p.x},${p.y}`).join(" ")
+            : "";
+
+    return (
+        <svg width="100%" height="170" viewBox={`0 0 ${width} 150`} preserveAspectRatio="none">
+            <defs>
+                <linearGradient id="qaccTrendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={tokens.colorBrandForeground1} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={tokens.colorBrandForeground1} stopOpacity={0} />
+                </linearGradient>
+            </defs>
+
+            <line
+                x1={0}
+                y1={plotBottom}
+                x2={width}
+                y2={plotBottom}
+                style={{ stroke: tokens.colorNeutralStroke2 }}
+                strokeWidth={1}
+            />
+
+            {areaPath && <polygon points={areaPath} fill="url(#qaccTrendFill)" />}
+            {realPath && (
+                <polyline
+                    points={realPath}
+                    fill="none"
+                    style={{ stroke: tokens.colorBrandForeground1 }}
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            )}
+            {forecastPath && (
+                <polyline
+                    points={forecastPath}
+                    fill="none"
+                    style={{ stroke: tokens.colorBrandStroke1 }}
+                    strokeWidth={2}
+                    strokeDasharray="5 4"
+                    strokeLinecap="round"
+                />
+            )}
+
+            {points.map((p, i) => (
+                <g key={i}>
+                    {p.day.forecast ? (
+                        <circle
+                            cx={p.x}
+                            cy={p.y}
+                            r={4}
+                            fill={tokens.colorNeutralBackground1}
+                            style={{ stroke: tokens.colorBrandStroke1 }}
+                            strokeWidth={2}
+                        />
+                    ) : (
+                        <circle cx={p.x} cy={p.y} r={4} style={{ fill: tokens.colorBrandForeground1 }} />
+                    )}
+                    <text
+                        x={p.x}
+                        y={p.y - 12}
+                        textAnchor="middle"
+                        fontSize={13}
+                        fontWeight={600}
+                        style={{ fill: tokens.colorNeutralForeground1 }}
+                    >
+                        {p.day.count}
+                    </text>
+                    <text
+                        x={p.x}
+                        y={plotBottom + 22}
+                        textAnchor="middle"
+                        fontSize={11}
+                        style={{ fill: tokens.colorNeutralForeground3 }}
+                    >
+                        {dayLabel(p.day.date)}
+                        {p.day.forecast ? "*" : ""}
+                    </text>
+                </g>
+            ))}
+        </svg>
+    );
 }
 
 export function QaControlCenterPage() {
@@ -290,6 +383,38 @@ export function QaControlCenterPage() {
         enabled: !!scope.project && planId != null,
     });
 
+    // Land on a working view without forcing a manual pick every time: the
+    // first plan, then that plan's root suite - which the server already
+    // treats as "every point under it, recursively" (includeChildren
+    // defaults true - see /api/qa-control-center), so selecting it is a
+    // real "All suites in this plan" view, not a fabricated aggregate.
+    // Done during render, same escape hatch as the reset logic above,
+    // rather than in an effect (which would commit one extra render with
+    // nothing selected before the default kicks in).
+    if (planId == null && plans && plans.length > 0) {
+        setPlanId(plans[0].id);
+    }
+
+    const rootSuite = useMemo(
+        () => (suites ?? []).find((s) => s.parentId == null) ?? null,
+        [suites]
+    );
+
+    if (suiteId == null && suites && suites.length > 0) {
+        setSuiteId(rootSuite?.id ?? suites[0].id);
+    }
+
+    // Tab-style suite filter (mirrors Test Suites' Overview + per-suite
+    // tabs): the root suite stands in for "All", followed by its direct
+    // children. Deeper nesting still rolls up into whichever tab covers it
+    // recursively, it just doesn't get its own tab.
+    const suiteTabs = useMemo(() => {
+        if (!suites) return [];
+        if (!rootSuite) return suites;
+        const children = suites.filter((s) => s.parentId === rootSuite.id);
+        return [{ id: rootSuite.id, name: t("qaControlCenterPage.allSuitesTab") }, ...children];
+    }, [suites, rootSuite, t]);
+
     const {
         data,
         isLoading: dataLoading,
@@ -303,7 +428,6 @@ export function QaControlCenterPage() {
     });
 
     const selectedPlan = (plans ?? []).find((p) => p.id === planId) ?? null;
-    const selectedSuite = (suites ?? []).find((s) => s.id === suiteId) ?? null;
 
     const outcomeSegments = useMemo(() => {
         if (!data) return [];
@@ -315,11 +439,6 @@ export function QaControlCenterPage() {
             { key: "other", count: data.other },
             { key: "notApplicable", count: data.notApplicable },
         ];
-    }, [data]);
-
-    const trendMax = useMemo(() => {
-        if (!data) return 1;
-        return Math.max(1, ...data.trend.map((d: QaControlCenterTrendDay) => d.count));
     }, [data]);
 
     return (
@@ -341,29 +460,29 @@ export function QaControlCenterPage() {
                         </Option>
                     ))}
                 </Dropdown>
-
-                <Dropdown
-                    className={styles.pickerDropdown}
-                    placeholder={t("qaControlCenterPage.pickSuite")}
-                    value={selectedSuite?.name ?? ""}
-                    selectedOptions={suiteId != null ? [String(suiteId)] : []}
-                    onOptionSelect={(_, d) => setSuiteId(d.optionValue ? Number(d.optionValue) : null)}
-                    disabled={planId == null || suitesLoading}
-                >
-                    {(suites ?? []).map((suite) => (
-                        <Option key={suite.id} value={String(suite.id)}>
-                            {suite.name}
-                        </Option>
-                    ))}
-                </Dropdown>
             </div>
 
             {!scope.project && (
                 <Text className={styles.hint}>{t("qaControlCenterPage.pickProject")}</Text>
             )}
 
-            {scope.project && (planId == null || suiteId == null) && (
-                <Text className={styles.hint}>{t("qaControlCenterPage.pickPlanSuite")}</Text>
+            {scope.project && planId != null && suiteTabs.length > 0 && (
+                <TabList
+                    selectedValue={suiteId != null ? String(suiteId) : undefined}
+                    onTabSelect={(_: SelectTabEvent, tabData: SelectTabData) =>
+                        setSuiteId(Number(tabData.value))
+                    }
+                >
+                    {suiteTabs.map((suite) => (
+                        <Tab key={suite.id} value={String(suite.id)}>
+                            {suite.name}
+                        </Tab>
+                    ))}
+                </TabList>
+            )}
+
+            {scope.project && planId != null && suitesLoading && (
+                <Text className={styles.hint}>{t("qaControlCenterPage.loadingSuites")}</Text>
             )}
 
             {dataLoading && <LoadingCardGrid />}
@@ -402,15 +521,14 @@ export function QaControlCenterPage() {
                             <span className={styles.statLabel}>{t("qaControlCenterPage.kpi.yesterday")}</span>
                         </Card>
                         <Card
-                            className={
-                                styles.statTile +
-                                " " +
-                                (data.trendStatus === "up"
+                            className={mergeClasses(
+                                styles.statTile,
+                                data.trendStatus === "up"
                                     ? styles.statTileGood
                                     : data.trendStatus === "down"
                                       ? styles.statTileRisk
-                                      : styles.statTileWarning)
-                            }
+                                      : styles.statTileWarning
+                            )}
                         >
                             <span className={styles.statValue}>{data.tomorrowForecast}</span>
                             <span className={styles.statLabel}>{t("qaControlCenterPage.kpi.forecast")}</span>
@@ -469,23 +587,7 @@ export function QaControlCenterPage() {
                                 <span className={styles.statDetail}>{t("qaControlCenterPage.trendHint")}</span>
                             </div>
                             <div className={styles.trendChart}>
-                                {data.trend.map((day: QaControlCenterTrendDay, i: number) => (
-                                    <div key={i} className={styles.trendCol}>
-                                        <span className={styles.trendValue}>{day.count}</span>
-                                        <div className={styles.trendBarWrap}>
-                                            <div
-                                                className={day.forecast ? styles.trendBarForecast : styles.trendBar}
-                                                style={{
-                                                    height: `${Math.max(3, Math.round((day.count / trendMax) * 76))}px`,
-                                                }}
-                                            />
-                                        </div>
-                                        <span className={styles.trendLabel}>
-                                            {dayLabel(day.date)}
-                                            {day.forecast ? "*" : ""}
-                                        </span>
-                                    </div>
-                                ))}
+                                <TrendChart trend={data.trend} />
                             </div>
                         </Card>
 
@@ -496,34 +598,40 @@ export function QaControlCenterPage() {
                             {data.team.length === 0 ? (
                                 <Text className={styles.hint}>{t("qaControlCenterPage.noTeam")}</Text>
                             ) : (
-                                <table className={styles.table}>
-                                    <thead>
-                                        <tr>
-                                            <th className={`${styles.tableHeadCell} ${styles.tableHeadCellFirst}`}>
-                                                {t("qaControlCenterPage.team.tester")}
-                                            </th>
-                                            <th className={styles.tableHeadCell}>{t("qaControlCenterPage.team.assigned")}</th>
-                                            <th className={styles.tableHeadCell}>{t("qaControlCenterPage.team.remaining")}</th>
-                                            <th className={styles.tableHeadCell}>{t("qaControlCenterPage.team.hours")}</th>
-                                            <th className={styles.tableHeadCell}>{t("qaControlCenterPage.team.completion")}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {data.team.slice(0, 8).map((member) => (
-                                            <tr key={member.key}>
-                                                <td className={`${styles.tableCell} ${styles.tableCellFirst}`}>
+                                <div className={styles.teamList}>
+                                    {data.team.slice(0, 8).map((member, i) => (
+                                        <div
+                                            key={member.key}
+                                            className={mergeClasses(
+                                                styles.teamRow,
+                                                i === 0 && styles.teamRowFirst
+                                            )}
+                                        >
+                                            <span className={styles.teamAvatar}>
+                                                {member.key === "__unassigned__"
+                                                    ? "?"
+                                                    : initials(member.name)}
+                                            </span>
+                                            <div style={{ flexGrow: 1, minWidth: 0 }}>
+                                                <div className={styles.teamName}>
                                                     {member.key === "__unassigned__"
                                                         ? t("qaControlCenterPage.unassignedTester")
                                                         : member.name}
-                                                </td>
-                                                <td className={styles.tableCell}>{member.assigned}</td>
-                                                <td className={styles.tableCell}>{member.remaining}</td>
-                                                <td className={styles.tableCell}>{formatHours(member.effortHours)}</td>
-                                                <td className={styles.tableCell}>{member.completionPct}%</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                </div>
+                                                <div className={styles.teamMeta}>
+                                                    {t("qaControlCenterPage.team.metaLine", {
+                                                        assigned: member.assigned,
+                                                        remaining: member.remaining,
+                                                        hours: formatHours(member.effortHours),
+                                                    })}
+                                                </div>
+                                            </div>
+                                            <StatusTag tone={completionTone(member.completionPct)}>
+                                                {member.completionPct}%
+                                            </StatusTag>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </Card>
                     </div>
@@ -533,21 +641,21 @@ export function QaControlCenterPage() {
                             <span>{t("qaControlCenterPage.riskTitle")}</span>
                         </div>
                         <div className={styles.riskRow}>
-                            <span className={`${styles.riskPill} ${data.unassignedCount > 0 ? styles.riskPillBad : ""}`}>
+                            <StatusTag tone={data.unassignedCount > 0 ? "danger" : "neutral"}>
                                 {t("qaControlCenterPage.risk.unassigned", { count: data.unassignedCount })}
-                            </span>
-                            <span className={`${styles.riskPill} ${data.openBugs > 0 ? styles.riskPillWarn : ""}`}>
+                            </StatusTag>
+                            <StatusTag tone={data.openBugs > 0 ? "warning" : "neutral"}>
                                 {t("qaControlCenterPage.risk.openBugs", { count: data.openBugs })}
-                            </span>
-                            <span className={`${styles.riskPill} ${data.blockedByBug > 0 ? styles.riskPillWarn : ""}`}>
+                            </StatusTag>
+                            <StatusTag tone={data.blockedByBug > 0 ? "warning" : "neutral"}>
                                 {t("qaControlCenterPage.risk.blockedByBug", { count: data.blockedByBug })}
-                            </span>
-                            <span className={styles.riskPill}>
+                            </StatusTag>
+                            <StatusTag tone="neutral">
                                 {t("qaControlCenterPage.risk.readyForRetest", { count: data.readyForRetest })}
-                            </span>
-                            <span className={`${styles.riskPill} ${data.failedWithoutBug > 0 ? styles.riskPillBad : ""}`}>
+                            </StatusTag>
+                            <StatusTag tone={data.failedWithoutBug > 0 ? "danger" : "neutral"}>
                                 {t("qaControlCenterPage.risk.failedWithoutBug", { count: data.failedWithoutBug })}
-                            </span>
+                            </StatusTag>
                         </div>
                     </Card>
 

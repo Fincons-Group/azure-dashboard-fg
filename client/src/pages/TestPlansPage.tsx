@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
-    Badge,
     Card,
     Input,
     Spinner,
@@ -15,8 +14,11 @@ import {
 import { OpenRegular, SearchRegular } from "@fluentui/react-icons";
 import { PageLayout } from "../components/PageLayout";
 import { ErrorState } from "../components/ErrorState";
+import { StatusTag } from "../components/StatusTag";
+import type { StatusTone } from "../components/statusTone";
 import { useScope } from "../hooks/useScope";
 import { fetchPlans, fetchPlanOverview } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
 import type { Outcome, PlanOverviewTestCase } from "../types";
 
 const useStyles = makeStyles({
@@ -37,6 +39,8 @@ const useStyles = makeStyles({
         // Independent scroll region so a long plan list never pushes the
         // detail panel below the fold.
         maxHeight: "calc(100vh - 260px)",
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     planList: {
         overflowY: "auto",
@@ -90,6 +94,8 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalM,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     detailHead: {
         display: "flex",
@@ -127,6 +133,8 @@ const useStyles = makeStyles({
         borderTopWidth: "3px",
         borderTopStyle: "solid",
         borderTopColor: tokens.colorBrandStroke1,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     statValue: {
         fontSize: "22px",
@@ -183,23 +191,17 @@ const useStyles = makeStyles({
     },
 });
 
-function outcomeToBadgeColor(
-    outcome: Outcome
-): "success" | "danger" | "severe" | "warning" | "informative" | "subtle" {
+function outcomeTone(outcome: Outcome): StatusTone {
     switch (outcome) {
         case "Passed":
             return "success";
         case "Failed":
-            return "danger";
         case "Blocked":
-            return "severe";
+            return "danger";
         case "InProgress":
             return "warning";
-        case "NotApplicable":
-        case "Paused":
-            return "subtle";
         default:
-            return "informative";
+            return "neutral";
     }
 }
 
@@ -440,9 +442,9 @@ export function TestPlansPage() {
                                                         </td>
                                                         <td className={styles.tableCell}>{tc.suiteName}</td>
                                                         <td className={styles.tableCell}>
-                                                            <Badge appearance="filled" color={outcomeToBadgeColor(tc.outcome)}>
+                                                            <StatusTag tone={outcomeTone(tc.outcome)}>
                                                                 {t(`outcome.${tc.outcome}`)}
-                                                            </Badge>
+                                                            </StatusTag>
                                                         </td>
                                                         <td className={styles.tableCell}>
                                                             {tc.lastRunId != null ? (
