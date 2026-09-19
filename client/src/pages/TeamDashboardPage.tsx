@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Button, Card, Text, Title2, makeStyles, tokens } from "@fluentui/react-components";
 import { BoardRegular, OpenRegular } from "@fluentui/react-icons";
 import { PageLayout } from "../components/PageLayout";
+import { CARD_RADIUS } from "../layoutConstants";
 
 // Azure DevOps sends X-Frame-Options: SAMEORIGIN on _dashboards pages (and
 // everything else under dev.azure.com), so the browser refuses to render it
@@ -25,6 +26,8 @@ const useStyles = makeStyles({
         gap: tokens.spacingVerticalM,
         maxWidth: "520px",
         margin: "0 auto",
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     icon: {
         fontSize: "40px",

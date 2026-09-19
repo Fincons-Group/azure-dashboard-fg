@@ -18,6 +18,7 @@ import { ThroughputBarChart, CycleTimeLineChart } from "../components/CycleTimeC
 import { PaginationControls } from "../components/PaginationControls";
 import { usePagination } from "../hooks/usePagination";
 import { fetchCycleTime } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
 import type { CycleTimeTask, CycleTimeTrendPoint, ThroughputPoint } from "../types";
 
 const TABLE_PAGE_SIZE = 5;
@@ -53,6 +54,8 @@ const useStyles = makeStyles({
         borderTopWidth: "3px",
         borderTopStyle: "solid",
         borderTopColor: tokens.colorBrandStroke1,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     statValue: {
         fontSize: "24px",
@@ -73,6 +76,12 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
+    },
+    tableCard: {
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     chartTitle: {
         fontSize: "14px",
@@ -375,7 +384,7 @@ export function CycleTimeReportPage() {
                     </div>
 
                     {openTasks.length > 0 && (
-                        <Card>
+                        <Card className={styles.tableCard}>
                             <Text className={styles.tableCardTitle}>
                                 {t("cycleTimePage.openTasksTitle", {
                                     count: openTasks.length,
@@ -455,7 +464,7 @@ export function CycleTimeReportPage() {
                                 </Card>
                             </div>
 
-                            <Card>
+                            <Card className={styles.tableCard}>
                                 <Text className={styles.tableCardTitle}>
                                     {t("cycleTimePage.completedTasksTitle", {
                                         count: filteredTasks.length,

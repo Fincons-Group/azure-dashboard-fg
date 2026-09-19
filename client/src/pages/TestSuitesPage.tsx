@@ -6,7 +6,6 @@ import {
     AccordionHeader,
     AccordionItem,
     AccordionPanel,
-    Badge,
     Button,
     Card,
     Dropdown,
@@ -33,8 +32,11 @@ import {
 import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
+import { StatusTag } from "../components/StatusTag";
+import type { StatusTone } from "../components/statusTone";
 import type { RunHistoryPoint } from "../components/RunHistoryStrip";
 import { getApiBaseUrl, fetchTestSuites, fetchSignedReportUrl } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
 import type {
     NrtDomainResult,
     NrtRunDetail,
@@ -106,6 +108,8 @@ const useStyles = makeStyles({
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
         border: "none",
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
         ":hover": {
             outlineWidth: "1px",
             outlineStyle: "solid",
@@ -166,6 +170,8 @@ const useStyles = makeStyles({
         alignItems: "center",
         textAlign: "center",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     placeholderIcon: {
         fontSize: "32px",
@@ -235,6 +241,8 @@ const useStyles = makeStyles({
         borderTopWidth: "3px",
         borderTopStyle: "solid",
         borderTopColor: tokens.colorBrandStroke1,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     statValue: {
         fontSize: "22px",
@@ -256,6 +264,8 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     cardTitle: {
         fontSize: tokens.fontSizeBase300,
@@ -479,7 +489,7 @@ function nrtPassRate(detail: NrtRunDetail): number {
     return Math.round((passed / tests.length) * 1000) / 10;
 }
 
-function statusToBadgeColor(status: TestRunStatus): "success" | "warning" | "danger" {
+function statusTone(status: TestRunStatus): StatusTone {
     if (status === "good") return "success";
     if (status === "warn") return "warning";
     return "danger";
@@ -729,9 +739,9 @@ function SuiteCard({
                     <Icon />
                 </div>
                 {latest && (
-                    <Badge appearance="filled" color={statusToBadgeColor(latest.status)}>
+                    <StatusTag tone={statusTone(latest.status)}>
                         {t(`testSuitesPage.status.${latest.status}`)}
-                    </Badge>
+                    </StatusTag>
                 )}
             </div>
             <div>
@@ -798,9 +808,9 @@ function SuiteDetail({
                     <div>
                         <Title2 as="h2">{t(`testSuitesPage.suites.${suite}.full`)}</Title2>
                         <div className={styles.detailSub}>
-                            <Badge appearance="filled" color={statusToBadgeColor(run.status)}>
+                            <StatusTag tone={statusTone(run.status)}>
                                 {t(`testSuitesPage.status.${run.status}`)}
-                            </Badge>
+                            </StatusTag>
                             <Text font="monospace" size={200} className={styles.detailBranch} title={run.branch}>
                                 {run.branch}
                             </Text>
@@ -963,9 +973,9 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                 <AccordionItem key={`${test.title}-${i}`} value={i}>
                                     <AccordionHeader expandIconPosition="end">
                                         <div className={styles.testHeaderRow}>
-                                            <Badge appearance="filled" color={statusToBadgeColor(test.status === "failed" ? "bad" : test.status === "skipped" ? "warn" : "good")}>
+                                            <StatusTag tone={statusTone(test.status === "failed" ? "bad" : test.status === "skipped" ? "warn" : "good")}>
                                                 {t(`testSuitesPage.nrt.testStatus.${test.status}`)}
-                                            </Badge>
+                                            </StatusTag>
                                             <Text className={styles.testTitle}>{test.title}</Text>
                                             <Text className={styles.findingMeta} font="monospace">
                                                 {test.domain}
@@ -1009,14 +1019,13 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                                             <tr key={point.runId}>
                                                                 <td className={styles.tableCell}>{formatDateTime(point.date)}</td>
                                                                 <td className={styles.tableCell}>
-                                                                    <Badge
-                                                                        appearance="filled"
-                                                                        color={statusToBadgeColor(
+                                                                    <StatusTag
+                                                                        tone={statusTone(
                                                                             point.outcome === "failed" ? "bad" : point.outcome === "skipped" ? "warn" : "good"
                                                                         )}
                                                                     >
                                                                         {t(`testSuitesPage.nrt.testStatus.${point.outcome}`)}
-                                                                    </Badge>
+                                                                    </StatusTag>
                                                                 </td>
                                                                 <td className={styles.tableCellNum}>{(point.durationMs / 1000).toFixed(1)}s</td>
                                                             </tr>
@@ -1070,9 +1079,9 @@ function RunsList({
                                         {t("testSuitesPage.latest")}
                                     </Text>
                                 )}
-                                <Badge appearance="filled" color={statusToBadgeColor(run.status)}>
+                                <StatusTag tone={statusTone(run.status)}>
                                     {t(`testSuitesPage.status.${run.status}`)}
-                                </Badge>
+                                </StatusTag>
                             </div>
                         </div>
                         <Text

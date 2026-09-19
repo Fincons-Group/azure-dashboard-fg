@@ -12,6 +12,12 @@
   "nav": {
     "primary": "Primary",
     "home": "Go to home",
+    "group": {
+      "overview": "Overview",
+      "reports": "Reports",
+      "quality": "Quality",
+      "team": "Team"
+    },
     "dynamicSprintReport": "Sprint Report",
     "excelExport": "Excel Export",
     "coverageRoadmap": "Coverage Roadmap",
@@ -22,11 +28,14 @@
     "testPlans": "Test Plans",
     "teamDashboard": "Team Dashboard",
     "qaControlCenter": "QA Control Center",
+    "qualityPulse": "Quality Pulse",
     "bugs": "Bugs",
     "refresh": "Refresh Now",
     "refreshing": "Refreshing...",
     "refreshFailed": "Refresh failed: {{message}}",
     "refreshUpToDate": "Already up to date (try again in {{minutes}}m)",
+    "syncedJustNow": "Synced just now",
+    "syncedAgo": "Synced {{minutes}}m ago",
     "help": "Help",
     "testGraphLogin": "Login",
     "testGraphLogout": "Logout",
@@ -44,7 +53,7 @@
     "showExtraKpisLabel": "Show additional KPIs",
     "showExtraKpisHint": "Controls the \"Additional KPIs\" section on the Sprint Report card - when off, it's hidden on screen and left out of every emailed/exported report (HTML, PDF, PPTX). Saved in this browser.",
     "showExperimentalPagesLabel": "Show experimental pages",
-    "showExperimentalPagesHint": "Shows Cycle Time, E2E History, Automation KPIs, Team Dashboard, and QA Control Center in the sidebar - pages still being polished, hidden by default. Saved in this browser.",
+    "showExperimentalPagesHint": "Shows Cycle Time, E2E History, Automation KPIs, Team Dashboard, QA Control Center, and Quality Pulse in the sidebar - pages still being polished, hidden by default. Saved in this browser.",
     "close": "Close"
   },
   "azdoPatSteps": {
@@ -77,6 +86,7 @@
       "test-plans": "Browse Azure DevOps test plans for any project - test cases, outcomes, and which run last touched each one.",
       "team-dashboard": "Quick link to the Nuova Frontiera team dashboard in Azure DevOps (opens in a new tab - ADO blocks embedding it here).",
       "qa-control-center": "Execution velocity, forecast, tester workload and bug risk for any test plan/suite - a native replica of the QA Control Center ADO dashboard widget.",
+      "quality-pulse": "Preview: pipeline status, suite analytics, flaky test monitoring and defect escapes by module - built on sample data.",
       "bugs": "Bugs pending QA verification and bugs opened today, both scoped to Fincons Group (@finconsgroup.com) team members."
     },
     "gotIt": "Got it"
@@ -183,6 +193,15 @@
       "done": "Done",
       "in-progress": "In progress",
       "at-risk": "At risk"
+    },
+    "searchPlaceholder": "Search epics or owners…",
+    "statusFilterAll": "All statuses",
+    "noResults": "No epics match your search.",
+    "summary": {
+      "total": "{{count}} epics",
+      "done": "{{count}} done",
+      "inProgress": "{{count}} in progress",
+      "atRisk": "{{count}} at risk"
     }
   },
   "automationKpiPage": {
@@ -396,6 +415,8 @@
     "pickSuite": "Pick a test suite...",
     "pickProject": "Pick a project above to get started.",
     "pickPlanSuite": "Pick a test plan and suite above to see its execution velocity.",
+    "allSuitesTab": "All suites",
+    "loadingSuites": "Loading suites…",
     "eyebrow": "QA governance",
     "trend": {
       "up": "Trending up",
@@ -433,7 +454,8 @@
       "assigned": "Assigned",
       "remaining": "Remaining",
       "hours": "Hours",
-      "completion": "%"
+      "completion": "%",
+      "metaLine": "{{assigned}} assigned · {{remaining}} remaining · {{hours}}h"
     },
     "riskTitle": "Governance & risk",
     "risk": {
@@ -446,6 +468,69 @@
     "calibrationNote": "Adaptive estimate factor ×{{factor}} from {{samples}} observed manual cases.",
     "historyTruncated": "history limited to the 100 most recent runs.",
     "historyFallback": "full run history unavailable; counts based on each point's last result."
+  },
+  "qualityPulsePage": {
+    "title": "Quality Pulse",
+    "subtitle": "Pipeline status, suite analytics, flaky test monitoring and defect escapes by module, in one preview.",
+    "sampleDataBadge": "Sample data · illustrative, not live",
+    "pipeline": {
+      "title": "Pipeline Overview",
+      "audience": "For QA Leads & DevOps",
+      "action": "Drives: block or allow deployment gating",
+      "gate": {
+        "good": "Deployment allowed",
+        "warn": "Deployment: caution",
+        "bad": "Deployment blocked"
+      },
+      "status": {
+        "good": "Passing",
+        "warn": "Attention",
+        "bad": "Failing"
+      },
+      "lastRun": "Last run {{time}}",
+      "duration": "{{minutes}}m",
+      "trendChartTitle": "Build pass rate, last 14 runs",
+      "trendChartLabel": "Line chart of build pass rate over the last 14 pipeline runs"
+    },
+    "suiteAnalytics": {
+      "title": "Suite Analytics",
+      "audience": "For Automation Engineers",
+      "action": "Drives: refactor slow or failing test suites",
+      "chartTitle": "Runs by module, last 7 days",
+      "chartLabel": "Stacked bar chart of passed, failed and flaky runs per module",
+      "legend": {
+        "passed": "Passed",
+        "failed": "Failed",
+        "flaky": "Flaky"
+      }
+    },
+    "flakyMonitor": {
+      "title": "Flaky Test Monitor",
+      "audience": "For Automation Engineers",
+      "action": "Drives: quarantining or fixing unreliable tests",
+      "table": {
+        "test": "Test",
+        "module": "Module",
+        "retries": "Retries",
+        "flakeRate": "Flake rate",
+        "status": "Status",
+        "lastSeen": "Last seen"
+      },
+      "status": {
+        "monitoring": "Monitoring",
+        "quarantined": "Quarantined"
+      }
+    },
+    "defectEscapes": {
+      "title": "Defect Escapes",
+      "audience": "For QA Managers & Product Owners",
+      "action": "Drives: expanding automated coverage in high-risk areas",
+      "escapesChartTitle": "Escaped defects by module",
+      "escapesChartLabel": "Bar chart of production-found defects per module",
+      "escapesCount": "{{count}} escapes",
+      "coverageChartTitle": "Automation coverage by module",
+      "riskNote": "Highest risk: {{module}} — {{escapes}} escapes at {{coverage}}% coverage"
+    }
   },
   "planOverviewPage": {
     "exporting": "Exporting...",
@@ -863,6 +948,7 @@
     "label": "Loading"
   },
   "themeSwitcher": {
+    "groupLabel": "Theme",
     "light": "Light",
     "dark": "Dark"
   },

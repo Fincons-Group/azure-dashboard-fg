@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Badge,
   Card,
   Switch,
   Tab,
@@ -17,8 +16,11 @@ import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import { PaginationControls } from "../components/PaginationControls";
+import { StatusTag } from "../components/StatusTag";
+import type { StatusTone } from "../components/statusTone";
 import { usePagination } from "../hooks/usePagination";
 import { fetchDefects } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
 import type { DefectSummary } from "../types";
 
 const TABLE_PAGE_SIZE = 8;
@@ -70,15 +72,23 @@ function isSameLocalDay(dateString: string, reference: Date): boolean {
   );
 }
 
-function stateBadgeColor(state: string): "warning" | "brand" | "informative" {
+// "Da verificare" (nobody's picked it up) reads as needing attention,
+// "In verifica" (someone's actively on it) reads as progress, everything
+// else (New/In Lavorazione/Riaperto/Pronto per il rilascio/Closed) is just
+// informational - the closest 3-way split StatusTag's tone set supports.
+function bugStateTone(state: string): StatusTone {
   if (state === "Da verificare") return "warning";
-  if (state === "In verifica") return "brand";
-  return "informative";
+  if (state === "In verifica") return "success";
+  return "neutral";
 }
 
 const useStyles = makeStyles({
   subtitle: {
     color: tokens.colorNeutralForeground3,
+  },
+  card: {
+    borderRadius: CARD_RADIUS,
+    boxShadow: tokens.shadow4,
   },
   sectionGrid: {
     display: "flex",
@@ -235,7 +245,7 @@ export function BugsPage() {
 
       {data && (
         <div className={styles.sectionGrid}>
-          <Card>
+          <Card className={styles.card}>
             <div className={styles.tableCardHead}>
               <Text className={styles.tableCardTitle}>
                 {t("bugsPage.toVerify.title", {
@@ -301,12 +311,9 @@ export function BugsPage() {
                             <BugTitleCell bug={bug} styles={styles} />
                           </td>
                           <td className={styles.tableCell}>
-                            <Badge
-                              appearance="filled"
-                              color={stateBadgeColor(bug.state)}
-                            >
+                            <StatusTag tone={bugStateTone(bug.state)}>
                               {bug.state}
-                            </Badge>
+                            </StatusTag>
                           </td>
                           <td className={styles.tableCell}>
                             {bug.assignee?.displayName ?? "-"}
@@ -327,7 +334,7 @@ export function BugsPage() {
             )}
           </Card>
 
-          <Card>
+          <Card className={styles.card}>
             <div className={styles.tableCardHead}>
               <Text className={styles.tableCardTitle}>
                 {t("bugsPage.openedToday.title", {

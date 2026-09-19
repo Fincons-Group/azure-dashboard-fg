@@ -41,6 +41,9 @@ const TeamDashboardPage = lazy(() =>
 const QaControlCenterPage = lazy(() =>
     import("./pages/QaControlCenterPage").then((m) => ({ default: m.QaControlCenterPage }))
 );
+const QualityPulsePage = lazy(() =>
+    import("./pages/QualityPulsePage").then((m) => ({ default: m.QualityPulsePage }))
+);
 const BugsPage = lazy(() =>
     import("./pages/BugsPage").then((m) => ({ default: m.BugsPage }))
 );
@@ -93,6 +96,10 @@ function AppRoutes() {
                 <Route
                     path="/qa-control-center"
                     element={<QaControlCenterPage />}
+                />
+                <Route
+                    path="/quality-pulse"
+                    element={<QualityPulsePage />}
                 />
                 <Route path="/bugs" element={<BugsPage />} />
                 <Route
