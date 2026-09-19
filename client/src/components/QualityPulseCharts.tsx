@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { makeStyles, tokens } from "@fluentui/react-components";
 import { useThemeMode } from "../hooks/useThemeMode";
-import type { PipelineTrendPoint, SuiteModuleStats, EscapeModuleStats } from "../pages/qualityPulseMockData";
+import type { PipelineTrendPoint, EscapeModuleStats } from "../pages/qualityPulseMockData";
+import type { SuiteModuleStats } from "../pages/qualityPulseData";
 
 // Same single brand hue approach as CycleTimeCharts.tsx/AutomationKpiCharts.tsx
 // for the two single-series charts here (build trend, defect escapes).

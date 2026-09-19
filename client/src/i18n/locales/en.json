@@ -473,6 +473,28 @@
     "title": "Quality Pulse",
     "subtitle": "Pipeline status, suite analytics, flaky test monitoring and defect escapes by module, in one preview.",
     "sampleDataBadge": "Sample data · illustrative, not live",
+    "liveDataBadge": "Live data",
+    "tiers": {
+      "engineering": "Engineering",
+      "operations": "Operations",
+      "governance": "Governance",
+      "executive": "Executive"
+    },
+    "tierHint": {
+      "engineering": "Suite health and flaky tests, for automation engineers deciding what to refactor or quarantine.",
+      "operations": "Pipeline and deployment gate status, for QA leads and DevOps running day-to-day releases.",
+      "governance": "Defect escapes vs. coverage by module, for QA principals prioritising where to expand automation.",
+      "executive": "Headline numbers only, for managers who need the call without the chart detail."
+    },
+    "executive": {
+      "title": "At a glance",
+      "audience": "For Managers",
+      "action": "Drives: go/no-go calls without digging into the detail below",
+      "gateLabel": "Deployment gate",
+      "suiteHealthLabel": "Suite health (7d)",
+      "flakyLabel": "Tests in quarantine",
+      "riskLabel": "Highest-risk module"
+    },
     "pipeline": {
       "title": "Pipeline Overview",
       "audience": "For QA Leads & DevOps",
@@ -496,8 +518,9 @@
       "title": "Suite Analytics",
       "audience": "For Automation Engineers",
       "action": "Drives: refactor slow or failing test suites",
-      "chartTitle": "Runs by module, last 7 days",
-      "chartLabel": "Stacked bar chart of passed, failed and flaky runs per module",
+      "chartTitle": "Runs by test domain, latest suite run",
+      "chartLabel": "Stacked bar chart of passed, failed and flaky runs per test domain",
+      "empty": "No NRT/A11Y/Security run history yet.",
       "legend": {
         "passed": "Passed",
         "failed": "Failed",
@@ -508,13 +531,12 @@
       "title": "Flaky Test Monitor",
       "audience": "For Automation Engineers",
       "action": "Drives: quarantining or fixing unreliable tests",
+      "empty": "No flaky automated tests right now.",
       "table": {
         "test": "Test",
-        "module": "Module",
-        "retries": "Retries",
-        "flakeRate": "Flake rate",
+        "flakeCount": "Flake count",
         "status": "Status",
-        "lastSeen": "Last seen"
+        "lastSeen": "Last failed"
       },
       "status": {
         "monitoring": "Monitoring",

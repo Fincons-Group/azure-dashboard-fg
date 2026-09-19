@@ -473,6 +473,28 @@
     "title": "Quality Pulse",
     "subtitle": "Stato pipeline, analisi delle suite, monitoraggio dei test instabili e difetti sfuggiti per modulo, in un'unica anteprima.",
     "sampleDataBadge": "Dati di esempio · illustrativi, non live",
+    "liveDataBadge": "Dati live",
+    "tiers": {
+      "engineering": "Engineering",
+      "operations": "Operations",
+      "governance": "Governance",
+      "executive": "Executive"
+    },
+    "tierHint": {
+      "engineering": "Salute delle suite e test instabili, per gli automation engineer che devono decidere cosa rifattorizzare o mettere in quarantena.",
+      "operations": "Stato della pipeline e del gate di deployment, per QA lead e DevOps che gestiscono le release quotidiane.",
+      "governance": "Difetti sfuggiti rispetto alla copertura per modulo, per i QA principal che devono decidere dove estendere l'automazione.",
+      "executive": "Solo i numeri chiave, per i manager che devono decidere senza analizzare il dettaglio sottostante."
+    },
+    "executive": {
+      "title": "Colpo d'occhio",
+      "audience": "Per i Manager",
+      "action": "Guida: decisioni di go/no-go senza analizzare il dettaglio sottostante",
+      "gateLabel": "Gate di deployment",
+      "suiteHealthLabel": "Salute delle suite (7g)",
+      "flakyLabel": "Test in quarantena",
+      "riskLabel": "Modulo a rischio più alto"
+    },
     "pipeline": {
       "title": "Pipeline Overview",
       "audience": "Per QA Lead & DevOps",
@@ -496,8 +518,9 @@
       "title": "Suite Analytics",
       "audience": "Per gli Automation Engineer",
       "action": "Guida: refactoring delle suite lente o instabili",
-      "chartTitle": "Esecuzioni per modulo, ultimi 7 giorni",
-      "chartLabel": "Grafico a barre impilate di esecuzioni superate, fallite e instabili per modulo",
+      "chartTitle": "Esecuzioni per dominio di test, ultima esecuzione della suite",
+      "chartLabel": "Grafico a barre impilate di esecuzioni superate, fallite e instabili per dominio di test",
+      "empty": "Nessuno storico di esecuzioni NRT/A11Y/Security ancora disponibile.",
       "legend": {
         "passed": "Superati",
         "failed": "Falliti",
@@ -508,13 +531,12 @@
       "title": "Flaky Test Monitor",
       "audience": "Per gli Automation Engineer",
       "action": "Guida: messa in quarantena o correzione dei test instabili",
+      "empty": "Nessun test automatizzato instabile al momento.",
       "table": {
         "test": "Test",
-        "module": "Modulo",
-        "retries": "Retry",
-        "flakeRate": "Flake rate",
+        "flakeCount": "Flake count",
         "status": "Stato",
-        "lastSeen": "Ultimo riscontro"
+        "lastSeen": "Ultimo fallimento"
       },
       "status": {
         "monitoring": "Monitorato",

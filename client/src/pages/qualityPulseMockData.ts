@@ -1,13 +1,17 @@
-// Illustrative sample data for the Quality Pulse preview page (behind
-// AppSettings.showExperimentalPages) - no server endpoint backs this yet.
-// Real wiring, when it lands: Suite Analytics/Flaky Test Monitor can extend
-// automationKpiData.ts's per-module rollup (see buildAutomationTestCaseRows),
-// Defect Escapes can reuse defectData.ts once a "Found In" environment field
-// exists on bug work items (see docs/kpi-improvement-plan.md #2.2/#2.3), and
-// Pipeline Overview needs a CI/CD data source this project doesn't have yet -
-// a prior AutomationKpiResponse iteration hardcoded mock pipeline numbers,
-// deliberately not resurrected there, so this page is the one place that's
-// explicitly marked as a preview instead of pretending to be live.
+// Illustrative sample data for the Quality Pulse page's Operations,
+// Governance and Executive tabs (behind AppSettings.showExperimentalPages).
+// The Engineering tab has since moved to real data - see qualityPulseData.ts,
+// which reshapes the same /api/automation-kpis and /api/test-suites
+// responses AutomationKpiPage.tsx/TestSuitesPage.tsx already fetch - so
+// Suite Analytics and Flaky Test Monitor no longer live here.
+//
+// What's left is still mocked because the real source doesn't exist yet:
+// Defect Escapes needs a "Found In" environment field on bug work items
+// (see docs/kpi-improvement-plan.md #2.2/#2.3), and Pipeline Overview needs
+// a CI/CD data source this project doesn't have - a prior AutomationKpiResponse
+// iteration hardcoded mock pipeline numbers, deliberately not resurrected
+// there, so this file is the one place that's explicitly marked as a preview
+// instead of pretending to be live.
 
 export type PipelineHealth = "good" | "warn" | "bad";
 
@@ -22,23 +26,6 @@ export interface PipelineStage {
 export interface PipelineTrendPoint {
     date: string;
     passRatePct: number;
-}
-
-export interface SuiteModuleStats {
-    module: string;
-    passed: number;
-    failed: number;
-    flaky: number;
-}
-
-export interface FlakyMonitorRow {
-    testCaseId: number;
-    testName: string;
-    module: string;
-    retries: number;
-    flakeRatePct: number;
-    status: "monitoring" | "quarantined";
-    lastSeen: string;
 }
 
 export interface EscapeModuleStats {
@@ -61,9 +48,7 @@ interface ModuleSeed {
     coveragePct: number;
     // Production-found defects attributed to this module - deliberately
     // correlated with (100 - coveragePct) below rather than random, so
-    // Quote & Bind / Claims Intake read as the same high-risk modules across
-    // Suite Analytics, Flaky Test Monitor and Defect Escapes instead of each
-    // section telling an unrelated story.
+    // Quote & Bind / Claims Intake read as consistently high-risk here.
     escapes: number;
 }
 
@@ -109,27 +94,6 @@ export const BUILD_TREND: PipelineTrendPoint[] = (() => {
     return points;
 })();
 
-export const SUITE_ANALYTICS: SuiteModuleStats[] = MODULE_SEEDS.map((m) => {
-    const RUNS_PER_AUTOMATED_TEST = 5.2;
-    const totalRuns = Math.round(m.automated * RUNS_PER_AUTOMATED_TEST);
-    const riskFactor = (100 - m.coveragePct) / 100;
-    const failed = Math.round(totalRuns * (0.02 + riskFactor * 0.09));
-    const flaky = Math.round(totalRuns * (0.01 + riskFactor * 0.05));
-
-    return { module: m.module, passed: totalRuns - failed - flaky, failed, flaky };
-});
-
-export const FLAKY_MONITOR: FlakyMonitorRow[] = [
-    { testCaseId: 89142, testName: "should show correct total after applying discount", module: "Quote & Bind", retries: 14, flakeRatePct: 23.1, status: "quarantined", lastSeen: "2026-09-18" },
-    { testCaseId: 88710, testName: "should recover from network interruption", module: "Claims Intake", retries: 11, flakeRatePct: 19.6, status: "quarantined", lastSeen: "2026-09-19" },
-    { testCaseId: 89355, testName: "should retry failed API call gracefully", module: "Quote & Bind", retries: 9, flakeRatePct: 15.8, status: "monitoring", lastSeen: "2026-09-17" },
-    { testCaseId: 88901, testName: "should render list within timeout", module: "Reporting", retries: 8, flakeRatePct: 14.2, status: "monitoring", lastSeen: "2026-09-16" },
-    { testCaseId: 89020, testName: "should handle concurrent session logout", module: "Claims Intake", retries: 7, flakeRatePct: 12.4, status: "monitoring", lastSeen: "2026-09-18" },
-    { testCaseId: 88544, testName: "should sync status across browser tabs", module: "Document Upload", retries: 6, flakeRatePct: 10.9, status: "monitoring", lastSeen: "2026-09-15" },
-    { testCaseId: 89477, testName: "should paginate large result sets", module: "Policy Search", retries: 5, flakeRatePct: 8.7, status: "monitoring", lastSeen: "2026-09-14" },
-    { testCaseId: 88632, testName: "should apply correct currency formatting", module: "Payments", retries: 4, flakeRatePct: 6.3, status: "monitoring", lastSeen: "2026-09-12" },
-];
-
 export const DEFECT_ESCAPES: EscapeModuleStats[] = MODULE_SEEDS
     .map((m) => ({ module: m.module, escapes: m.escapes, coveragePct: m.coveragePct }))
     .sort((a, b) => b.escapes - a.escapes);
@@ -142,3 +106,10 @@ export const COVERAGE_BY_MODULE: CoverageModuleStats[] = MODULE_SEEDS.map((m) =>
 }));
 
 export const HIGHEST_RISK_MODULE = DEFECT_ESCAPES[0];
+
+// Standalone illustrative figures for the Executive tab's summary tiles -
+// deliberately NOT derived from Suite Analytics/Flaky Test Monitor (those
+// are real now, see qualityPulseData.ts). Only the Engineering tab went
+// live; Operations/Governance/Executive stay self-contained mock data.
+export const SAMPLE_SUITE_HEALTH_PCT: number = 93.4;
+export const SAMPLE_QUARANTINED_COUNT: number = 2;
