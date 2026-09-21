@@ -75,6 +75,8 @@
       "intro": "Il pacchetto locale carica i dati solo dopo che hai salvato in questo browser la tua organizzazione Azure DevOps e il PAT:"
     },
     "navSectionTitle": "Cosa trovi nel menu",
+    "experimentalHint": "Le voci con il badge \"Sperimentale\" non sono ancora nel menu laterale - attiva \"Mostra pagine sperimentali\" in Impostazioni per usarle.",
+    "experimentalBadge": "Sperimentale",
     "navSections": {
       "dynamic-sprint-report": "Crea un report filtrato per area path, sprint e piano di test.",
       "excel-export": "Esporta in Excel più ambiti insieme (Plurifonds, sprint Auto...) con l'opzione \"Tutto\" combinata.",

@@ -3,6 +3,7 @@ import {
     AccordionHeader,
     AccordionItem,
     AccordionPanel,
+    Badge,
     Button,
     Dialog,
     DialogActions,
@@ -18,7 +19,6 @@ import {
 import { useTranslation } from "react-i18next";
 import { AzdoPatSteps } from "./AzdoPatSteps";
 import { NAV_ITEMS, EXPERIMENTAL_NAV_KEYS } from "../config/navItems";
-import { useSettings } from "../hooks/useSettings";
 
 const useStyles = makeStyles({
     content: {
@@ -31,11 +31,21 @@ const useStyles = makeStyles({
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
     },
+    accordionHeaderContent: {
+        display: "flex",
+        alignItems: "center",
+        gap: tokens.spacingHorizontalS,
+    },
 });
 
 // Shown once automatically on first load (see App.tsx) and reachable anytime
-// afterward via the Help button in TopBar.tsx - a first-load-only dialog is
-// easy to dismiss without reading, so it stays available on demand too.
+// afterward via the Help button in TopBar.tsx. It lists every nav item,
+// including ones still behind AppSettings.showExperimentalPages (badged
+// "Experimental" below) - new functionality gets explained here the moment
+// it ships, whether or not it's toggled on in the sidebar yet. modalType
+// "alert" blocks Escape/backdrop dismissal so the first-load run can't be
+// skipped without reading; see ONBOARDING_GUIDE_VERSION in App.tsx for how
+// this guide is re-forced on everyone after a content update.
 export function GettingStartedGuide({
     open,
     onClose,
@@ -45,14 +55,11 @@ export function GettingStartedGuide({
 }) {
     const { t } = useTranslation();
     const styles = useStyles();
-    const { settings } = useSettings();
-    const visibleNavItems = NAV_ITEMS.filter(
-        (item) => settings.showExperimentalPages || !EXPERIMENTAL_NAV_KEYS.has(item.key)
-    );
 
     return (
         <Dialog
             open={open}
+            modalType="alert"
             onOpenChange={(_, data) => {
                 if (!data.open) {
                     onClose();
@@ -90,14 +97,35 @@ export function GettingStartedGuide({
                             <Title3 as="h3">
                                 {t("onboardingGuide.navSectionTitle")}
                             </Title3>
+                            <Text block>
+                                {t("onboardingGuide.experimentalHint")}
+                            </Text>
                             <Accordion collapsible>
-                                {visibleNavItems.map((item) => (
+                                {NAV_ITEMS.map((item) => (
                                     <AccordionItem
                                         key={item.key}
                                         value={item.key}
                                     >
                                         <AccordionHeader>
-                                            {t(item.labelKey)}
+                                            <span
+                                                className={
+                                                    styles.accordionHeaderContent
+                                                }
+                                            >
+                                                {t(item.labelKey)}
+                                                {EXPERIMENTAL_NAV_KEYS.has(
+                                                    item.key
+                                                ) && (
+                                                    <Badge
+                                                        appearance="tint"
+                                                        color="informative"
+                                                    >
+                                                        {t(
+                                                            "onboardingGuide.experimentalBadge"
+                                                        )}
+                                                    </Badge>
+                                                )}
+                                            </span>
                                         </AccordionHeader>
                                         <AccordionPanel>
                                             <Text block>

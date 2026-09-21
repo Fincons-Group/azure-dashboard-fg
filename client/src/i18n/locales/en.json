@@ -75,6 +75,8 @@
       "intro": "The local package loads data only after you save your Azure DevOps organization and PAT in this browser:"
     },
     "navSectionTitle": "What's in the menu",
+    "experimentalHint": "Items badged \"Experimental\" aren't in the sidebar yet - turn on \"Show experimental pages\" in Settings to use them.",
+    "experimentalBadge": "Experimental",
     "navSections": {
       "dynamic-sprint-report": "Build a report scoped to an area path, sprint, and test plan.",
       "excel-export": "Export several scopes to Excel at once (Plurifonds, Auto sprints...) with a combined \"All\" option.",
