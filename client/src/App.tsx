@@ -112,6 +112,12 @@ function AppRoutes() {
 }
 
 const ONBOARDING_SEEN_KEY = "azureDashboardOnboardingSeen";
+// Bump this whenever GettingStartedGuide.tsx's content changes (a new nav
+// item, a reworded section, ...) so everyone - including browsers that
+// already dismissed an older version - is forced through the guide again on
+// their next load. The stored value is compared against this version, not
+// just a boolean.
+const ONBOARDING_GUIDE_VERSION = "2";
 const SCOPE_STORAGE_KEY = "azureDashboardScope";
 
 // No sign-in wall: access is gated on whether the server's AZDO_PAT actually
@@ -129,14 +135,17 @@ function App() {
         enabled: connection != null,
     });
 
-    // Shown once per browser the first time the app loads successfully;
-    // reachable again anytime after via the Help button in TopBar.tsx.
+    // Shown once per browser the first time the app loads successfully, and
+    // again whenever ONBOARDING_GUIDE_VERSION is bumped; reachable anytime
+    // after via the Help button in TopBar.tsx.
     const [guideOpen, setGuideOpen] = useState(
-        () => localStorage.getItem(ONBOARDING_SEEN_KEY) !== "true"
+        () =>
+            localStorage.getItem(ONBOARDING_SEEN_KEY) !==
+            ONBOARDING_GUIDE_VERSION
     );
 
     const closeGuide = () => {
-        localStorage.setItem(ONBOARDING_SEEN_KEY, "true");
+        localStorage.setItem(ONBOARDING_SEEN_KEY, ONBOARDING_GUIDE_VERSION);
         setGuideOpen(false);
     };
 

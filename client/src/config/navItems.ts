@@ -22,9 +22,11 @@ export interface NavItemConfig {
 }
 
 // Nav keys gated behind AppSettings.showExperimentalPages (see
-// settingsContext.ts) - off by default. Sidebar.tsx and GettingStartedGuide.tsx
-// both filter their own NAV_ITEMS-shaped lists against this same set so the
-// sidebar and the onboarding guide never disagree about what's visible.
+// settingsContext.ts) - off by default. Sidebar.tsx filters its NAV_ITEMS-shaped
+// list against this set to decide what's actually in the sidebar.
+// GettingStartedGuide.tsx does NOT filter by it - every item is explained in
+// the guide (badged "Experimental" for these keys) so new functionality is
+// documented from the moment it ships, even before the toggle is flipped on.
 export const EXPERIMENTAL_NAV_KEYS = new Set([
     "cycle-time",
     "e2e-history",
