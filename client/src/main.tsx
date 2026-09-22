@@ -156,11 +156,11 @@ async function bootAppWithDashboardMsal() {
                 <SettingsProvider>
                     <ThemedFluentProvider>
                         <QueryClientProvider client={queryClient}>
-                            <ScopeProvider>
-                                <BrowserRouter basename={import.meta.env.BASE_URL}>
+                            <BrowserRouter basename={import.meta.env.BASE_URL}>
+                                <ScopeProvider>
                                     <App />
-                                </BrowserRouter>
-                            </ScopeProvider>
+                                </ScopeProvider>
+                            </BrowserRouter>
                         </QueryClientProvider>
                     </ThemedFluentProvider>
                 </SettingsProvider>
@@ -175,11 +175,11 @@ async function bootApp() {
             <SettingsProvider>
                 <ThemedFluentProvider>
                     <QueryClientProvider client={queryClient}>
-                        <ScopeProvider>
-                            <BrowserRouter basename={import.meta.env.BASE_URL}>
+                        <BrowserRouter basename={import.meta.env.BASE_URL}>
+                            <ScopeProvider>
                                 <App />
-                            </BrowserRouter>
-                        </ScopeProvider>
+                            </ScopeProvider>
+                        </BrowserRouter>
                     </QueryClientProvider>
                 </ThemedFluentProvider>
             </SettingsProvider>

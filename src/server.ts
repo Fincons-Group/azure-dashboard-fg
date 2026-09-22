@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express, { type Response } from "express";
 import cors from "cors";
+import axios from "axios";
 import {
     AzdoAuthError,
     AzdoConfigError,
@@ -124,7 +125,24 @@ app.use("/api", (req, res, next) => {
 // revoked) - surface it as 502 Bad Gateway so the client can tell it apart
 // from an ordinary server-side bug and show a specific, actionable message.
 function sendApiError(res: Response, error: any): void {
-    console.error(error);
+    // Never log the raw error: every azdo.ts client carries the shared PAT
+    // as a default Authorization header (createAzdoClient), and Node prints
+    // an AxiosError's own enumerable properties - including `config.headers`
+    // - alongside its stack trace. Logging the raw object would leak the PAT
+    // to server logs on every ordinary Azure DevOps hiccup. Mirrors the safe
+    // logging shape already used by azdo.ts's fetchAuthenticatedEmail.
+    if (axios.isAxiosError(error)) {
+        console.error({
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data,
+            url: error.config?.baseURL
+                ? error.config.baseURL + (error.config?.url ?? "")
+                : error.config?.url,
+        });
+    } else {
+        console.error(error);
+    }
 
     if (error instanceof AzdoAuthError) {
         res.status(502).json({ message: error.message });

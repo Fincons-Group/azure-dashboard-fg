@@ -69,15 +69,17 @@ const useStyles = makeStyles({
 
 // Option C from the "Scope Gate" design doc: a cascading bar (Project ->
 // Area Path -> Sprint) selected once, collapsing to a chip summary once a
-// project is chosen. Rendered globally by PageLayout so every page shares
-// the same selection instead of each page owning its own copy.
+// project is chosen. Rendered by PageLayout on every page, but useScope()
+// resolves to that page's own remembered selection (keyed by route
+// pathname in ScopeContext.tsx) - picking a project here only changes it
+// for the current page.
 export function ScopeBar({
     hideAreaSprint = false,
 }: {
     // The Report page owns Area Path/Sprint selection itself via
     // ReportSidebar - showing them here too would be two controls for the
-    // same shared scope. Project stays here since ReportSidebar still
-    // needs it and every other page keeps reading it from ScopeBar.
+    // same page scope. Project stays here since ReportSidebar still needs
+    // it and every other page keeps reading it from ScopeBar.
     hideAreaSprint?: boolean;
 } = {}) {
     const styles = useStyles();

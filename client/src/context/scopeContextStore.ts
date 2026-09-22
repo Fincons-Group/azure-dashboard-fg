@@ -9,9 +9,10 @@ export interface Scope {
     setSprint: (sprint: string) => void;
     // The one hard requirement before any page fires a query - matches how
     // every page already treats iteration/area as optional filters (empty
-    // string = no filter). Not tied to any signed-in account: this is a
-    // single shared localStorage key, independent of which MSAL account (if
-    // any) is currently signed in.
+    // string = no filter). Not tied to any signed-in account: scope is
+    // stored per-page (keyed by route pathname) in a single localStorage
+    // key, independent of which MSAL account (if any) is currently signed
+    // in - see ScopeContext.tsx.
     isComplete: boolean;
 }
 
