@@ -1,21 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { makeStyles } from "@fluentui/react-components";
 import type { Outcome } from "../types";
-
-// Fixed dark-card palette (not Fluent tokens) - this component only ever
-// renders inside StatusReportCard, which must look the same regardless of
-// the app's light/dark theme. NotApplicable and NotRun intentionally share
-// the same neutral gray (matching the reference card, where both read as
-// "not meaningfully executed" rather than getting their own colors).
-const OUTCOME_COLORS: Record<Outcome, string> = {
-    Passed: "#3fb950",
-    Failed: "#d13438",
-    Blocked: "#eda100",
-    Paused: "#b180d7",
-    InProgress: "#3aa0f3",
-    NotApplicable: "#8a8886",
-    NotRun: "#8a8886",
-};
+import { OUTCOME_COLORS } from "./outcomeColors";
 
 const SEGMENT_ORDER: Outcome[] = [
     "Passed",

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Tooltip, makeStyles } from "@fluentui/react-components";
 import { InfoRegular } from "@fluentui/react-icons";
 import { SuiteProgressBar } from "./SuiteProgressBar";
+import { OUTCOME_COLORS } from "./outcomeColors";
 import {
   bugsClosedLabel,
   bugsToCloseLabel,
@@ -211,10 +212,8 @@ const useStyles = makeStyles({
     justifyContent: "center",
     gap: "2px",
     padding: "10px 6px",
-    // Fixed rather than content-sized so the second-row tile (alone,
-    // with a single-line label) matches the height that row 1's grid
-    // row is stretched to by its tallest tile (avgClosureTime's
-    // two-line label) - otherwise it'd render visibly shorter.
+    // Shared minimum keeps compact KPI rows visually aligned while labels
+    // with an intentional line break can still grow when necessary.
     minHeight: "64px",
     boxSizing: "border-box",
     borderRadius: "6px",
@@ -227,9 +226,14 @@ const useStyles = makeStyles({
   },
   executedBreakdown: {
     display: "flex",
-    flexDirection: "column",
-    gap: "2px",
-    marginTop: "4px",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: "4px 18px",
+    minHeight: "24px",
+    padding: "4px 8px",
+    borderRadius: "5px",
+    backgroundColor: "#252525",
     fontSize: "10px",
     fontWeight: 600,
     lineHeight: "13px",
@@ -539,7 +543,6 @@ function SeverityChipsRow({
 // bugs. helpKey is a translation key under statusCard.kpisHelp.
 function KpiTile({
   value,
-  detail,
   color,
   labelKey,
   label,
@@ -547,7 +550,6 @@ function KpiTile({
   borderColor,
 }: {
   value: ReactNode;
-  detail?: ReactNode;
   color: string;
   labelKey?: string;
   label?: string;
@@ -579,7 +581,6 @@ function KpiTile({
           </span>
         </Tooltip>
       </span>
-      {detail}
     </div>
   );
 }
@@ -753,13 +754,6 @@ export const StatusReportCard = forwardRef<
               />
               <KpiTile
                 value={`${totalExecuted} (${executedPct}%)`}
-                detail={
-                  <div className={styles.executedBreakdown}>
-                    <span style={{ color: "#6bcf6b" }}>{totalPassed} {t("outcome.Passed")}</span>
-                    <span style={{ color: "#f17070" }}>{totalFailed} {t("outcome.Failed")}</span>
-                    <span style={{ color: "#e8b34c" }}>{totalBlocked} {t("outcome.Blocked")}</span>
-                  </div>
-                }
                 color="#6bcf6b"
                 borderColor="#6bcf6b"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.executedCount"
@@ -793,6 +787,17 @@ export const StatusReportCard = forwardRef<
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.passRate"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.passRate"
               />
+            </div>
+            <div className={styles.executedBreakdown}>
+              <span style={{ color: OUTCOME_COLORS.Passed }}>
+                {totalPassed} {t("outcome.Passed")}
+              </span>
+              <span style={{ color: OUTCOME_COLORS.Failed }}>
+                {totalFailed} {t("outcome.Failed")}
+              </span>
+              <span style={{ color: OUTCOME_COLORS.Blocked }}>
+                {totalBlocked} {t("outcome.Blocked")}
+              </span>
             </div>
           </div>
 
