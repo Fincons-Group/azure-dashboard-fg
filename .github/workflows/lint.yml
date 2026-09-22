@@ -40,6 +40,6 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run test:kpis
       - run: npm ci --prefix client
+      - run: npm run test:kpis
       - run: npm run build
