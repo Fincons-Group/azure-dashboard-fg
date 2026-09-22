@@ -1,6 +1,7 @@
 {
   "common": {
-    "title": "QA Dashboard"
+    "title": "QA Dashboard",
+    "version": "v{{version}}"
   },
   "pagination": {
     "range": "{{rangeStart}}-{{rangeEnd}} di {{total}}",
@@ -11,6 +12,12 @@
   "nav": {
     "primary": "Principale",
     "home": "Vai alla home",
+    "group": {
+      "overview": "Panoramica",
+      "reports": "Report",
+      "quality": "Qualità",
+      "team": "Team"
+    },
     "dynamicSprintReport": "Report Sprint",
     "excelExport": "Export Excel",
     "coverageRoadmap": "Copertura Automazione",
@@ -18,11 +25,17 @@
     "automationKpis": "KPI di Automazione",
     "e2eHistory": "Storico E2E",
     "testSuites": "Suite di Test",
+    "testPlans": "Piani di Test",
+    "teamDashboard": "Dashboard del Team",
+    "qaControlCenter": "QA Control Center",
+    "qualityPulse": "Quality Pulse",
     "bugs": "Bug",
     "refresh": "Aggiorna Ora",
     "refreshing": "Aggiornamento...",
     "refreshFailed": "Aggiornamento non riuscito: {{message}}",
     "refreshUpToDate": "Già aggiornato (riprova tra {{minutes}}m)",
+    "syncedJustNow": "Sincronizzato ora",
+    "syncedAgo": "Sincronizzato {{minutes}}m fa",
     "help": "Guida",
     "testGraphLogin": "Login",
     "testGraphLogout": "Logout",
@@ -39,6 +52,8 @@
     "title": "Impostazioni",
     "showExtraKpisLabel": "Mostra KPI aggiuntivi",
     "showExtraKpisHint": "Controlla la sezione \"KPI aggiuntivi\" nella card del Report Sprint - se disattivata, viene nascosta a schermo e omessa da ogni report inviato/esportato (HTML, PDF, PPTX). Salvato in questo browser.",
+    "showExperimentalPagesLabel": "Mostra pagine sperimentali",
+    "showExperimentalPagesHint": "Mostra nel menu Tempo di Ciclo, Storico E2E, KPI di Automazione, Dashboard del Team, QA Control Center e Quality Pulse - pagine ancora in fase di rifinitura, nascoste di default. Salvato in questo browser.",
     "close": "Chiudi"
   },
   "azdoPatSteps": {
@@ -60,6 +75,8 @@
       "intro": "Il pacchetto locale carica i dati solo dopo che hai salvato in questo browser la tua organizzazione Azure DevOps e il PAT:"
     },
     "navSectionTitle": "Cosa trovi nel menu",
+    "experimentalHint": "Le voci con il badge \"Sperimentale\" non sono ancora nel menu laterale - attiva \"Mostra pagine sperimentali\" in Impostazioni per usarle.",
+    "experimentalBadge": "Sperimentale",
     "navSections": {
       "dynamic-sprint-report": "Crea un report filtrato per area path, sprint e piano di test.",
       "excel-export": "Esporta in Excel più ambiti insieme (Plurifonds, sprint Auto...) con l'opzione \"Tutto\" combinata.",
@@ -68,6 +85,10 @@
       "automation-kpis": "Copertura di automazione reale sui test case, success rate e test instabili per il progetto Test Factory.",
       "e2e-history": "Andamento del success rate e storico delle esecuzioni recenti della suite Playwright tst-e2e, pubblicati via Firebase.",
       "test-suites": "NRT, accessibilità e sicurezza in un unico hub - scegli una suite per vedere l'ultima esecuzione e lo storico.",
+      "test-plans": "Sfoglia i piani di test di Azure DevOps per qualsiasi progetto - test case, esiti e quale esecuzione ha aggiornato per ultima ognuno.",
+      "team-dashboard": "Link rapido alla dashboard del team Nuova Frontiera in Azure DevOps (si apre in una nuova scheda - ADO ne blocca l'incorporamento qui).",
+      "qa-control-center": "Velocità di esecuzione, previsione, carico dei tester e rischio bug per qualsiasi piano/suite di test - una replica nativa del widget dashboard QA Control Center.",
+      "quality-pulse": "Anteprima: stato pipeline, analisi delle suite, monitoraggio dei test instabili e difetti sfuggiti per modulo - basata su dati di esempio.",
       "bugs": "Bug in attesa di verifica QA e bug aperti oggi, entrambi filtrati sui membri del team Fincons Group (@finconsgroup.com)."
     },
     "gotIt": "Capito"
@@ -136,7 +157,11 @@
     "toVerify": {
       "title": "Bug da verificare ({{count}})",
       "subtitle": "Bug in stato \"Da verificare\" o \"In verifica\", assegnati a un membro del team @finconsgroup.com.",
-      "empty": "Nessun bug in attesa di verifica assegnato a Fincons Group al momento."
+      "empty": "Nessun bug in attesa di verifica assegnato a Fincons Group al momento.",
+      "excludeClosed": "Escludi chiusi",
+      "tabs": {
+        "overview": "Panoramica"
+      }
     },
     "openedToday": {
       "title": "Aperti oggi ({{count}})",
@@ -170,6 +195,15 @@
       "done": "Completato",
       "in-progress": "In corso",
       "at-risk": "A rischio"
+    },
+    "searchPlaceholder": "Cerca epic o owner…",
+    "statusFilterAll": "Tutti gli stati",
+    "noResults": "Nessun epic corrisponde alla ricerca.",
+    "summary": {
+      "total": "{{count}} epic",
+      "done": "{{count}} completati",
+      "inProgress": "{{count}} in corso",
+      "atRisk": "{{count}} a rischio"
     }
   },
   "automationKpiPage": {
@@ -189,10 +223,27 @@
     },
     "flakyTestsTitle_one": "Test instabile ({{count}})",
     "flakyTestsTitle_other": "Test instabili ({{count}})",
+    "specCatalog": {
+      "title": "File di test automatizzati",
+      "loading": "Caricamento file di test...",
+      "notConfigured": "Esegui \"npm run e2e:publish-spec-catalog\" da un checkout di tst-e2e per pubblicare qui l'elenco dei file di test reali.",
+      "empty": "Nessun file di test trovato per questa suite.",
+      "notLinked": "Non ancora collegato ad Azure DevOps",
+      "tabs": {
+        "nrt": "NRT",
+        "a11y": "A11Y",
+        "security": "Security"
+      }
+    },
     "table": {
       "testCase": "Test case",
       "flakeCount": "Fallimenti",
-      "lastFailed": "Ultimo fallimento"
+      "lastFailed": "Ultimo fallimento",
+      "specFile": "File di test",
+      "browser": "Browser",
+      "lastRuns": "Storico esecuzioni",
+      "topErrors": "Errori più comuni",
+      "noErrors": "Nessun errore registrato"
     }
   },
   "e2eHistoryPage": {
@@ -225,13 +276,9 @@
   "testSuitesPage": {
     "title": "Suite di Test",
     "subtitle": "NRT, accessibilità e sicurezza per la suite di automazione - scegli una suite per vedere l'ultima esecuzione e lo storico.",
+    "notConfiguredTitle": "Non ancora configurato",
+    "notConfiguredBody": "Imposta FIREBASE_SERVICE_ACCOUNT_JSON sul server per iniziare a mostrare qui lo storico reale delle esecuzioni NRT/A11Y/Security.",
     "eyebrow": "Quality gate automatizzati",
-    "appLabel": "App",
-    "appOptions": {
-      "plurifond": "Plurifonds",
-      "frontOfficeAuto": "Front Office Auto",
-      "all": "Tutte le app (regressione completa)"
-    },
     "envLabel": "Ambiente",
     "envOptions": {
       "tst": "TST",
@@ -242,10 +289,10 @@
       "overview": "Panoramica",
       "nrt": "NRT",
       "a11y": "A11Y",
-      "dast": "DAST"
+      "security": "Security"
     },
     "notWiredTitle": "Non ancora collegato",
-    "notWiredBody": "Non c'è ancora uno storico per {{app}} su {{env}}. Una volta collegata la pipeline, le esecuzioni appariranno qui come per Plurifonds.",
+    "notWiredBody": "Non c'è ancora uno storico su {{env}}. Una volta collegata la pipeline, le esecuzioni appariranno qui.",
     "suites": {
       "nrt": {
         "name": "NRT",
@@ -257,19 +304,19 @@
         "name": "A11Y",
         "full": "Audit di Accessibilità",
         "tool": "via axe-core",
-        "desc": "Scansione axe-core di ogni step del wizard Plurifonds, verificata secondo WCAG 2.2 AA."
+        "desc": "Scansione axe-core di ogni step del wizard Plurifonds, verificata secondo WCAG 2.1 AA."
       },
-      "dast": {
-        "name": "DAST",
-        "full": "Test di Sicurezza Dinamici",
-        "tool": "via OWASP ZAP",
-        "desc": "Scansione ZAP baseline + attiva sull'ambiente di staging, eseguita settimanalmente prima di ogni release."
+      "security": {
+        "name": "Security",
+        "full": "Test Funzionali di Sicurezza",
+        "tool": "via playwright-smart-reporter",
+        "desc": "Specifiche Playwright taggate type:security - controlli funzionali di sicurezza."
       }
     },
     "ranAt": "Eseguito {{time}}",
     "viewReports": "Vedi i report",
     "openReport": "Apri {{file}}",
-    "openReportIt": "Apri report in italiano ({{file}})",
+    "openReportError": "Impossibile aprire il report - riprova tra un momento.",
     "renderedBy": "Generato da {{tool}}",
     "linkedNoteNrt": "Questa esecuzione ha incluso anche il progetto a11y-chrome - vedi la scheda A11Y per i risultati.",
     "linkedNoteA11y": "Catturato all'interno dell'esecuzione NRT {{runId}} (il progetto a11y-chrome è girato insieme alle specifiche vit).",
@@ -289,13 +336,20 @@
       "passedCol": "Superati",
       "totalCol": "Totali",
       "flakyCol": "Instabili",
+      "teamsTitle": "Risultati per team",
+      "teamCol": "Team",
       "testsTitle": "Test",
       "testStatus": {
         "passed": "Superato",
         "failed": "Fallito",
         "skipped": "Saltato"
       },
-      "noSteps": "Nessuno step registrato per questo test."
+      "noSteps": "Nessuno step registrato per questo test.",
+      "historyTitle_one": "Storico esecuzioni ({{count}})",
+      "historyTitle_other": "Storico esecuzioni ({{count}})",
+      "historyDateCol": "Data",
+      "historyOutcomeCol": "Esito",
+      "historyDurationCol": "Durata"
     },
     "a11y": {
       "violations": "Violazioni",
@@ -318,24 +372,189 @@
         "minor": "Minore"
       }
     },
-    "dast": {
-      "riskScore": "Punteggio di rischio",
-      "openAlerts": "Alert aperti",
-      "endpointsScanned": "Endpoint scansionati",
-      "highRisk": "Rischio alto",
-      "riskTitle": "Alert per livello di rischio",
-      "alertsTitle": "Alert",
-      "risk": {
-        "High": "Alto",
-        "Medium": "Medio",
-        "Low": "Basso",
-        "Informational": "Informativo"
-      }
-    },
     "pastRuns": "Esecuzioni precedenti",
     "totalRuns_one": "{{count}} esecuzione",
     "totalRuns_other": "{{count}} esecuzioni",
     "latest": "Ultima"
+  },
+  "testPlansPage": {
+    "title": "Piani di Test",
+    "subtitle": "Sfoglia i piani di test di Azure DevOps per il progetto selezionato e scopri quale esecuzione ha aggiornato per ultima ogni test case.",
+    "pickProject": "Seleziona un progetto sopra per vedere i suoi piani di test.",
+    "searchPlansPlaceholder": "Cerca piani per nome o ID...",
+    "loadingPlans": "Caricamento piani di test...",
+    "noPlans": "Nessun piano di test trovato per questo progetto.",
+    "selectPlanHint": "Seleziona un piano di test per vedere i suoi test case e lo storico esecuzioni.",
+    "loadingOverview": "Caricamento piano di test...",
+    "openInAdo": "Apri in Azure DevOps",
+    "stats": {
+      "totalTestCases": "Test case totali",
+      "totalBugs": "Bug collegati"
+    },
+    "testCasesTitle_one": "{{count}} di {{total}} test case",
+    "testCasesTitle_other": "{{count}} di {{total}} test case",
+    "searchTestCasesPlaceholder": "Cerca per test case, suite o ID esecuzione...",
+    "noTestCases": "Nessun test case trovato in questo piano.",
+    "table": {
+      "testCase": "Test case",
+      "suite": "Suite",
+      "outcome": "Esito",
+      "lastRun": "Ultima esecuzione",
+      "lastRunAt": "Data ultima esecuzione"
+    }
+  },
+  "teamDashboardPage": {
+    "title": "Dashboard del Team",
+    "subtitle": "La dashboard del team Nuova Frontiera si trova in Azure DevOps e non può essere incorporata qui.",
+    "cardTitle": "Dashboard Nuova Frontiera",
+    "cardBody": "Azure DevOps impedisce che le sue dashboard vengano mostrate all'interno della pagina di un altro sito (X-Frame-Options: SAMEORIGIN), quindi si apre in una nuova scheda invece di essere incorporata qui.",
+    "openButton": "Apri in Azure DevOps"
+  },
+  "qaControlCenterPage": {
+    "title": "QA Control Center",
+    "subtitle": "Velocità di esecuzione, previsione, carico dei tester e rischio bug per un piano/suite di test - una replica nativa del widget dashboard QA Control Center.",
+    "pickPlan": "Scegli un piano di test...",
+    "pickSuite": "Scegli una suite di test...",
+    "pickProject": "Seleziona un progetto sopra per iniziare.",
+    "pickPlanSuite": "Scegli un piano e una suite di test sopra per vedere la velocità di esecuzione.",
+    "allSuitesTab": "Tutte le suite",
+    "loadingSuites": "Caricamento suite…",
+    "eyebrow": "Governance QA",
+    "trend": {
+      "up": "In crescita",
+      "down": "In calo",
+      "stable": "Stabile",
+      "limitedData": "Dati limitati"
+    },
+    "kpi": {
+      "remaining": "Casi ancora da chiudere",
+      "remainingDetail": "{{total}} totali",
+      "today": "Eseguiti oggi",
+      "yesterday": "Eseguiti ieri",
+      "forecast": "Previsti domani",
+      "forecastDetail": "media pesata {{average}} casi/giorno",
+      "forecastNonWorkingDay": "giornata non lavorativa"
+    },
+    "completionTitle": "Avanzamento esecuzione",
+    "completionDetail": "Eseguiti {{executed}} / {{total}} · Execution Rate {{executionRate}}% · Pass Rate {{passRate}}%",
+    "outcome": {
+      "passed": "passed",
+      "failed": "failed",
+      "blocked": "blocked",
+      "partial": "parziali",
+      "other": "altri esiti",
+      "notApplicable": "N/A"
+    },
+    "hoursRemaining": "ore residue",
+    "trendTitle": "Esecuzioni giornaliere",
+    "trendHint": "test case unici · * previsione",
+    "teamTitle": "Carico per tester",
+    "noTeam": "Nessuna assegnazione.",
+    "unassignedTester": "Non assegnato",
+    "team": {
+      "tester": "Tester",
+      "assigned": "Ass.",
+      "remaining": "Resid.",
+      "hours": "Ore",
+      "completion": "%",
+      "metaLine": "{{assigned}} assegnati · {{remaining}} residui · {{hours}}h"
+    },
+    "riskTitle": "Governance e rischi",
+    "risk": {
+      "unassigned": "{{count}} non assegnati",
+      "openBugs": "{{count}} bug aperti",
+      "blockedByBug": "{{count}} bloccati da bug",
+      "readyForRetest": "{{count}} pronti al retest",
+      "failedWithoutBug": "{{count}} failed senza bug"
+    },
+    "calibrationNote": "Fattore di stima adattiva ×{{factor}} da {{samples}} casi manuali osservati.",
+    "historyTruncated": "storico limitato alle 100 esecuzioni più recenti.",
+    "historyFallback": "storico completo non disponibile; conteggio basato sull'ultimo esito."
+  },
+  "qualityPulsePage": {
+    "title": "Quality Pulse",
+    "subtitle": "Stato pipeline, analisi delle suite, monitoraggio dei test instabili e difetti sfuggiti per modulo, in un'unica anteprima.",
+    "sampleDataBadge": "Dati di esempio · illustrativi, non live",
+    "liveDataBadge": "Dati live",
+    "tiers": {
+      "engineering": "Engineering",
+      "operations": "Operations",
+      "governance": "Governance",
+      "executive": "Executive"
+    },
+    "tierHint": {
+      "engineering": "Salute delle suite e test instabili, per gli automation engineer che devono decidere cosa rifattorizzare o mettere in quarantena.",
+      "operations": "Stato della pipeline e del gate di deployment, per QA lead e DevOps che gestiscono le release quotidiane.",
+      "governance": "Difetti sfuggiti rispetto alla copertura per modulo, per i QA principal che devono decidere dove estendere l'automazione.",
+      "executive": "Solo i numeri chiave, per i manager che devono decidere senza analizzare il dettaglio sottostante."
+    },
+    "executive": {
+      "title": "Colpo d'occhio",
+      "audience": "Per i Manager",
+      "action": "Guida: decisioni di go/no-go senza analizzare il dettaglio sottostante",
+      "gateLabel": "Gate di deployment",
+      "suiteHealthLabel": "Salute delle suite (7g)",
+      "flakyLabel": "Test in quarantena",
+      "riskLabel": "Modulo a rischio più alto"
+    },
+    "pipeline": {
+      "title": "Pipeline Overview",
+      "audience": "Per QA Lead & DevOps",
+      "action": "Guida: blocco o consenso al deployment",
+      "gate": {
+        "good": "Deployment consentito",
+        "warn": "Deployment: attenzione",
+        "bad": "Deployment bloccato"
+      },
+      "status": {
+        "good": "OK",
+        "warn": "Attenzione",
+        "bad": "In errore"
+      },
+      "lastRun": "Ultima esecuzione {{time}}",
+      "duration": "{{minutes}}m",
+      "trendChartTitle": "Pass rate delle build, ultime 14 esecuzioni",
+      "trendChartLabel": "Grafico a linee del pass rate delle build nelle ultime 14 esecuzioni della pipeline"
+    },
+    "suiteAnalytics": {
+      "title": "Suite Analytics",
+      "audience": "Per gli Automation Engineer",
+      "action": "Guida: refactoring delle suite lente o instabili",
+      "chartTitle": "Esecuzioni per dominio di test, ultima esecuzione della suite",
+      "chartLabel": "Grafico a barre impilate di esecuzioni superate, fallite e instabili per dominio di test",
+      "empty": "Nessuno storico di esecuzioni NRT/A11Y/Security ancora disponibile.",
+      "legend": {
+        "passed": "Superati",
+        "failed": "Falliti",
+        "flaky": "Instabili"
+      }
+    },
+    "flakyMonitor": {
+      "title": "Flaky Test Monitor",
+      "audience": "Per gli Automation Engineer",
+      "action": "Guida: messa in quarantena o correzione dei test instabili",
+      "empty": "Nessun test automatizzato instabile al momento.",
+      "table": {
+        "test": "Test",
+        "flakeCount": "Flake count",
+        "status": "Stato",
+        "lastSeen": "Ultimo fallimento"
+      },
+      "status": {
+        "monitoring": "Monitorato",
+        "quarantined": "In quarantena"
+      }
+    },
+    "defectEscapes": {
+      "title": "Defect Escapes",
+      "audience": "Per QA Manager e Product Owner",
+      "action": "Guida: estensione della copertura automatizzata nelle aree a rischio",
+      "escapesChartTitle": "Difetti sfuggiti per modulo",
+      "escapesChartLabel": "Grafico a barre dei difetti rilevati in produzione per modulo",
+      "escapesCount": "{{count}} difetti sfuggiti",
+      "coverageChartTitle": "Copertura di automazione per modulo",
+      "riskNote": "Rischio più alto: {{module}} — {{escapes}} difetti sfuggiti con copertura al {{coverage}}%"
+    }
   },
   "planOverviewPage": {
     "exporting": "Esportazione...",
@@ -440,11 +659,11 @@
           "firstExecutionPassRateUat": "First Execution Pass Rate\nUAT Test Case",
           "firstExecutionPassRateFunctionalSteps": "First Execution Pass Rate\nFunctional Test Steps",
           "firstExecutionPassRateUatSteps": "First Execution Pass Rate\nUAT Test Steps",
-          "avgFixTimeBusinessDays": "Average Bug Fix Time",
-          "criticalHighBugPct": "Critical Defect Rate",
-          "testPlanCorrectnessPct": "Test Plan Correctness\n/ Executability",
-          "bugReopenRate": "Bug Re-open Rate",
-          "avgClosingTimeBusinessDays": "Average Closing Time"
+          "avgFixTimeBusinessDays": "Tempo medio fix bug\n(gg lavorativi)",
+          "criticalDefectRatePct": "Tasso bug critici",
+          "testPlanCorrectnessPct": "Correttezza / eseguibilità\ndel piano di test",
+          "bugReopenRate": "Tasso di riapertura bug",
+          "avgClosingTimeBusinessDays": "Tempo medio di chiusura"
         },
         "kpisHelp": {
           "totalTestCases": "Tutti i casi di test presenti nel/i piano/i selezionato/i, qualsiasi sia il loro stato.",
@@ -469,10 +688,10 @@
           "firstExecutionPassRateFunctionalSteps": "% dei singoli step funzionali risultati PASS alla prima esecuzione, indipendentemente dall'esito finale del test case. Gli N/A sono inclusi nel denominatore. Target >= 95%.",
           "firstExecutionPassRateUatSteps": "% dei singoli step UAT risultati PASS alla prima esecuzione, indipendentemente dall'esito finale del test case. Gli N/A sono inclusi nel denominatore. Target >= 98%.",
           "avgFixTimeBusinessDays": "Giorni lavorativi medi (lun-ven) tra l'apertura di un bug e la sua prima transizione in Resolved/Da verificare (fix pronta per il retest) - non giorni di calendario fino a Closed. Target <= 2 giorni lavorativi.",
-          "criticalHighBugPct": "Bug con severity Critical sul totale dei test case eseguiti; gli N/A sono inclusi nel denominatore. Target <= 0,5%.",
+          "criticalDefectRatePct": "Bug con severity Critical sul totale dei test case eseguiti; gli N/A sono inclusi nel denominatore. Target <= 0,5%.",
           "testPlanCorrectnessPct": "% di casi di test pianificati non marcati Not Applicable durante Execute. Target 95-100%.",
           "bugReopenRate": "% dei bug arrivati a Da verificare che sono stati riaperti almeno una volta dopo il retest. Ogni bug conta una sola volta. Target <= 7%.",
-          "avgClosingTimeBusinessDays": "Giorni lavorativi medi tra apertura e chiusura del bug. Target <= 4 giorni lavorativi."
+          "avgClosingTimeBusinessDays": "Giorni lavorativi medi (lun-ven) tra apertura e chiusura del bug. Sabato e domenica sono esclusi; le festività infrasettimanali sono conteggiate. Target <= 4 giorni lavorativi."
         },
         "sectionHelp": {
           "suiteProgress": "Il \"% Eseguiti\" usa la stessa regola della KPI: (Passati + Falliti + Bloccati) ÷ Totale. I Non Applicabile restano separati. Pass Rate = Passati ÷ (Totale meno Non Applicabile).",
@@ -507,6 +726,13 @@
     "defaultHeaderSubtitle": "Stato di esecuzione dei test",
     "extraKpisLoading": "Calcolo dei KPI dal dettaglio storico di Azure DevOps...",
     "extraKpisError": "Impossibile calcolare i KPI: {{message}}",
+    "followUp": {
+      "title": "Confronto con il report precedente",
+      "previous": "Ultimo report scaricato: {{date}}",
+      "firstReport": "Nessun report precedente per questo ambito. Scarica il file per usarlo come riferimento al prossimo confronto.",
+      "useInEmail": "Porta il testo nella scheda email",
+      "useSuggestion": "Usa il testo suggerito"
+    },
     "excel": {
       "exportButton": "Esporta Excel",
       "exporting": "Esportazione...",
@@ -746,6 +972,7 @@
     "label": "Caricamento"
   },
   "themeSwitcher": {
+    "groupLabel": "Tema",
     "light": "Chiaro",
     "dark": "Scuro"
   },

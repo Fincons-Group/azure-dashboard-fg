@@ -7,7 +7,11 @@ import {
     FlashAutoRegular,
     BeakerRegular,
     AppsListRegular,
+    ClipboardTaskListLtrRegular,
+    BoardRegular,
+    GaugeRegular,
     BugRegular,
+    PulseRegular,
 } from "@fluentui/react-icons";
 
 export interface NavItemConfig {
@@ -16,6 +20,21 @@ export interface NavItemConfig {
     icon: FluentIcon;
     descriptionKey: string;
 }
+
+// Nav keys gated behind AppSettings.showExperimentalPages (see
+// settingsContext.ts) - off by default. Sidebar.tsx filters its NAV_ITEMS-shaped
+// list against this set to decide what's actually in the sidebar.
+// GettingStartedGuide.tsx does NOT filter by it - every item is explained in
+// the guide (badged "Experimental" for these keys) so new functionality is
+// documented from the moment it ships, even before the toggle is flipped on.
+export const EXPERIMENTAL_NAV_KEYS = new Set([
+    "cycle-time",
+    "e2e-history",
+    "automation-kpis",
+    "team-dashboard",
+    "qa-control-center",
+    "quality-pulse",
+]);
 
 // This branch ships the Sprint Report, the multi-scope Excel Export page,
 // the Test Factory Coverage Roadmap, its Cycle Time report, its Automation
@@ -64,6 +83,30 @@ export const NAV_ITEMS: NavItemConfig[] = [
         labelKey: "nav.testSuites",
         icon: AppsListRegular,
         descriptionKey: "onboardingGuide.navSections.test-suites",
+    },
+    {
+        key: "test-plans",
+        labelKey: "nav.testPlans",
+        icon: ClipboardTaskListLtrRegular,
+        descriptionKey: "onboardingGuide.navSections.test-plans",
+    },
+    {
+        key: "team-dashboard",
+        labelKey: "nav.teamDashboard",
+        icon: BoardRegular,
+        descriptionKey: "onboardingGuide.navSections.team-dashboard",
+    },
+    {
+        key: "qa-control-center",
+        labelKey: "nav.qaControlCenter",
+        icon: GaugeRegular,
+        descriptionKey: "onboardingGuide.navSections.qa-control-center",
+    },
+    {
+        key: "quality-pulse",
+        labelKey: "nav.qualityPulse",
+        icon: PulseRegular,
+        descriptionKey: "onboardingGuide.navSections.quality-pulse",
     },
     {
         key: "bugs",

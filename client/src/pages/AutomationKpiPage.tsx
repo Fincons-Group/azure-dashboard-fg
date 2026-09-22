@@ -1,11 +1,25 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Text, makeStyles, tokens } from "@fluentui/react-components";
+import {
+    Card,
+    Tab,
+    TabList,
+    Text,
+    makeStyles,
+    tokens,
+    type SelectTabData,
+    type SelectTabEvent,
+} from "@fluentui/react-components";
 import { PageLayout } from "../components/PageLayout";
 import { LoadingCardGrid } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
+import { StatusTag } from "../components/StatusTag";
 import { ModuleCoverageBarChart } from "../components/AutomationKpiCharts";
-import { fetchAutomationKpis } from "../api/client";
+import { RunHistoryStrip, type RunHistoryPoint } from "../components/RunHistoryStrip";
+import { fetchAutomationKpis, fetchTestSpecCatalog } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
+import type { TestCatalogRow } from "../types";
 
 const useStyles = makeStyles({
     subtitle: {
@@ -27,6 +41,8 @@ const useStyles = makeStyles({
         borderTopWidth: "3px",
         borderTopStyle: "solid",
         borderTopColor: tokens.colorBrandStroke1,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     statValue: {
         fontSize: "24px",
@@ -42,6 +58,12 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
+    },
+    tableCard: {
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     chartTitle: {
         fontSize: "14px",
@@ -84,6 +106,40 @@ const useStyles = makeStyles({
         borderBottomWidth: "1px",
         borderBottomStyle: "solid",
         borderBottomColor: tokens.colorNeutralStroke2,
+    },
+    specCell: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "2px",
+    },
+    specFileName: {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        fontWeight: 600,
+    },
+    specTestCaseTitle: {
+        fontSize: "11px",
+        color: tokens.colorNeutralForeground3,
+    },
+    errorsCell: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "2px",
+        maxWidth: "420px",
+    },
+    errorLine: {
+        fontSize: "12px",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+    },
+    catalogHead: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: tokens.spacingHorizontalS,
+        padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalM} 0`,
     },
 });
 
@@ -172,7 +228,7 @@ export function AutomationKpiPage() {
                         </Card>
                     )}
 
-                    <Card>
+                    <Card className={styles.tableCard}>
                         <Text className={styles.tableCardTitle}>
                             {t("automationKpiPage.flakyTestsTitle", {
                                 count: data.flakyTests.length,
@@ -227,8 +283,163 @@ export function AutomationKpiPage() {
                             </div>
                         )}
                     </Card>
+
+                    <SpecCatalogCard />
                 </>
             )}
         </PageLayout>
+    );
+}
+
+type SpecCatalogKind = "nrt" | "a11y" | "security";
+const SPEC_CATALOG_KINDS: SpecCatalogKind[] = ["nrt", "a11y", "security"];
+
+// Separate query from the automation-kpis one above: this needs
+// TEST_SUITES_REPORTS_DIR (a repo checkout to scan), a different
+// "configured" gate than the ADO-only KPIs, so it fails/loads independently
+// rather than taking the whole page down with it.
+function SpecCatalogCard() {
+    const { t } = useTranslation();
+    const styles = useStyles();
+    const [kind, setKind] = useState<SpecCatalogKind>("nrt");
+
+    const { data, isLoading, isError, error, refetch } = useQuery({
+        queryKey: ["test-spec-catalog", PROJECT],
+        queryFn: () => fetchTestSpecCatalog(PROJECT),
+    });
+
+    const handleTabSelect = (_event: SelectTabEvent, tabData: SelectTabData) => {
+        setKind(tabData.value as SpecCatalogKind);
+    };
+
+    const rows: TestCatalogRow[] = data ? data[kind] : [];
+
+    return (
+        <Card className={styles.tableCard}>
+            <div className={styles.catalogHead}>
+                <Text className={styles.tableCardTitle} style={{ padding: 0 }}>
+                    {t("automationKpiPage.specCatalog.title")}
+                </Text>
+                <TabList selectedValue={kind} onTabSelect={handleTabSelect} size="small">
+                    {SPEC_CATALOG_KINDS.map((k) => (
+                        <Tab key={k} value={k}>
+                            {t(`automationKpiPage.specCatalog.tabs.${k}`)}
+                        </Tab>
+                    ))}
+                </TabList>
+            </div>
+
+            {isLoading && (
+                <Text
+                    className={styles.hint}
+                    style={{ display: "block", padding: tokens.spacingHorizontalM }}
+                >
+                    {t("automationKpiPage.specCatalog.loading")}
+                </Text>
+            )}
+
+            {isError && (
+                <div style={{ padding: tokens.spacingHorizontalM }}>
+                    <ErrorState message={error.message} onRetry={refetch} />
+                </div>
+            )}
+
+            {data && !data.configured && (
+                <Text
+                    className={styles.hint}
+                    style={{ display: "block", padding: tokens.spacingHorizontalM }}
+                >
+                    {t("automationKpiPage.specCatalog.notConfigured")}
+                </Text>
+            )}
+
+            {data && data.configured && rows.length === 0 && (
+                <Text
+                    className={styles.hint}
+                    style={{ display: "block", padding: tokens.spacingHorizontalM }}
+                >
+                    {t("automationKpiPage.specCatalog.empty")}
+                </Text>
+            )}
+
+            {data && data.configured && rows.length > 0 && (
+                <div style={{ overflowX: "auto" }}>
+                    <table className={styles.table}>
+                        <thead>
+                            <tr>
+                                <th className={styles.tableHeadCell}>
+                                    {t("automationKpiPage.table.specFile")}
+                                </th>
+                                <th className={styles.tableHeadCell}>
+                                    {t("automationKpiPage.table.browser")}
+                                </th>
+                                <th className={styles.tableHeadCell}>
+                                    {t("automationKpiPage.table.lastRuns")}
+                                </th>
+                                <th className={styles.tableHeadCell}>
+                                    {t("automationKpiPage.table.topErrors")}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((row) => (
+                                <tr key={row.specPath}>
+                                    <td className={styles.tableCell}>
+                                        <div className={styles.specCell}>
+                                            <span className={styles.specFileName}>
+                                                {row.specFile}
+                                            </span>
+                                            {row.testCaseTitle && (
+                                                <span className={styles.specTestCaseTitle}>
+                                                    {row.testCaseTitle}
+                                                </span>
+                                            )}
+                                            {kind !== "nrt" && !row.testCaseId && (
+                                                <StatusTag tone="neutral">
+                                                    {t("automationKpiPage.specCatalog.notLinked")}
+                                                </StatusTag>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className={styles.tableCell}>
+                                        {row.browsers.length === 0 ? "—" : row.browsers.join(", ")}
+                                    </td>
+                                    <td className={styles.tableCell}>
+                                        <RunHistoryStrip
+                                            points={row.lastRuns.map(
+                                                (run): RunHistoryPoint => ({
+                                                    outcome: run.outcome,
+                                                    date: run.completedDate,
+                                                    detail: run.browser,
+                                                })
+                                            )}
+                                        />
+                                    </td>
+                                    <td className={styles.tableCell}>
+                                        {row.topErrors.length === 0 ? (
+                                            <Text className={styles.hint}>
+                                                {t("automationKpiPage.table.noErrors")}
+                                            </Text>
+                                        ) : (
+                                            <div className={styles.errorsCell}>
+                                                {row.topErrors.map((err, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className={styles.errorLine}
+                                                        title={err.message}
+                                                    >
+                                                        ({err.count}×) {err.message}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </Card>
     );
 }

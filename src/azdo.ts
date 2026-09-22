@@ -280,13 +280,24 @@ async function fetchAuthenticatedEmail(
             "/connectionData?api-version=7.1-preview.1"
         );
 
-        // AAD-backed identities carry the UPN/email under
-        // authenticatedUser.properties.Account rather than any top-level
-        // field - there's no dedicated "email" property on this response.
-        const email: string | undefined =
-            response.data?.authenticatedUser?.properties?.Account?.$value;
+        const email = extractAuthenticatedEmail(response.data);
 
-        return email ? email.trim().toLowerCase() : null;
+        if (!email) {
+            const authenticatedUser = response.data?.authenticatedUser;
+            console.error(
+                "Azure DevOps connectionData authenticated the PAT but did " +
+                    "not expose an email address for its owner:",
+                {
+                    org,
+                    hasUniqueName: !!authenticatedUser?.uniqueName,
+                    propertyNames: Object.keys(
+                        authenticatedUser?.properties ?? {}
+                    ),
+                }
+            );
+        }
+
+        return email;
     } catch (error) {
         console.error(
             "Failed to resolve the calling PAT's Azure DevOps identity " +
@@ -304,12 +315,80 @@ async function fetchAuthenticatedEmail(
     }
 }
 
-// Keyed by PAT (not by request) so the same PAT reused across many requests
-// only hits connectionData once per TTL - same shape as the dashboard caches
-// elsewhere (dashboardData.ts etc.), just keyed differently.
+function emailFromIdentityValue(value: unknown): string | null {
+    const rawValue =
+        typeof value === "string"
+            ? value
+            : value && typeof value === "object" && "$value" in value
+              ? (value as { $value?: unknown }).$value
+              : null;
+
+    if (typeof rawValue !== "string") {
+        return null;
+    }
+
+    const normalized = rawValue.trim().toLowerCase();
+    return normalized.includes("@") ? normalized : null;
+}
+
+export function extractAuthenticatedEmail(connectionData: unknown): string | null {
+    if (!connectionData || typeof connectionData !== "object") {
+        return null;
+    }
+
+    const authenticatedUser = (
+        connectionData as {
+            authenticatedUser?: Record<string, unknown>;
+        }
+    ).authenticatedUser;
+
+    if (!authenticatedUser || typeof authenticatedUser !== "object") {
+        return null;
+    }
+
+    const properties =
+        authenticatedUser.properties &&
+        typeof authenticatedUser.properties === "object"
+            ? (authenticatedUser.properties as Record<string, unknown>)
+            : {};
+    const preferredPropertyNames = ["Account", "Mail", "Email"];
+    const preferredProperties = preferredPropertyNames.map(
+        (name) => properties[name]
+    );
+    const otherEmailProperties = Object.entries(properties)
+        .filter(
+            ([name]) =>
+                !preferredPropertyNames.includes(name) &&
+                /(account|e-?mail|upn|principal)/i.test(name)
+        )
+        .map(([, value]) => value);
+    const candidates = [
+        ...preferredProperties,
+        ...otherEmailProperties,
+        authenticatedUser.mailAddress,
+        authenticatedUser.email,
+        authenticatedUser.mail,
+        authenticatedUser.uniqueName,
+        authenticatedUser.principalName,
+    ];
+
+    for (const candidate of candidates) {
+        const email = emailFromIdentityValue(candidate);
+
+        if (email) {
+            return email;
+        }
+    }
+
+    return null;
+}
+
+// Keyed by org and PAT so changing organization cannot reuse the result from
+// a previous connection. Failed identity lookups are deliberately not cached:
+// a transient Azure DevOps error must be recoverable through the Retry action.
 const domainCheckCache = new Map<
     string,
-    { allowed: boolean; email: string | null; timestamp: number }
+    { allowed: boolean; email: string; timestamp: number }
 >();
 const DOMAIN_CHECK_CACHE_MS = 10 * 60 * 1000;
 
@@ -319,7 +398,8 @@ const DOMAIN_CHECK_CACHE_MS = 10 * 60 * 1000;
 export async function assertAllowedDomain(): Promise<void> {
     const pat = requirePat();
     const org = requireOrg();
-    const cached = domainCheckCache.get(pat);
+    const cacheKey = `${org}|${pat}`;
+    const cached = domainCheckCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < DOMAIN_CHECK_CACHE_MS) {
         if (!cached.allowed) {
@@ -332,7 +412,13 @@ export async function assertAllowedDomain(): Promise<void> {
     const email = await fetchAuthenticatedEmail(org, pat);
     const allowed = !!email && email.endsWith(`@${ALLOWED_EMAIL_DOMAIN}`);
 
-    domainCheckCache.set(pat, { allowed, email, timestamp: Date.now() });
+    if (email) {
+        domainCheckCache.set(cacheKey, {
+            allowed,
+            email,
+            timestamp: Date.now(),
+        });
+    }
 
     if (!allowed) {
         throw new AzdoDomainError(email);
@@ -530,6 +616,70 @@ export async function getTestPoints(
     return response.data.value;
 }
 
+// Unlike getTestPoints above, this includes every point-level detail (last
+// result outcome/date, tester, configuration) and every point under a
+// suite's child suites when recursive - what the QA Control Center replica
+// needs to build its per-tester/per-outcome model. Paged via the
+// x-ms-continuationtoken response header, same mechanism as
+// getTestRunsForPlan below (the testplan API doesn't support $skip here).
+export async function getTestPointsRecursive(
+    planId: number,
+    suiteId: number,
+    project?: string,
+    recursive = true
+) {
+    const points: any[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+        const response = await clientFor(project).get(
+            `/testplan/Plans/${planId}/Suites/${suiteId}/TestPoint?includePointDetails=true&returnIdentityRef=true&isRecursive=${recursive}&api-version=7.1${
+                continuationToken
+                    ? `&continuationToken=${encodeURIComponent(continuationToken)}`
+                    : ""
+            }`
+        );
+
+        points.push(...(response.data.value ?? []));
+        continuationToken = response.headers["x-ms-continuationtoken"];
+    } while (continuationToken);
+
+    return points;
+}
+
+// Test runs scoped to one plan within a date window (by last-updated date) -
+// unlike getTestRuns above (every run, project-wide, no filter), this is
+// what the QA Control Center replica walks in rolling windows to build
+// execution history without pulling the entire project's run list.
+export async function getTestRunsForPlan(
+    planId: number,
+    minDate: Date,
+    maxDate: Date,
+    project?: string
+) {
+    const runs: any[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+        const response = await clientFor(project).get(
+            `/test/runs?minLastUpdatedDate=${encodeURIComponent(
+                minDate.toISOString()
+            )}&maxLastUpdatedDate=${encodeURIComponent(
+                maxDate.toISOString()
+            )}&planIds=${planId}&$top=100&api-version=7.1${
+                continuationToken
+                    ? `&continuationToken=${encodeURIComponent(continuationToken)}`
+                    : ""
+            }`
+        );
+
+        runs.push(...(response.data.value ?? []));
+        continuationToken = response.headers["x-ms-continuationtoken"];
+    } while (continuationToken);
+
+    return runs;
+}
+
 // The runs list endpoint returns runs in ascending creation order with no
 // $orderby support, so a single capped page (e.g. $top=50) only ever returns
 // the oldest runs project-wide - newer runs past that page silently never
@@ -591,19 +741,29 @@ export async function getTestRunStatistics(
     }
 }
 
+const projectsWithoutIterationDetails = new Set<string>();
+
 export async function getTestRunResults(
     runId: number,
     project?: string,
-    options: { includeIterations?: boolean } = {}
+    options: { includeIterations?: boolean; includePoints?: boolean } = {}
 ) {
+    const results: any[] = [];
+    const currentConfig = getCurrentConfig();
+    const projectKey = `${currentConfig.org}/${project ?? currentConfig.project}`;
+    const includeIterations =
+        options.includeIterations === true &&
+        !projectsWithoutIterationDetails.has(projectKey);
+
     try {
-        const results: any[] = [];
-        const pageSize = options.includeIterations ? 200 : 1000;
+        const pageSize = 1000;
         let skip = 0;
 
         while (true) {
-            const details = options.includeIterations
+            const details = includeIterations
                 ? "&detailsToInclude=Iterations"
+                : options.includePoints
+                ? "&detailsToInclude=Point"
                 : "";
             const response = await clientFor(project).get(
                 `/test/Runs/${runId}/results?api-version=7.1&$top=${pageSize}&$skip=${skip}${details}`
@@ -616,20 +776,22 @@ export async function getTestRunResults(
 
         return results;
     } catch (error) {
-        // Azure can retain a deleted run in the list briefly. Skipping that
-        // stale run is safer than failing the complete KPI response.
+        // Azure can retain a deleted run in the list briefly. Preserve pages
+        // already fetched if a later page disappears; an initial 404 still
+        // returns [] and skips the stale run.
         if (axios.isAxiosError(error) && error.response?.status === 404) {
-            return [];
+            return results;
         }
 
         // Some Azure DevOps installations reject step-level expansion even
         // though ordinary result history is available. Preserve test-case
         // KPIs in that case; step KPIs correctly remain unavailable.
         if (
-            options.includeIterations &&
+            includeIterations &&
             axios.isAxiosError(error) &&
             error.response?.status === 400
         ) {
+            projectsWithoutIterationDetails.add(projectKey);
             return getTestRunResults(runId, project);
         }
 
@@ -683,6 +845,29 @@ export async function getWorkItem(id: number, project?: string) {
     );
 
     return response.data;
+}
+
+// JSON Patch update of one or more fields on a single work item. ADO
+// requires application/json-patch+json for this endpoint, which differs from
+// every read call in this file (those use the client's default
+// application/json), so the content type is overridden per-request here
+// rather than on the shared client.
+export async function updateWorkItemFields(
+    id: number,
+    fields: Record<string, unknown>,
+    project?: string
+): Promise<void> {
+    const patch = Object.entries(fields).map(([path, value]) => ({
+        op: "add",
+        path: `/fields/${path}`,
+        value,
+    }));
+
+    await clientFor(project).patch(
+        `/wit/workitems/${id}?api-version=7.1`,
+        patch,
+        { headers: { "Content-Type": "application/json-patch+json" } }
+    );
 }
 
 export async function getWorkItems(

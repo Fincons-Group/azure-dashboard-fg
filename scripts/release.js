@@ -58,6 +58,37 @@ function fail(message) {
     process.exit(1);
 }
 
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// `gh pr checks --watch` only watches checks that already exist - called
+// right after `gh pr create`, GitHub's webhook hasn't created the PR's
+// check-run rows yet, so it sees zero checks and exits immediately with
+// "no checks reported" instead of entering watch mode, even though the
+// workflows are about to start. Poll until at least one check shows up
+// before handing off to --watch for the real wait/pass/fail logic.
+async function waitForChecksToAppear(prNumber, { timeoutMs = 120_000, intervalMs = 5000 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    let warned = false;
+    while (Date.now() < deadline) {
+        try {
+            const json = runCapture("gh", ["pr", "checks", String(prNumber), "--json", "name"], { quiet: true });
+            if (JSON.parse(json).length > 0) return;
+        } catch {
+            if (!warned) {
+                console.log("(no checks registered yet - waiting for GitHub Actions to pick up the PR...)");
+                warned = true;
+            }
+        }
+        await sleep(intervalMs);
+    }
+    fail(
+        `no checks appeared on PR #${prNumber} within ${timeoutMs / 1000}s - check that the required workflows ` +
+            `are configured to run on this branch/PR, then re-run: npm run release -- --tag-only`
+    );
+}
+
 async function confirm(question) {
     if (yes) return true;
     const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -257,6 +288,7 @@ try {
 }
 
 console.log(`\nWaiting for required checks on PR #${prNumber}...`);
+await waitForChecksToAppear(prNumber);
 try {
     run("gh", ["pr", "checks", String(prNumber), "--watch"]);
 } catch {

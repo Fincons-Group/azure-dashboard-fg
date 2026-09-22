@@ -1,16 +1,15 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import {
     Accordion,
     AccordionHeader,
     AccordionItem,
     AccordionPanel,
-    Badge,
     Button,
     Card,
     Dropdown,
     Option,
-    Switch,
     Tab,
     TabList,
     Text,
@@ -27,16 +26,21 @@ import {
     ChevronRightRegular,
     OpenRegular,
     ShieldCheckmarkRegular,
+    WrenchRegular,
     type FluentIcon,
 } from "@fluentui/react-icons";
 import { PageLayout } from "../components/PageLayout";
-import { getApiBaseUrl } from "../api/client";
-import { TEST_SUITE_RUNS } from "../data/testSuitesMockData";
+import { LoadingCardGrid } from "../components/LoadingState";
+import { ErrorState } from "../components/ErrorState";
+import { StatusTag } from "../components/StatusTag";
+import type { StatusTone } from "../components/statusTone";
+import type { RunHistoryPoint } from "../components/RunHistoryStrip";
+import { getApiBaseUrl, fetchTestSuites, fetchSignedReportUrl } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
 import type {
-    A11yRuleViolation,
-    DastAlert,
     NrtDomainResult,
-    TestAppScope,
+    NrtRunDetail,
+    NrtTestResult,
     TestEnvironment,
     TestRunStatus,
     TestSuiteKey,
@@ -45,24 +49,15 @@ import type {
 
 type TabKey = "overview" | TestSuiteKey;
 
-const SUITE_ORDER: TestSuiteKey[] = ["nrt", "a11y", "dast"];
-const APP_OPTIONS: TestAppScope[] = ["plurifond", "frontOfficeAuto", "all"];
+const SUITE_ORDER: TestSuiteKey[] = ["nrt", "a11y", "security"];
 const ENV_OPTIONS: TestEnvironment[] = ["tst", "pre", "prd"];
 const TREND_RUN_COUNT = 6;
 
 const SUITE_ICONS: Record<TestSuiteKey, FluentIcon> = {
     nrt: ArrowRepeatAllRegular,
     a11y: AccessibilityCheckmarkRegular,
-    dast: ShieldCheckmarkRegular,
+    security: ShieldCheckmarkRegular,
 };
-
-// The scope bar (tabs + app/environment pickers) sits directly beneath
-// PageLayout's TopBar (sticky at top:0) and ScopeBar (sticky at
-// top:NAV_HEIGHT, showing at least the Project chip). 140px is their
-// combined rendered height, measured in-browser (TopBar 65px + ScopeBar's
-// collapsed row 75px) - there's no shared constant for ScopeBar's height to
-// derive this from. Re-measure if either bar's layout changes.
-const SCOPE_BAR_TOP = "140px";
 
 const useStyles = makeStyles({
     subtitle: {
@@ -70,7 +65,10 @@ const useStyles = makeStyles({
     },
     stickyBar: {
         position: "sticky",
-        top: SCOPE_BAR_TOP,
+        // Set by PageLayout from TopBar+ScopeBar's actual measured height
+        // (see its ResizeObserver) - falls back to a rough estimate before
+        // that first measurement lands.
+        top: "var(--app-header-height, 140px)",
         zIndex: 8,
         display: "flex",
         flexWrap: "wrap",
@@ -110,6 +108,8 @@ const useStyles = makeStyles({
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
         border: "none",
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
         ":hover": {
             outlineWidth: "1px",
             outlineStyle: "solid",
@@ -170,6 +170,16 @@ const useStyles = makeStyles({
         alignItems: "center",
         textAlign: "center",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
+    },
+    placeholderIcon: {
+        fontSize: "32px",
+        color: tokens.colorNeutralForeground3,
+    },
+    placeholderBody: {
+        color: tokens.colorNeutralForeground3,
+        maxWidth: "480px",
     },
     detailHead: {
         display: "flex",
@@ -201,6 +211,12 @@ const useStyles = makeStyles({
         color: tokens.colorNeutralForeground3,
         fontSize: tokens.fontSizeBase200,
     },
+    detailBranch: {
+        maxWidth: "320px",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+    },
     detailNote: {
         fontSize: tokens.fontSizeBase200,
         color: tokens.colorNeutralForeground3,
@@ -225,6 +241,8 @@ const useStyles = makeStyles({
         borderTopWidth: "3px",
         borderTopStyle: "solid",
         borderTopColor: tokens.colorBrandStroke1,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     statValue: {
         fontSize: "22px",
@@ -246,6 +264,8 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     cardTitle: {
         fontSize: tokens.fontSizeBase300,
@@ -258,34 +278,6 @@ const useStyles = makeStyles({
         fontSize: tokens.fontSizeBase200,
         fontWeight: tokens.fontWeightRegular,
         color: tokens.colorNeutralForeground3,
-    },
-    barRow: {
-        display: "flex",
-        alignItems: "center",
-        gap: tokens.spacingHorizontalS,
-    },
-    barLabel: {
-        width: "96px",
-        flexShrink: 0,
-        fontSize: tokens.fontSizeBase200,
-        color: tokens.colorNeutralForeground2,
-    },
-    barTrack: {
-        flex: 1,
-        height: "8px",
-        borderRadius: tokens.borderRadiusMedium,
-        backgroundColor: tokens.colorNeutralBackground3,
-        overflow: "hidden",
-    },
-    barFill: {
-        height: "100%",
-    },
-    barCount: {
-        width: "28px",
-        textAlign: "right",
-        fontSize: tokens.fontSizeBase200,
-        fontWeight: tokens.fontWeightSemibold,
-        flexShrink: 0,
     },
     table: {
         width: "100%",
@@ -319,6 +311,15 @@ const useStyles = makeStyles({
         borderBottomStyle: "solid",
         borderBottomColor: tokens.colorNeutralStroke2,
     },
+    tableRowClickable: {
+        cursor: "pointer",
+        ":hover": {
+            backgroundColor: tokens.colorNeutralBackground1Hover,
+        },
+    },
+    tableRowSelected: {
+        backgroundColor: tokens.colorBrandBackground2,
+    },
     trendBars: {
         display: "flex",
         alignItems: "flex-end",
@@ -351,12 +352,6 @@ const useStyles = makeStyles({
         flexWrap: "wrap",
         marginBottom: "2px",
     },
-    findingId: {
-        fontSize: tokens.fontSizeBase200,
-        fontWeight: tokens.fontWeightSemibold,
-        color: tokens.colorBrandForeground1,
-        textDecorationLine: "none",
-    },
     findingTitle: {
         fontSize: tokens.fontSizeBase300,
         fontWeight: tokens.fontWeightRegular,
@@ -365,33 +360,6 @@ const useStyles = makeStyles({
     findingMeta: {
         fontSize: tokens.fontSizeBase200,
         color: tokens.colorNeutralForeground3,
-    },
-    stepBlock: {
-        paddingTop: tokens.spacingVerticalM,
-        marginTop: tokens.spacingVerticalM,
-        borderTopWidth: "1px",
-        borderTopStyle: "solid",
-        borderTopColor: tokens.colorNeutralStroke2,
-        ":first-of-type": {
-            paddingTop: 0,
-            marginTop: 0,
-            borderTopWidth: 0,
-        },
-    },
-    stepHeader: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: tokens.spacingHorizontalS,
-        marginBottom: tokens.spacingVerticalM,
-        padding: `${tokens.spacingVerticalSNudge} ${tokens.spacingHorizontalS}`,
-        backgroundColor: tokens.colorNeutralBackground3,
-        borderRadius: tokens.borderRadiusMedium,
-    },
-    stepLabel: {
-        fontSize: tokens.fontSizeBase400,
-        fontWeight: tokens.fontWeightBold,
-        color: tokens.colorNeutralForeground1,
     },
     testHeaderRow: {
         display: "flex",
@@ -421,6 +389,16 @@ const useStyles = makeStyles({
         gap: tokens.spacingHorizontalM,
         fontSize: tokens.fontSizeBase300,
     },
+    testHistorySection: {
+        marginTop: tokens.spacingVerticalM,
+        paddingTop: tokens.spacingVerticalM,
+        borderTopWidth: "1px",
+        borderTopStyle: "solid",
+        borderTopColor: tokens.colorNeutralStroke2,
+        display: "flex",
+        flexDirection: "column",
+        gap: tokens.spacingVerticalXS,
+    },
     runsList: {
         display: "flex",
         flexDirection: "column",
@@ -431,6 +409,10 @@ const useStyles = makeStyles({
         textAlign: "left",
         border: "2px solid transparent",
         backgroundColor: "transparent",
+        // A plain <button> doesn't inherit the page's text color from the UA
+        // stylesheet (defaults to black), which read as unreadable against
+        // this card's dark background.
+        color: tokens.colorNeutralForeground1,
         borderRadius: tokens.borderRadiusMedium,
         padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalS}`,
         cursor: "pointer",
@@ -469,32 +451,48 @@ const useStyles = makeStyles({
         fontSize: tokens.fontSizeBase200,
         fontWeight: tokens.fontWeightSemibold,
     },
+    runBadges: {
+        display: "flex",
+        alignItems: "center",
+        gap: tokens.spacingHorizontalXS,
+    },
+    runLatestTag: {
+        color: tokens.colorBrandForeground1,
+    },
     runBranch: {
         fontSize: tokens.fontSizeBase200,
         color: tokens.colorNeutralForeground2,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
     },
 });
 
-function statusToBadgeColor(status: TestRunStatus): "success" | "warning" | "danger" {
+// setup/*.setup.ts specs are Playwright auth scaffolding ("authenticate as
+// ..."), not test cases a QA reviewer is checking - they run before the real
+// specs and always pass/skip by construction, so counting them only dilutes
+// a run's pass rate and inflates its total. NrtRunDetail.totalTests/.passed
+// come straight from the run doc and still include them (that's a
+// report-generation concern upstream in tst-e2e, out of scope here), so
+// every pass-rate/total-tests display in this page is derived from the
+// already-filtered test list instead of trusting those fields directly.
+// Once the reporter stops emitting setup specs into totalTests/passed, this
+// filter becomes a no-op and can stay in place harmlessly.
+function realNrtTests(detail: NrtRunDetail): NrtTestResult[] {
+    return (detail.tests ?? []).filter((test) => !test.file.startsWith("setup/"));
+}
+
+function nrtPassRate(detail: NrtRunDetail): number {
+    const tests = realNrtTests(detail);
+    if (tests.length === 0) return 0;
+    const passed = tests.filter((test) => test.status === "passed").length;
+    return Math.round((passed / tests.length) * 1000) / 10;
+}
+
+function statusTone(status: TestRunStatus): StatusTone {
     if (status === "good") return "success";
     if (status === "warn") return "warning";
     return "danger";
-}
-
-function impactToBadgeColor(
-    impact: "critical" | "serious" | "moderate" | "minor"
-): "danger" | "severe" | "warning" | "informative" {
-    if (impact === "critical") return "danger";
-    if (impact === "serious") return "severe";
-    if (impact === "moderate") return "warning";
-    return "informative";
-}
-
-function riskToBadgeColor(risk: DastAlert["risk"]): "danger" | "warning" | "informative" | "subtle" {
-    if (risk === "High") return "danger";
-    if (risk === "Medium") return "warning";
-    if (risk === "Low") return "informative";
-    return "subtle";
 }
 
 function formatDateTime(iso: string): string {
@@ -502,14 +500,14 @@ function formatDateTime(iso: string): string {
     return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-// Points at whatever a local tst-e2e checkout's reports/ folder the server
-// is statically serving under /test-suites-reports (see
-// TEST_SUITES_REPORTS_DIR in src/server.ts) - a dev-only convenience, so
-// this 404s when that env var isn't set. reportFile/reportFileIt already
-// carry the full path relative to reports/ (e.g. "runs/<id>/smart-report.html",
-// "a11y/index.html", "zap/<file>.html") - same convention
-// scripts/publish-local-test-runs.js writes - so this never re-derives a
-// per-suite subpath itself.
+// Fallback for when a run has no reportUrl yet (no real CI pipeline exists,
+// see TestSuiteRun.reportUrl in types.ts) - points at whatever local tst-e2e
+// checkout's reports/ folder the server is statically serving under
+// /test-suites-reports (see TEST_SUITES_REPORTS_DIR in src/server.ts), a
+// dev-only convenience that 404s everywhere else. reportFile carries the
+// path relative to reports/ (e.g. "runs/<id>/smart-report.html",
+// "a11y/index.html") - same convention scripts/publish-local-test-runs.js
+// writes - so this never re-derives a per-suite subpath itself.
 //
 // Must be an absolute URL against the API origin, not a plain "/..." path:
 // this is a real <a href>, not a fetch through apiFetch's proxy-aware base,
@@ -519,6 +517,61 @@ function formatDateTime(iso: string): string {
 // fallback and lands on whatever the app's default route is).
 function reportHref(file: string): string {
     return `${getApiBaseUrl()}/test-suites-reports/${file}`;
+}
+
+// Local-dev fallback (no reportUrl) opens straight away. A real reportUrl is
+// a gated API path, not a link (see its comment in types.ts) - it has to be
+// fetched (carrying the usual PAT header) before there's a URL to open. The
+// blank window opens synchronously on click, before that await, so browsers
+// don't treat the later navigation as an unrequested popup - it can't pass
+// "noopener" as a window.open() feature and keep a reference to navigate
+// later, though: browsers return null from window.open() specifically when
+// noopener is set (the whole point of the flag is that no such reference
+// ever exists), which left the blank tab permanently blank. window.opener
+// is nulled out manually instead, right after opening, which blocks the
+// same reverse-tabnabbing risk without losing the reference.
+async function openTestSuiteReport(run: TestSuiteRun): Promise<void> {
+    if (!run.reportUrl) {
+        window.open(reportHref(run.reportFile), "_blank", "noopener");
+        return;
+    }
+
+    const win = window.open("", "_blank");
+    if (win) win.opener = null;
+    const url = await fetchSignedReportUrl(run.reportUrl);
+    if (win) win.location.href = url;
+}
+
+interface TestHistoryPoint extends RunHistoryPoint {
+    runId: string;
+    durationMs: number;
+}
+
+// Cross-run history for one test, derived entirely from `runs` (already
+// fetched for this suite+env, up to 200 per firebaseTestSuiteRunsData.ts) -
+// no separate API call or backend change needed. Matched by file+title+
+// browser so a test that runs on more than one browser gets its own history
+// per browser, not one blended strip. `runs` is already newest-first (see
+// runsBySuite in TestSuitesPage), so the result is too.
+function historyForTest(test: NrtTestResult, runs: TestSuiteRun[]): TestHistoryPoint[] {
+    const points: TestHistoryPoint[] = [];
+
+    for (const run of runs) {
+        const match = (run.nrt?.tests ?? []).find(
+            (t) => t.file === test.file && t.title === test.title && t.browser === test.browser
+        );
+        if (match) {
+            points.push({
+                runId: run.id,
+                outcome: match.status,
+                date: run.startedAt,
+                detail: match.browser,
+                durationMs: match.durationMs,
+            });
+        }
+    }
+
+    return points;
 }
 
 function StatTile({ value, label }: { value: string | number; label: string }) {
@@ -531,58 +584,49 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
     );
 }
 
-function SeverityBar({
-    label,
-    count,
-    max,
-    color,
-}: {
-    label: string;
-    count: number;
-    max: number;
-    color: string;
-}) {
-    const styles = useStyles();
-    const pct = max > 0 ? Math.max((count / max) * 100, count > 0 ? 4 : 0) : 0;
-
-    return (
-        <div className={styles.barRow}>
-            <span className={styles.barLabel}>{label}</span>
-            <div className={styles.barTrack}>
-                <div className={styles.barFill} style={{ width: `${pct}%`, backgroundColor: color }} />
-            </div>
-            <span className={styles.barCount}>{count}</span>
-        </div>
-    );
-}
 
 export function TestSuitesPage() {
     const { t } = useTranslation();
     const styles = useStyles();
 
     const [tab, setTab] = useState<TabKey>("overview");
-    const [appScope, setAppScope] = useState<TestAppScope>("plurifond");
     const [env, setEnv] = useState<TestEnvironment>("tst");
     const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+
+    const { data, isLoading, isError, error, refetch } = useQuery({
+        queryKey: ["test-suites"],
+        queryFn: fetchTestSuites,
+    });
+
+    const runs = useMemo(() => data?.runs ?? [], [data]);
 
     const runsBySuite = useMemo(() => {
         const map = new Map<TestSuiteKey, TestSuiteRun[]>();
         for (const suite of SUITE_ORDER) {
-            const matching = TEST_SUITE_RUNS.filter(
-                (run) => run.suite === suite && run.app === appScope && run.env === env
-            ).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+            const matching = runs
+                .filter((run) => run.suite === suite && run.env === env)
+                // An "nrt" run doc can carry nothing but untagged scaffolding
+                // (e.g. auth setup) when it was actually a local check
+                // pointed at only the a11y/security tag subset - every
+                // domain comes back "other" in that case. Its a11y/security
+                // results still matter (see AutomationKpiPage's spec
+                // catalog, which reads them from this same doc's tests[]),
+                // but showing it here as an NRT run reads as a false
+                // all-skipped "bad" result. Hidden from this tab only - the
+                // doc itself is untouched.
+                .filter(
+                    (run) =>
+                        suite !== "nrt" ||
+                        (run.nrt?.domains ?? []).some((d) => d.domain !== "other")
+                )
+                .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
             map.set(suite, matching);
         }
         return map;
-    }, [appScope, env]);
+    }, [runs, env]);
 
     const handleTabSelect = (_event: SelectTabEvent, data: SelectTabData) => {
         setTab(data.value as TabKey);
-        setSelectedRunId(null);
-    };
-
-    const handleAppChange = (value: string) => {
-        setAppScope(value as TestAppScope);
         setSelectedRunId(null);
     };
 
@@ -593,49 +637,53 @@ export function TestSuitesPage() {
 
     return (
         <PageLayout title={t("testSuitesPage.title")} hideAreaSprintScope wide>
+            {data && data.configured && (
+                <div className={styles.stickyBar}>
+                    <TabList selectedValue={tab} onTabSelect={handleTabSelect}>
+                        <Tab value="overview">{t("testSuitesPage.tabs.overview")}</Tab>
+                        {SUITE_ORDER.map((suite) => (
+                            <Tab key={suite} value={suite}>
+                                {t(`testSuitesPage.tabs.${suite}`)}
+                            </Tab>
+                        ))}
+                    </TabList>
+
+                    <div className={styles.scopeSelects}>
+                        <Dropdown
+                            className={styles.scopeDropdown}
+                            value={t(`testSuitesPage.envOptions.${env}`)}
+                            selectedOptions={[env]}
+                            onOptionSelect={(_, data) => data.optionValue && handleEnvChange(data.optionValue)}
+                            aria-label={t("testSuitesPage.envLabel")}
+                        >
+                            {ENV_OPTIONS.map((option) => (
+                                <Option key={option} value={option}>
+                                    {t(`testSuitesPage.envOptions.${option}`)}
+                                </Option>
+                            ))}
+                        </Dropdown>
+                    </div>
+                </div>
+            )}
+
             <Text className={styles.subtitle}>{t("testSuitesPage.subtitle")}</Text>
 
-            <div className={styles.stickyBar}>
-                <TabList selectedValue={tab} onTabSelect={handleTabSelect}>
-                    <Tab value="overview">{t("testSuitesPage.tabs.overview")}</Tab>
-                    {SUITE_ORDER.map((suite) => (
-                        <Tab key={suite} value={suite}>
-                            {t(`testSuitesPage.tabs.${suite}`)}
-                        </Tab>
-                    ))}
-                </TabList>
+            {isLoading && <LoadingCardGrid />}
 
-                <div className={styles.scopeSelects}>
-                    <Dropdown
-                        className={styles.scopeDropdown}
-                        value={t(`testSuitesPage.appOptions.${appScope}`)}
-                        selectedOptions={[appScope]}
-                        onOptionSelect={(_, data) => data.optionValue && handleAppChange(data.optionValue)}
-                        aria-label={t("testSuitesPage.appLabel")}
-                    >
-                        {APP_OPTIONS.map((option) => (
-                            <Option key={option} value={option}>
-                                {t(`testSuitesPage.appOptions.${option}`)}
-                            </Option>
-                        ))}
-                    </Dropdown>
+            {isError && <ErrorState message={error.message} onRetry={refetch} />}
 
-                    <Dropdown
-                        className={styles.scopeDropdown}
-                        value={t(`testSuitesPage.envOptions.${env}`)}
-                        selectedOptions={[env]}
-                        onOptionSelect={(_, data) => data.optionValue && handleEnvChange(data.optionValue)}
-                        aria-label={t("testSuitesPage.envLabel")}
-                    >
-                        {ENV_OPTIONS.map((option) => (
-                            <Option key={option} value={option}>
-                                {t(`testSuitesPage.envOptions.${option}`)}
-                            </Option>
-                        ))}
-                    </Dropdown>
-                </div>
-            </div>
+            {data && !data.configured && (
+                <Card className={styles.placeholderCard}>
+                    <WrenchRegular className={styles.placeholderIcon} />
+                    <Text weight="semibold">{t("testSuitesPage.notConfiguredTitle")}</Text>
+                    <Text className={styles.placeholderBody}>
+                        {t("testSuitesPage.notConfiguredBody")}
+                    </Text>
+                </Card>
+            )}
 
+            {data && data.configured && (
+            <>
             {tab === "overview" && (
                 <>
                     <span className={styles.eyebrow}>{t("testSuitesPage.eyebrow")}</span>
@@ -661,9 +709,10 @@ export function TestSuitesPage() {
                     runs={runsBySuite.get(tab) ?? []}
                     selectedRunId={selectedRunId}
                     onSelectRun={setSelectedRunId}
-                    appScope={appScope}
                     env={env}
                 />
+            )}
+            </>
             )}
         </PageLayout>
     );
@@ -690,9 +739,9 @@ function SuiteCard({
                     <Icon />
                 </div>
                 {latest && (
-                    <Badge appearance="filled" color={statusToBadgeColor(latest.status)}>
+                    <StatusTag tone={statusTone(latest.status)}>
                         {t(`testSuitesPage.status.${latest.status}`)}
-                    </Badge>
+                    </StatusTag>
                 )}
             </div>
             <div>
@@ -719,20 +768,19 @@ function SuiteDetail({
     runs,
     selectedRunId,
     onSelectRun,
-    appScope,
     env,
 }: {
     suite: TestSuiteKey;
     runs: TestSuiteRun[];
     selectedRunId: string | null;
     onSelectRun: (id: string) => void;
-    appScope: TestAppScope;
     env: TestEnvironment;
 }) {
     const { t } = useTranslation();
     const styles = useStyles();
     const Icon = SUITE_ICONS[suite];
     const run = runs.find((r) => r.id === selectedRunId) ?? runs[0] ?? null;
+    const [reportError, setReportError] = useState(false);
 
     if (!run) {
         return (
@@ -743,7 +791,6 @@ function SuiteDetail({
                 <Text weight="semibold">{t("testSuitesPage.notWiredTitle")}</Text>
                 <Text className={styles.detailNote}>
                     {t("testSuitesPage.notWiredBody", {
-                        app: t(`testSuitesPage.appOptions.${appScope}`),
                         env: t(`testSuitesPage.envOptions.${env}`),
                     })}
                 </Text>
@@ -761,54 +808,40 @@ function SuiteDetail({
                     <div>
                         <Title2 as="h2">{t(`testSuitesPage.suites.${suite}.full`)}</Title2>
                         <div className={styles.detailSub}>
-                            <Badge appearance="filled" color={statusToBadgeColor(run.status)}>
+                            <StatusTag tone={statusTone(run.status)}>
                                 {t(`testSuitesPage.status.${run.status}`)}
-                            </Badge>
-                            <Text font="monospace" size={200}>
+                            </StatusTag>
+                            <Text font="monospace" size={200} className={styles.detailBranch} title={run.branch}>
                                 {run.branch}
                             </Text>
-                            <span>&middot;</span>
-                            <Text font="monospace" size={200}>
-                                {run.commitSha}
-                            </Text>
-                            <span>&middot;</span>
-                            <Text font="monospace" size={200}>
-                                {run.id}
-                            </Text>
+                            {run.commitSha && (
+                                <>
+                                    <span>&middot;</span>
+                                    <Text font="monospace" size={200} title={run.commitSha}>
+                                        {run.commitSha.slice(0, 7)}
+                                    </Text>
+                                </>
+                            )}
                             <span>&middot;</span>
                             <span>{formatDateTime(run.startedAt)}</span>
                         </div>
-                        {run.linkedRunId && (
-                            <Text className={styles.detailNote} block>
-                                {suite === "nrt"
-                                    ? t("testSuitesPage.linkedNoteNrt")
-                                    : t("testSuitesPage.linkedNoteA11y", { runId: run.linkedRunId })}
-                            </Text>
-                        )}
                     </div>
                 </div>
                 <div className={styles.reportCta}>
                     <Button
-                        as="a"
-                        href={reportHref(run.reportFile)}
-                        target="_blank"
-                        rel="noreferrer"
                         appearance="primary"
                         icon={<OpenRegular />}
+                        onClick={() => {
+                            setReportError(false);
+                            openTestSuiteReport(run).catch(() => setReportError(true));
+                        }}
                     >
                         {t("testSuitesPage.openReport", { file: run.reportFile })}
                     </Button>
-                    {run.reportFileIt && (
-                        <Button
-                            as="a"
-                            href={reportHref(run.reportFileIt)}
-                            target="_blank"
-                            rel="noreferrer"
-                            appearance="secondary"
-                            icon={<OpenRegular />}
-                        >
-                            {t("testSuitesPage.openReportIt", { file: run.reportFileIt })}
-                        </Button>
+                    {reportError && (
+                        <Text className={styles.detailNote} style={{ color: tokens.colorPaletteRedForeground1 }}>
+                            {t("testSuitesPage.openReportError")}
+                        </Text>
                     )}
                     <Text className={styles.detailNote}>{t("testSuitesPage.renderedBy", { tool: run.reportTool })}</Text>
                 </div>
@@ -816,9 +849,7 @@ function SuiteDetail({
 
             <div className={styles.gridTwo}>
                 <div>
-                    {suite === "nrt" && run.nrt && <NrtDetail run={run} runs={runs} />}
-                    {suite === "a11y" && run.a11y && <A11yDetail detail={run.a11y} />}
-                    {suite === "dast" && run.dast && <DastDetail detail={run.dast} />}
+                    {run.nrt && <NrtDetail run={run} runs={runs} />}
                 </div>
                 <RunsList runs={runs} selectedId={run.id} onSelect={onSelectRun} />
             </div>
@@ -830,16 +861,31 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
     const { t } = useTranslation();
     const styles = useStyles();
     const detail = run.nrt!;
-    const pct = Math.round((detail.passed / detail.totalTests) * 1000) / 10;
+    // a11y/security runs carry team: tag data instead of a meaningful
+    // domain breakdown (see buildTeamSummary) - prefer it over domains when
+    // present rather than showing both.
+    const hasTeams = (detail.teams?.length ?? 0) > 0;
     const durationLabel = `${Math.round(detail.durationMs / 60000)}m ${Math.round((detail.durationMs % 60000) / 1000)}s`;
 
     const trendRuns = runs.slice(0, TREND_RUN_COUNT).filter((r) => r.nrt).reverse();
+
+    // See realNrtTests/nrtPassRate above for why these exclude setup/*
+    // scaffolding specs instead of trusting detail.totalTests/.passed.
+    const realTests = realNrtTests(detail);
+    const pct = nrtPassRate(detail);
+
+    // Clicking a row in the domain/team breakdown filters the Test list
+    // below to just that group - toggled off by clicking the same row again.
+    const [rowFilter, setRowFilter] = useState<string | null>(null);
+    const filteredTests = realTests.filter(
+        (test) => !rowFilter || (hasTeams ? test.app : test.domain) === rowFilter
+    );
 
     return (
         <div>
                 <div className={styles.statRow}>
                     <StatTile value={`${pct}%`} label={t("testSuitesPage.nrt.passRate")} />
-                    <StatTile value={detail.totalTests} label={t("testSuitesPage.nrt.totalTests")} />
+                    <StatTile value={realTests.length} label={t("testSuitesPage.nrt.totalTests")} />
                     <StatTile value={detail.flaky} label={t("testSuitesPage.nrt.flaky")} />
                     <StatTile value={durationLabel} label={t("testSuitesPage.nrt.duration")} />
                 </div>
@@ -850,7 +896,8 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                     </div>
                     <div className={styles.trendBars}>
                         {trendRuns.map((r) => {
-                            const rPct = Math.max((r.nrt!.passed / r.nrt!.totalTests) * 100, 8);
+                            const rRatePct = nrtPassRate(r.nrt!);
+                            const rPct = Math.max(rRatePct, 8);
                             const color =
                                 r.status === "bad"
                                     ? tokens.colorPaletteRedForeground1
@@ -862,7 +909,7 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                     key={r.id}
                                     className={styles.trendBar}
                                     style={{ height: `${rPct}%`, backgroundColor: color }}
-                                    title={`${Math.round((r.nrt!.passed / r.nrt!.totalTests) * 1000) / 10}%`}
+                                    title={`${rRatePct}%`}
                                 />
                             );
                         })}
@@ -871,13 +918,15 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
 
                 <Card className={styles.card}>
                     <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.nrt.domainsTitle")}</span>
+                        <span>{t(hasTeams ? "testSuitesPage.nrt.teamsTitle" : "testSuitesPage.nrt.domainsTitle")}</span>
                         <span className={styles.cardTitleHint}>{detail.totalTests}</span>
                     </div>
                     <table className={styles.table}>
                         <thead>
                             <tr>
-                                <th className={styles.tableHeadCell}>{t("testSuitesPage.nrt.domainCol")}</th>
+                                <th className={styles.tableHeadCell}>
+                                    {t(hasTeams ? "testSuitesPage.nrt.teamCol" : "testSuitesPage.nrt.domainCol")}
+                                </th>
                                 <th className={styles.tableHeadCell} style={{ textAlign: "right" }}>
                                     {t("testSuitesPage.nrt.passedCol")}
                                 </th>
@@ -890,11 +939,16 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {detail.domains.map((d: NrtDomainResult) => (
-                                <tr key={d.domain}>
-                                    <td className={styles.tableCell}>
-                                        {d.domain} — {d.label}
-                                    </td>
+                            {(hasTeams ? detail.teams! : detail.domains).map((d: NrtDomainResult) => (
+                                <tr
+                                    key={d.domain}
+                                    className={mergeClasses(
+                                        styles.tableRowClickable,
+                                        rowFilter === d.domain && styles.tableRowSelected
+                                    )}
+                                    onClick={() => setRowFilter((current) => (current === d.domain ? null : d.domain))}
+                                >
+                                    <td className={styles.tableCell}>{hasTeams ? d.label : d.domain}</td>
                                     <td className={styles.tableCellNum}>{d.passed}</td>
                                     <td className={styles.tableCellNum}>{d.total}</td>
                                     <td className={styles.tableCellNum}>{d.flaky}</td>
@@ -904,20 +958,24 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                     </table>
                 </Card>
 
-                {detail.tests && detail.tests.length > 0 && (
+                {realTests.length > 0 && (
                     <Card className={styles.card}>
                         <div className={styles.cardTitle}>
                             <span>{t("testSuitesPage.nrt.testsTitle")}</span>
-                            <span className={styles.cardTitleHint}>{detail.tests.length}</span>
+                            <span className={styles.cardTitleHint}>
+                                {rowFilter ? `${filteredTests.length} / ${realTests.length}` : realTests.length}
+                            </span>
                         </div>
                         <Accordion collapsible>
-                            {detail.tests.map((test, i) => (
+                            {filteredTests.map((test, i) => {
+                                const history = historyForTest(test, runs);
+                                return (
                                 <AccordionItem key={`${test.title}-${i}`} value={i}>
                                     <AccordionHeader expandIconPosition="end">
                                         <div className={styles.testHeaderRow}>
-                                            <Badge appearance="filled" color={statusToBadgeColor(test.status === "failed" ? "bad" : test.status === "skipped" ? "warn" : "good")}>
+                                            <StatusTag tone={statusTone(test.status === "failed" ? "bad" : test.status === "skipped" ? "warn" : "good")}>
                                                 {t(`testSuitesPage.nrt.testStatus.${test.status}`)}
-                                            </Badge>
+                                            </StatusTag>
                                             <Text className={styles.testTitle}>{test.title}</Text>
                                             <Text className={styles.findingMeta} font="monospace">
                                                 {test.domain}
@@ -925,6 +983,9 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                         </div>
                                     </AccordionHeader>
                                     <AccordionPanel>
+                                        <Text className={styles.findingMeta} font="monospace" block>
+                                            {test.file}
+                                        </Text>
                                         {test.steps.length === 0 ? (
                                             <Text className={styles.detailNote}>{t("testSuitesPage.nrt.noSteps")}</Text>
                                         ) : (
@@ -937,153 +998,49 @@ function NrtDetail({ run, runs }: { run: TestSuiteRun; runs: TestSuiteRun[] }) {
                                                 ))}
                                             </ol>
                                         )}
+
+                                        {history.length > 0 && (
+                                            <div className={styles.testHistorySection}>
+                                                <Text weight="semibold" size={200}>
+                                                    {t("testSuitesPage.nrt.historyTitle", { count: history.length })}
+                                                </Text>
+                                                <table className={styles.table}>
+                                                    <thead>
+                                                        <tr>
+                                                            <th className={styles.tableHeadCell}>{t("testSuitesPage.nrt.historyDateCol")}</th>
+                                                            <th className={styles.tableHeadCell}>{t("testSuitesPage.nrt.historyOutcomeCol")}</th>
+                                                            <th className={styles.tableHeadCell} style={{ textAlign: "right" }}>
+                                                                {t("testSuitesPage.nrt.historyDurationCol")}
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {history.map((point) => (
+                                                            <tr key={point.runId}>
+                                                                <td className={styles.tableCell}>{formatDateTime(point.date)}</td>
+                                                                <td className={styles.tableCell}>
+                                                                    <StatusTag
+                                                                        tone={statusTone(
+                                                                            point.outcome === "failed" ? "bad" : point.outcome === "skipped" ? "warn" : "good"
+                                                                        )}
+                                                                    >
+                                                                        {t(`testSuitesPage.nrt.testStatus.${point.outcome}`)}
+                                                                    </StatusTag>
+                                                                </td>
+                                                                <td className={styles.tableCellNum}>{(point.durationMs / 1000).toFixed(1)}s</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
                                     </AccordionPanel>
                                 </AccordionItem>
-                            ))}
+                                );
+                            })}
                         </Accordion>
                     </Card>
                 )}
-        </div>
-    );
-}
-
-function A11yDetail({ detail }: { detail: NonNullable<TestSuiteRun["a11y"]> }) {
-    const { t } = useTranslation();
-    const styles = useStyles();
-    const [onlyFailed, setOnlyFailed] = useState(false);
-    const max = Math.max(detail.critical, detail.serious, detail.moderate, detail.minor, 1);
-    const failedSteps = detail.steps.filter((s) => s.violations > 0 || s.incomplete > 0);
-    const visibleSteps = onlyFailed ? failedSteps : detail.steps;
-
-    return (
-        <div>
-                <div className={styles.statRow}>
-                    <StatTile value={detail.violations} label={t("testSuitesPage.a11y.violations")} />
-                    <StatTile value={detail.incomplete} label={t("testSuitesPage.a11y.incomplete")} />
-                    {detail.passes != null && <StatTile value={detail.passes} label={t("testSuitesPage.a11y.passes")} />}
-                    <StatTile value={detail.stepsScanned} label={t("testSuitesPage.a11y.stepsScanned")} />
-                </div>
-
-                {/* This summary only has the counts/rule ids axe-data-*.json
-                    carries - no screenshots or DOM context, which only the
-                    generated report itself has (see the "Open ..." button
-                    above). */}
-                <Text className={styles.detailNote} block>
-                    {t("testSuitesPage.a11y.moreInfoNote")}
-                </Text>
-
-                <Card className={styles.card}>
-                    <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.a11y.impactTitle")}</span>
-                    </div>
-                    <SeverityBar label={t("testSuitesPage.a11y.impact.critical")} count={detail.critical} max={max} color={tokens.colorPaletteRedForeground1} />
-                    <SeverityBar label={t("testSuitesPage.a11y.impact.serious")} count={detail.serious} max={max} color={tokens.colorPaletteRedForeground1} />
-                    <SeverityBar label={t("testSuitesPage.a11y.impact.moderate")} count={detail.moderate} max={max} color={tokens.colorPaletteMarigoldForeground1} />
-                    <SeverityBar label={t("testSuitesPage.a11y.impact.minor")} count={detail.minor} max={max} color={tokens.colorNeutralForeground3} />
-                </Card>
-
-                <Card className={styles.card}>
-                    <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.a11y.stepsTitle")}</span>
-                        <span className={styles.cardTitleHint}>
-                            {t("testSuitesPage.a11y.stepsShown", { shown: visibleSteps.length, total: detail.steps.length })}
-                        </span>
-                    </div>
-                    <Switch
-                        checked={onlyFailed}
-                        onChange={(_, data) => setOnlyFailed(data.checked)}
-                        label={t("testSuitesPage.a11y.onlyFailedSteps", { count: failedSteps.length })}
-                    />
-                    {visibleSteps.length === 0 && (
-                        <Text className={styles.detailNote}>{t("testSuitesPage.a11y.noFailedSteps")}</Text>
-                    )}
-                    {visibleSteps.map((step) => {
-                        const stepFailed = step.violations > 0 || step.incomplete > 0;
-                        return (
-                            <div key={step.label} className={styles.stepBlock}>
-                                <div className={styles.stepHeader}>
-                                    <Text className={styles.stepLabel} font="monospace">{step.label}</Text>
-                                    <Badge appearance="filled" color={stepFailed ? "danger" : "success"}>
-                                        {stepFailed
-                                            ? t("testSuitesPage.a11y.stepFailed", { violations: step.violations, incomplete: step.incomplete })
-                                            : t("testSuitesPage.a11y.stepClean")}
-                                    </Badge>
-                                </div>
-                                {step.rules.map((rule: A11yRuleViolation) => (
-                                    <div key={rule.ruleId} className={styles.findingRow}>
-                                        <div className={styles.findingTop}>
-                                            <a
-                                                className={styles.findingId}
-                                                href={`https://dequeuniversity.com/rules/axe/4.12/${rule.ruleId}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                {rule.ruleId}
-                                            </a>
-                                            <Badge appearance="filled" color={impactToBadgeColor(rule.impact)}>
-                                                {t(`testSuitesPage.a11y.impact.${rule.impact}`)}
-                                            </Badge>
-                                            <span className={styles.findingMeta}>&times; {rule.count}</span>
-                                        </div>
-                                        <Text className={styles.findingTitle} block>
-                                            {rule.description}
-                                        </Text>
-                                    </div>
-                                ))}
-                            </div>
-                        );
-                    })}
-                </Card>
-        </div>
-    );
-}
-
-function DastDetail({ detail }: { detail: NonNullable<TestSuiteRun["dast"]> }) {
-    const { t } = useTranslation();
-    const styles = useStyles();
-    const max = Math.max(detail.high, detail.medium, detail.low, detail.informational, 1);
-
-    return (
-        <div>
-                <div className={styles.statRow}>
-                    <StatTile value={detail.riskScore} label={t("testSuitesPage.dast.riskScore")} />
-                    <StatTile
-                        value={detail.high + detail.medium + detail.low + detail.informational}
-                        label={t("testSuitesPage.dast.openAlerts")}
-                    />
-                    <StatTile value={detail.endpointsScanned} label={t("testSuitesPage.dast.endpointsScanned")} />
-                    <StatTile value={detail.high} label={t("testSuitesPage.dast.highRisk")} />
-                </div>
-
-                <Card className={styles.card}>
-                    <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.dast.riskTitle")}</span>
-                    </div>
-                    <SeverityBar label={t("testSuitesPage.dast.risk.High")} count={detail.high} max={max} color={tokens.colorPaletteRedForeground1} />
-                    <SeverityBar label={t("testSuitesPage.dast.risk.Medium")} count={detail.medium} max={max} color={tokens.colorPaletteMarigoldForeground1} />
-                    <SeverityBar label={t("testSuitesPage.dast.risk.Low")} count={detail.low} max={max} color={tokens.colorNeutralForeground3} />
-                    <SeverityBar label={t("testSuitesPage.dast.risk.Informational")} count={detail.informational} max={max} color={tokens.colorNeutralForeground3} />
-                </Card>
-
-                <Card className={styles.card}>
-                    <div className={styles.cardTitle}>
-                        <span>{t("testSuitesPage.dast.alertsTitle")}</span>
-                        <span className={styles.cardTitleHint}>{detail.alerts.length}</span>
-                    </div>
-                    {detail.alerts.map((alert: DastAlert, i: number) => (
-                        <div key={i} className={styles.findingRow}>
-                            <div className={styles.findingTop}>
-                                <Badge appearance="filled" color={riskToBadgeColor(alert.risk)}>
-                                    {t(`testSuitesPage.dast.risk.${alert.risk}`)}
-                                </Badge>
-                                <span className={styles.findingMeta}>{alert.target}</span>
-                            </div>
-                            <Text className={styles.findingTitle} block>
-                                {alert.title}
-                            </Text>
-                        </div>
-                    ))}
-                </Card>
         </div>
     );
 }
@@ -1116,18 +1073,24 @@ function RunsList({
                     >
                         <div className={styles.runTop}>
                             <span className={styles.runDate}>{formatDateTime(run.startedAt)}</span>
-                            {i === 0 ? (
-                                <Badge appearance="filled" color="brand">
-                                    {t("testSuitesPage.latest")}
-                                </Badge>
-                            ) : (
-                                <Badge appearance="filled" color={statusToBadgeColor(run.status)}>
+                            <div className={styles.runBadges}>
+                                {i === 0 && (
+                                    <Text size={200} weight="semibold" className={styles.runLatestTag}>
+                                        {t("testSuitesPage.latest")}
+                                    </Text>
+                                )}
+                                <StatusTag tone={statusTone(run.status)}>
                                     {t(`testSuitesPage.status.${run.status}`)}
-                                </Badge>
-                            )}
+                                </StatusTag>
+                            </div>
                         </div>
-                        <Text font="monospace" className={styles.runBranch}>
-                            {run.branch} &middot; {run.commitSha}
+                        <Text
+                            font="monospace"
+                            className={styles.runBranch}
+                            title={run.commitSha ? `${run.branch} · ${run.commitSha}` : run.branch}
+                        >
+                            {run.branch}
+                            {run.commitSha ? ` · ${run.commitSha.slice(0, 7)}` : ""}
                         </Text>
                     </button>
                 ))}

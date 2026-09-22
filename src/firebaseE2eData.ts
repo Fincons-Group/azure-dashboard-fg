@@ -1,5 +1,9 @@
 import { initializeApp, cert, getApps, type App } from "firebase-admin/app";
-import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import {
+    getFirestore,
+    type Firestore,
+    type QueryDocumentSnapshot,
+} from "firebase-admin/firestore";
 import type { E2eRun } from "./types.js";
 
 // Thrown when FIREBASE_SERVICE_ACCOUNT_JSON isn't set - distinct from a real
@@ -65,7 +69,9 @@ export async function getE2eRunHistory(limit = 30): Promise<E2eRun[]> {
         .limit(limit)
         .get();
 
-    const runs = snapshot.docs.map((doc) => doc.data() as E2eRun);
+    const runs = snapshot.docs.map(
+        (doc: QueryDocumentSnapshot) => doc.data() as E2eRun
+    );
 
     cache = { data: runs, timestamp: Date.now() };
 

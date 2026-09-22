@@ -282,6 +282,11 @@ export function SprintDefectReportTab({
   includeDeadline = true,
   enableEmailPreface = false,
   enableEmailClosing = false,
+  suggestedEmailPreface = "",
+  suggestedEmailPrefaceScopeKey = "",
+  suggestedEmailPrefaceRequestId = 0,
+  reportPublishingDisabled = false,
+  onReportPublished,
   project,
   extraKpis,
 }: {
@@ -300,10 +305,20 @@ export function SprintDefectReportTab({
   // Lets the sender type a free-text note below the card preview, appended
   // after the report in the sent email only (mirrors enableEmailPreface).
   enableEmailClosing?: boolean;
+  // Offered after comparing two Excel report exports of the same scope.
+  suggestedEmailPreface?: string;
+  suggestedEmailPrefaceScopeKey?: string;
+  // Incremented by an explicit "use in email" action; unlike automatic
+  // updates, this intentionally replaces text already edited by the sender.
+  suggestedEmailPrefaceRequestId?: number;
+  reportPublishingDisabled?: boolean;
+  // Called only after a report export completes or Graph confirms delivery.
+  // The dynamic report page uses it to advance the comparison baseline.
+  onReportPublished?: () => void;
   // Scopes the plan/plan-overview lookups below to a specific Azure DevOps
   // project.
   project?: string;
-  // The report's 4 additional KPIs (see ReportExtraKpis in types.ts) -
+  // The report's additional KPIs (see ReportExtraKpis in types.ts) -
   // fetched by the page (a separate, heavier query than `stats`) and
   // threaded through to the on-screen card and every export below so they
   // never drift apart on what "the report" includes.
@@ -401,6 +416,10 @@ export function SprintDefectReportTab({
   const [ccInput, setCcInput] = useState(DEFAULT_REPORT_CC.join(", "));
   const [fromDisplayName, setFromDisplayName] = useState("");
   const [emailPrefaceText, setEmailPrefaceText] = useState("");
+  const previousEmailSuggestionRef = useRef("");
+  const previousEmailSuggestionScopeRef = useRef(suggestedEmailPrefaceScopeKey);
+  const previousEmailSuggestionRequestRef = useRef(suggestedEmailPrefaceRequestId);
+  const emailPrefaceEditedRef = useRef(false);
   const [emailClosingText, setEmailClosingText] = useState("");
   const statusCardRef = useRef<HTMLDivElement>(null);
   const dashboardLinkRef = useRef<HTMLAnchorElement>(null);
@@ -413,6 +432,34 @@ export function SprintDefectReportTab({
   // Only height needs measuring - the card's own CSS pins its width to
   // STATUS_CARD_WIDTH, so it never varies; height does, with content.
   const [cardHeight, setCardHeight] = useState(0);
+
+  // Populate a proposal automatically until the sender edits or clears it.
+  // Changing report scope resets the field; an explicit request from the
+  // preview always replaces it.
+  useEffect(() => {
+    const scopeChanged =
+      suggestedEmailPrefaceScopeKey !== previousEmailSuggestionScopeRef.current;
+    const forceRequested =
+      suggestedEmailPrefaceRequestId !== previousEmailSuggestionRequestRef.current;
+
+    if (scopeChanged || forceRequested) {
+      setEmailPrefaceText(suggestedEmailPreface);
+      emailPrefaceEditedRef.current = false;
+    } else if (
+      suggestedEmailPreface !== previousEmailSuggestionRef.current &&
+      !emailPrefaceEditedRef.current
+    ) {
+      setEmailPrefaceText(suggestedEmailPreface);
+    }
+
+    previousEmailSuggestionRef.current = suggestedEmailPreface;
+    previousEmailSuggestionScopeRef.current = suggestedEmailPrefaceScopeKey;
+    previousEmailSuggestionRequestRef.current = suggestedEmailPrefaceRequestId;
+  }, [
+    suggestedEmailPreface,
+    suggestedEmailPrefaceRequestId,
+    suggestedEmailPrefaceScopeKey,
+  ]);
 
   useEffect(() => {
     const previewEl = statusCardPreviewRef.current;
@@ -692,6 +739,7 @@ export function SprintDefectReportTab({
         },
         t,
       );
+      onReportPublished?.();
     } finally {
       setIsExportingCard(false);
     }
@@ -734,6 +782,7 @@ export function SprintDefectReportTab({
         },
         t,
       );
+      onReportPublished?.();
     } finally {
       setIsExportingPptx(false);
     }
@@ -757,6 +806,7 @@ export function SprintDefectReportTab({
       },
       t,
     );
+    onReportPublished?.();
   };
 
   const handleCopyStatusCardHtml = async () => {
@@ -777,12 +827,15 @@ export function SprintDefectReportTab({
       t,
     );
 
+    onReportPublished?.();
+
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
 
   const emailReportMutation = useMutation({
     mutationFn: sendGraphMailReport,
+    onSuccess: () => onReportPublished?.(),
   });
 
   const toAddresses = parseAddressList(toInput);
@@ -886,7 +939,9 @@ export function SprintDefectReportTab({
               appearance="primary"
               icon={<MailRegular />}
               disabled={
-                emailReportMutation.isPending || toAddresses.length === 0
+                reportPublishingDisabled ||
+                emailReportMutation.isPending ||
+                toAddresses.length === 0
               }
               onClick={handleSendStatusCardEmail}
             >
@@ -919,6 +974,17 @@ export function SprintDefectReportTab({
               "defectManagementPage.sprintReport.statusCard.emailPrefaceLabel",
             )}
           </Text>
+          {suggestedEmailPreface && (
+            <Button
+              appearance="secondary"
+              onClick={() => {
+                emailPrefaceEditedRef.current = false;
+                setEmailPrefaceText(suggestedEmailPreface);
+              }}
+            >
+              {t("dynamicSprintReportPage.followUp.useSuggestion")}
+            </Button>
+          )}
           <Textarea
             className={styles.emailPrefaceTextarea}
             value={emailPrefaceText}
@@ -927,7 +993,10 @@ export function SprintDefectReportTab({
             )}
             rows={3}
             resize="vertical"
-            onChange={(_, data) => setEmailPrefaceText(data.value)}
+            onChange={(_, data) => {
+              emailPrefaceEditedRef.current = true;
+              setEmailPrefaceText(data.value);
+            }}
           />
         </div>
       )}
@@ -1151,7 +1220,7 @@ export function SprintDefectReportTab({
           <Button
             appearance="secondary"
             icon={<ArrowDownloadRegular />}
-            disabled={isExportingCard}
+            disabled={reportPublishingDisabled || isExportingCard}
             onClick={handleExportStatusCard}
           >
             {isExportingCard
@@ -1162,7 +1231,7 @@ export function SprintDefectReportTab({
           <Button
             appearance="secondary"
             icon={<SlideTextRegular />}
-            disabled={isExportingPptx}
+            disabled={reportPublishingDisabled || isExportingPptx}
             onClick={handleExportStatusCardPptx}
           >
             {isExportingPptx
@@ -1175,6 +1244,7 @@ export function SprintDefectReportTab({
           <Button
             appearance="secondary"
             icon={<CodeTextRegular />}
+            disabled={reportPublishingDisabled}
             onClick={handleDownloadStatusCardHtml}
           >
             {t(
@@ -1187,6 +1257,7 @@ export function SprintDefectReportTab({
             icon={
               isCopied ? <ClipboardCheckmarkRegular /> : <ClipboardRegular />
             }
+            disabled={reportPublishingDisabled}
             onClick={handleCopyStatusCardHtml}
           >
             {t(

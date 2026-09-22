@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express, { type Response } from "express";
 import cors from "cors";
+import axios from "axios";
 import {
     AzdoAuthError,
     AzdoConfigError,
@@ -9,6 +10,7 @@ import {
     getIterations,
     getAreaPaths,
     getProjects,
+    getSuites,
     runWithAzdoConfig,
 } from "./azdo.js";
 import {
@@ -41,12 +43,29 @@ import {
     getAutomationKpis,
     clearAutomationKpiCache,
 } from "./automationKpiData.js";
+import {
+    getQaControlCenter,
+    clearQaControlCenterCache,
+} from "./qaControlCenterData.js";
 import { computeReportExtraKpis } from "./reportExtraKpis.js";
 import {
     getE2eRunHistory,
     clearE2eHistoryCache,
     FirebaseConfigError,
 } from "./firebaseE2eData.js";
+import {
+    getTestSuiteRuns,
+    clearTestSuiteRunsCache,
+    getSignedReportFileUrl,
+} from "./firebaseTestSuitesData.js";
+import {
+    getSpecCatalog,
+    clearSpecCatalogCache,
+} from "./testSpecCatalogData.js";
+import {
+    sendBugsCreatedTodayReport,
+    sendVerificaCheck,
+} from "./notificationTriggers.js";
 
 const app = express();
 
@@ -67,18 +86,24 @@ if (process.env.E2E_REPORTS_DIR) {
     app.use("/e2e-reports", express.static(process.env.E2E_REPORTS_DIR));
 }
 
-// Same dev convenience as E2E_REPORTS_DIR above, for the NRT/A11Y/DAST Test
+// Same dev convenience as E2E_REPORTS_DIR above, for the NRT/A11Y/Security Test
 // Suites hub: point this at a local tst-e2e checkout's `reports/` folder
 // (the parent of its runs/, a11y/, and zap/ subfolders) so TestSuitesPage's
 // "Open ..." links resolve to the real smart-report.html / a11y/index.html /
-// ZAP report instead of a dead button. That page's run data is still a
-// client-side mock (see client/src/data/testSuitesMockData.ts) - this only
-// serves the static report files the mock's reportFile paths point at.
+// ZAP report instead of a dead button, for runs whose Firestore document
+// (see firebaseTestSuitesData.ts) has no reportUrl of its own yet - this
+// only serves the static files reportFile's relative paths point at.
 if (process.env.TEST_SUITES_REPORTS_DIR) {
     app.use("/test-suites-reports", express.static(process.env.TEST_SUITES_REPORTS_DIR));
 }
 
-app.use((req, res, next) => {
+// Scoped to /api - the static report routes above (and any request that
+// falls through them, e.g. a missing E2E_REPORTS_DIR/TEST_SUITES_REPORTS_DIR
+// file) never call Azure DevOps at all, so they shouldn't need a PAT to
+// resolve. Without this scoping, an unconfigured/missing report file used to
+// fall through to this gate and surface a confusing "Missing Azure DevOps
+// PAT" error instead of a plain 404.
+app.use("/api", (req, res, next) => {
     runWithAzdoConfig(
         {
             pat: req.header("x-ado-pat") ?? undefined,
@@ -86,9 +111,9 @@ app.use((req, res, next) => {
             project: req.header("x-ado-project") ?? undefined,
         },
         () => {
-            // Gate every route behind the PAT's owner, not just the ones
-            // that happen to call azdo.ts - a request must resolve to an
-            // allowed account before it can reach any handler below.
+            // Gate every /api route behind the PAT's owner, not just the
+            // ones that happen to call azdo.ts - a request must resolve to
+            // an allowed account before it can reach any handler below.
             assertAllowedDomain()
                 .then(next)
                 .catch((error) => sendApiError(res, error));
@@ -100,7 +125,24 @@ app.use((req, res, next) => {
 // revoked) - surface it as 502 Bad Gateway so the client can tell it apart
 // from an ordinary server-side bug and show a specific, actionable message.
 function sendApiError(res: Response, error: any): void {
-    console.error(error);
+    // Never log the raw error: every azdo.ts client carries the shared PAT
+    // as a default Authorization header (createAzdoClient), and Node prints
+    // an AxiosError's own enumerable properties - including `config.headers`
+    // - alongside its stack trace. Logging the raw object would leak the PAT
+    // to server logs on every ordinary Azure DevOps hiccup. Mirrors the safe
+    // logging shape already used by azdo.ts's fetchAuthenticatedEmail.
+    if (axios.isAxiosError(error)) {
+        console.error({
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data,
+            url: error.config?.baseURL
+                ? error.config.baseURL + (error.config?.url ?? "")
+                : error.config?.url,
+        });
+    } else {
+        console.error(error);
+    }
 
     if (error instanceof AzdoAuthError) {
         res.status(502).json({ message: error.message });
@@ -187,8 +229,51 @@ app.get("/api/plans/:planId/overview", async (req, res) => {
     }
 });
 
+app.get("/api/plans/:planId/suites", async (req, res) => {
+    try {
+        const planId = Number(req.params.planId);
+        const project = req.query.project as string | undefined;
+        const suites = await getSuites(planId, project);
+
+        res.json(
+            suites.map((suite: any) => ({
+                id: suite.id,
+                name: suite.name,
+                parentId: suite.parentSuite?.id,
+            }))
+        );
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+// Replicates the "QA Control Center" ADO dashboard widget (see
+// qaControlCenterData.ts for the full port) - ADO blocks that dashboard from
+// being framed here (X-Frame-Options: SAMEORIGIN, see TeamDashboardPage.tsx),
+// so this renders the same execution-velocity/forecast/workload model
+// natively instead, for any plan+suite rather than the one fixed instance.
+app.get("/api/qa-control-center", async (req, res) => {
+    try {
+        const planId = Number(req.query.planId);
+        const suiteId = Number(req.query.suiteId);
+        const project = req.query.project as string | undefined;
+        const includeChildren = req.query.includeChildren !== "false";
+
+        if (!planId || !suiteId) {
+            res.status(400).json({ message: "planId and suiteId are required." });
+            return;
+        }
+
+        res.json(
+            await getQaControlCenter(planId, suiteId, project, includeChildren)
+        );
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
 // Companion endpoint to /api/defects + /api/plans/:planId/overview for the
-// Sprint Report's 4 additional KPIs - kept as its own route (rather than
+// Sprint Report's additional KPIs - kept as its own route (rather than
 // folded into either response) because firstExecutionPassRate requires
 // enumerating Azure DevOps test run history, which is heavier than
 // everything else the report fetches and benefits from its own cache and
@@ -276,6 +361,73 @@ app.get("/api/e2e-history", async (req, res) => {
     }
 });
 
+// Same "not configured" shape as /api/e2e-history above - lets TestSuitesPage
+// show a setup hint instead of an error banner when FIREBASE_SERVICE_ACCOUNT_JSON
+// isn't set.
+app.get("/api/test-suites", async (_req, res) => {
+    try {
+        res.json({
+            runs: await getTestSuiteRuns(),
+            configured: true,
+        });
+    } catch (error: any) {
+        if (error instanceof FirebaseConfigError) {
+            res.json({ runs: [], configured: false });
+            return;
+        }
+
+        sendApiError(res, error);
+    }
+});
+
+// Backs TestSuiteRun.reportUrl (see its comment in types.ts) - sits behind
+// /api's assertAllowedDomain() gate above like every other route, so it
+// needs the same PAT header as any other API call, not just a knowable URL.
+// Returns a fresh short-lived signed URL rather than redirecting straight to
+// Storage, since the client can't follow a redirect through a plain <a
+// href> without losing that PAT-based gate - see TestSuitesPage.tsx's
+// report button.
+const REPORT_FILENAME_ALLOWLIST = new Set([
+    "smart-report.html",
+    "smart-report.pdf",
+    "smart-report-dark.pdf",
+    "smart-report-minimal.pdf",
+]);
+
+app.get("/api/test-suites-reports/runs/:runId/:filename", async (req, res) => {
+    if (!REPORT_FILENAME_ALLOWLIST.has(req.params.filename)) {
+        res.status(404).json({ message: "Unknown report file." });
+        return;
+    }
+
+    try {
+        const url = await getSignedReportFileUrl(req.params.runId, req.params.filename);
+
+        if (!url) {
+            res.status(404).json({ message: "Report not found." });
+            return;
+        }
+
+        res.json({ url });
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+// "As they are" spec-file inventory (see testSpecCatalogData.ts) - NRT/A11Y/
+// Security tabs of real Playwright spec files from the tst-e2e checkout,
+// each with whatever run history/errors are available. "configured" here
+// means the spec-path list has been published to Firestore (see
+// scripts/publish-spec-catalog.js) - independent of the Azure DevOps gate
+// this route sits behind, which only affects the title-enrichment lookup.
+app.get("/api/test-spec-catalog", async (req, res) => {
+    try {
+        res.json(await getSpecCatalog(req.query.project as string | undefined));
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
 app.get("/api/defects", async (req, res) => {
     try {
         const project = req.query.project as string | undefined;
@@ -357,8 +509,54 @@ app.post("/api/refresh", (_, res) => {
     clearCycleTimeCache();
     clearAutomationKpiCache();
     clearE2eHistoryCache();
+    clearTestSuiteRunsCache();
+    clearSpecCatalogCache();
+    clearQaControlCenterCache();
 
     res.status(200).json({ refreshed: true });
+});
+
+// Triggered by an external scheduler (see functions/) rather than a browser,
+// so it sits outside the /api PAT-forwarding gate above - it runs against
+// this server's own AZDO_PAT env var (see getCurrentConfig's fallback in
+// azdo.ts), not a per-request header. Gated by a shared secret instead of a
+// PAT/domain check since there's no end-user identity here to check against.
+function requireCronSecret(req: express.Request, res: Response): boolean {
+    const expected = process.env.INTERNAL_CRON_SECRET;
+
+    if (!expected) {
+        res.status(503).json({
+            message: "INTERNAL_CRON_SECRET is not configured on this server.",
+        });
+        return false;
+    }
+
+    if (req.header("x-cron-secret") !== expected) {
+        res.status(401).json({ message: "Invalid cron secret." });
+        return false;
+    }
+
+    return true;
+}
+
+app.post("/internal/notify/bugs-created-today", async (req, res) => {
+    if (!requireCronSecret(req, res)) return;
+
+    try {
+        res.json(await sendBugsCreatedTodayReport());
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
+});
+
+app.post("/internal/notify/verifica-check", async (req, res) => {
+    if (!requireCronSecret(req, res)) return;
+
+    try {
+        res.json(await sendVerificaCheck());
+    } catch (error: any) {
+        sendApiError(res, error);
+    }
 });
 
 const port = Number(process.env.PORT) || 3000;

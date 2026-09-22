@@ -9,6 +9,7 @@ import { E2ePassRateTrendChart } from "../components/E2eHistoryCharts";
 import { PaginationControls } from "../components/PaginationControls";
 import { usePagination } from "../hooks/usePagination";
 import { fetchE2eHistory } from "../api/client";
+import { CARD_RADIUS } from "../layoutConstants";
 
 const TABLE_PAGE_SIZE = 8;
 
@@ -23,6 +24,8 @@ const useStyles = makeStyles({
         alignItems: "center",
         textAlign: "center",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     placeholderIcon: {
         fontSize: "32px",
@@ -45,6 +48,8 @@ const useStyles = makeStyles({
         borderTopWidth: "3px",
         borderTopStyle: "solid",
         borderTopColor: tokens.colorBrandStroke1,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     statValue: {
         fontSize: "24px",
@@ -60,6 +65,12 @@ const useStyles = makeStyles({
         display: "flex",
         flexDirection: "column",
         gap: tokens.spacingVerticalS,
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
+    },
+    tableCard: {
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
     },
     chartTitle: {
         fontSize: "14px",
@@ -198,7 +209,7 @@ export function E2eHistoryPage() {
                         </Card>
                     )}
 
-                    <Card>
+                    <Card className={styles.tableCard}>
                         <Text className={styles.tableCardTitle}>
                             {t("e2eHistoryPage.table.title")}
                         </Text>

@@ -164,6 +164,38 @@ export interface AutomationKpiResponse {
   flakyTests: FlakyTestRankItem[];
 }
 
+export interface TestCatalogRunEntry {
+  outcome: string;
+  completedDate: string;
+  browser?: string;
+}
+
+export interface TestCatalogErrorGroup {
+  message: string;
+  count: number;
+}
+
+// One row per real Playwright spec file, keyed by its repo-relative path -
+// see server-side mirror in src/types.ts for the full rationale. Specs with
+// no ADO automation linkage (or, for NRT, no published run yet) still show
+// up with testCaseId/testCaseTitle unset and empty lastRuns/topErrors.
+export interface TestCatalogRow {
+  specPath: string;
+  specFile: string;
+  testCaseId?: number;
+  testCaseTitle?: string;
+  browsers: string[];
+  lastRuns: TestCatalogRunEntry[];
+  topErrors: TestCatalogErrorGroup[];
+}
+
+export interface TestSpecCatalogResponse {
+  configured: boolean;
+  nrt: TestCatalogRow[];
+  a11y: TestCatalogRow[];
+  security: TestCatalogRow[];
+}
+
 export interface DashboardStats {
   areaPaths: string[];
   suites: string[];
@@ -651,7 +683,7 @@ export interface ReportExtraKpis {
     uatSteps: number | null;
   };
   avgFixTimeBusinessDays: number | null;
-  criticalHighBugPct: number | null;
+  criticalDefectRatePct: number | null;
   testPlanCorrectnessPct: number;
   bugReopenRate: number | null;
   avgClosingTimeBusinessDays: number | null;
@@ -665,18 +697,20 @@ export interface IterationNode {
   finishDate: string | null;
 }
 
-// The NRT/A11Y/DAST test-suite hub (TestSuitesPage). Mock data for now (see
-// data/testSuitesMockData.ts) - there's no backend endpoint yet for these
-// three suites, unlike E2eRun above which already reads from Firestore.
-// Kept as real types (not inlined in the page) so the eventual API can slot
-// in behind the same shape.
-export type TestSuiteKey = "nrt" | "a11y" | "dast";
+// The NRT/A11Y/Security test-suite hub (TestSuitesPage) - reads from GET
+// /api/test-suites (see src/firebaseTestSuitesData.ts), same "not configured
+// yet" shape as E2eHistoryResponse below.
+// "security" reuses NrtRunDetail on TestSuiteRun.nrt (Playwright
+// type:security-tagged spec results) - see server-side mirror in
+// src/types.ts for the full rationale. DAST (ZAP dynamic scan) was removed
+// as a separate suite - considered redundant with this functional coverage.
+export type TestSuiteKey = "nrt" | "a11y" | "security";
 
 // Which product the run covers. "plurifond"/"frontOfficeAuto" mirror the
 // Area Path leaf names used elsewhere (see seedPresets() in
 // useExcelExportPresets.ts: "Nuova Frontiera\\Plurifond" and
 // "...\\Front Office Auto\\..."). "all" is a full regression run that
-// exercises every app together in one pass - NRT/A11Y/DAST runs are not
+// exercises every app together in one pass - NRT/A11Y/Security runs are not
 // always scoped to a single app.
 export type TestAppScope = "plurifond" | "frontOfficeAuto" | "all";
 
@@ -712,6 +746,14 @@ export interface NrtTestResult {
   status: "passed" | "failed" | "skipped";
   durationMs: number;
   steps: NrtTestStep[];
+  errorMessage?: string;
+  kind?: "nrt" | "a11y" | "security";
+  testCaseId?: number;
+  browser?: string;
+  // Product this a11y/security spec belongs to, parsed from its own
+  // "team:front-office-auto-sp1"/"team:plurifonds-sp1" tag - NRT specs don't
+  // carry this tag and stay undefined (their run doc's own `app` is "all").
+  app?: TestAppScope;
 }
 
 export interface NrtRunDetail {
@@ -720,65 +762,15 @@ export interface NrtRunDetail {
   flaky: number;
   durationMs: number;
   domains: NrtDomainResult[];
+  // Same shape as `domains`, grouped by product (Front Office Auto /
+  // Plurifonds) instead - only a11y/security tests carry the team: tag this
+  // is built from (see NrtTestResult.app), so this is empty for nrt's own
+  // tests and for runs published before this field existed.
+  teams?: NrtDomainResult[];
   // Optional: older mock runs and any real run published before this field
   // existed won't have it - the UI should treat it as "no per-test detail
   // available" rather than an empty list.
   tests?: NrtTestResult[];
-}
-
-export interface A11yRuleViolation {
-  // axe-core rule id, e.g. "color-contrast" - see
-  // https://dequeuniversity.com/rules/axe/4.12/{ruleId}
-  ruleId: string;
-  impact: "critical" | "serious" | "moderate" | "minor";
-  count: number;
-  description: string;
-}
-
-// One axe-core scan target within a run - mirrors one
-// tst-e2e/reports/a11y/<run>/axe-data-<label>.json file (the wizard step or
-// dialog that got scanned, e.g. "comparto-initial").
-export interface A11yStepResult {
-  label: string;
-  violations: number;
-  incomplete: number;
-  critical: number;
-  serious: number;
-  moderate: number;
-  minor: number;
-  rules: A11yRuleViolation[];
-}
-
-export interface A11yRunDetail {
-  stepsScanned: number;
-  violations: number;
-  incomplete: number;
-  // Not present in the raw axe-data-*.json files (only violations/incomplete
-  // are persisted there) - undefined when this run's numbers were parsed
-  // from real report files rather than the aggregated a11y/index.html.
-  passes?: number;
-  critical: number;
-  serious: number;
-  moderate: number;
-  minor: number;
-  steps: A11yStepResult[];
-}
-
-export interface DastAlert {
-  // OWASP ZAP risk level - no "Critical" tier, unlike axe's impact scale.
-  risk: "High" | "Medium" | "Low" | "Informational";
-  title: string;
-  target: string;
-}
-
-export interface DastRunDetail {
-  endpointsScanned: number;
-  riskScore: number;
-  high: number;
-  medium: number;
-  low: number;
-  informational: number;
-  alerts: DastAlert[];
 }
 
 export interface TestSuiteRun {
@@ -792,21 +784,99 @@ export interface TestSuiteRun {
   commitSha?: string;
   startedAt: string;
   status: TestRunStatus;
-  // Filename of the generated report this run opens into (smart-report.html,
-  // a11y/index.html, or the dated ZAP report) - not a full URL yet, since
-  // there's nowhere public these are hosted until a backend exists.
+  // Filename of the generated report this run opens into
+  // (smart-report.html), relative to whatever local tst-e2e checkout
+  // TEST_SUITES_REPORTS_DIR points the server's /test-suites-reports static
+  // route at - a dev-only convenience (see src/server.ts) that 404s in
+  // every other deployment. reportUrl below is the real, hosted path once
+  // one exists.
   reportFile: string;
-  // ZAP's own report generator emits an English and an Italian HTML report
-  // side by side for the same scan (see reports/zap/ - one plain-named file,
-  // one with an "-IT-" suffix) - only ever set for suite "dast", where the
-  // UI renders a second "Open report" button for it.
-  reportFileIt?: string;
+  // Not a direct link - the report is uploaded privately to Firebase
+  // Storage (see scripts/publish-local-test-runs.js), so this is instead
+  // the gated /api/test-suites-reports/runs/<id>/<file> path to fetch (with
+  // the usual PAT header) for a short-lived signed URL. Preferred over
+  // reportFile/reportHref() when present - see openTestSuiteReport in
+  // TestSuitesPage.tsx.
+  reportUrl?: string;
   reportTool: string;
-  // NRT and A11Y specs can execute inside the very same Playwright run (the
-  // a11y-chrome project alongside the vit specs) - this cross-links the two
-  // suite entries that came from one run.
-  linkedRunId?: string;
   nrt?: NrtRunDetail;
-  a11y?: A11yRunDetail;
-  dast?: DastRunDetail;
+}
+
+export interface TestSuitesResponse {
+  runs: TestSuiteRun[];
+  // False when the server's FIREBASE_SERVICE_ACCOUNT_JSON isn't set yet.
+  configured: boolean;
+}
+
+export interface TestPlanSuiteSummary {
+  id: number;
+  name: string;
+  parentId?: number;
+}
+
+// See the server's QaControlCenterResponse in src/types.ts and
+// src/qaControlCenterData.ts for what this replicates and why.
+export type QaTrendStatus = "up" | "down" | "stable" | "limitedData";
+
+export interface QaControlCenterTrendDay {
+  date: string;
+  count: number;
+  forecast: boolean;
+}
+
+export interface QaControlCenterTeamMember {
+  key: string;
+  name: string;
+  assigned: number;
+  remaining: number;
+  effortHours: number;
+  completionPct: number;
+}
+
+export interface QaControlCenterResponse {
+  planId: number;
+  planName: string;
+  suiteId: number;
+  suiteName: string;
+  generatedAt: string;
+
+  totalCases: number;
+  remainingCases: number;
+  unassignedCount: number;
+
+  passed: number;
+  failed: number;
+  blocked: number;
+  pending: number;
+  partial: number;
+  other: number;
+  notApplicable: number;
+  executedCases: number;
+  executionRatePct: number;
+  passRatePct: number;
+  healthThreshold: number;
+
+  todayCases: number;
+  yesterdayCases: number;
+  tomorrowForecast: number;
+  tomorrowIsWorkingDay: boolean;
+  historicalAveragePerDay: number;
+  historicalSamples: number;
+  trendStatus: QaTrendStatus;
+  trend: QaControlCenterTrendDay[];
+
+  remainingEffortHours: number;
+  calibrationFactor: number;
+  calibrationSamples: number;
+
+  team: QaControlCenterTeamMember[];
+
+  openBugs: number;
+  blockedByBug: number;
+  readyForRetest: number;
+  failedWithoutBug: number;
+
+  historyTruncated: boolean;
+  historyFallback: boolean;
+  historyError?: string;
 }

@@ -1,43 +1,28 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Text, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
 import {
-    ChevronRightRegular,
-    CheckmarkCircleRegular,
-    ClockRegular,
-    WarningRegular,
-} from "@fluentui/react-icons";
-import { useThemeMode } from "../hooks/useThemeMode";
+    Card,
+    Dropdown,
+    Input,
+    Option,
+    Text,
+    makeStyles,
+    mergeClasses,
+    tokens,
+} from "@fluentui/react-components";
+import { ChevronRightRegular, SearchRegular } from "@fluentui/react-icons";
+import { StatusTag } from "./StatusTag";
+import { STATUS_TONE_COLOR, type StatusTone } from "./statusTone";
+import { CARD_RADIUS } from "../layoutConstants";
 import type { CoverageArea, CoverageStatus, CoverageTask } from "../types";
 
-// The bar/dot fill is one saturated color in both themes (it reads fine on
-// the neutral track either way); fg/bg are separate per theme because a text
-// color tuned for a light tint background (dark theme) is unreadable on a
-// dark one and vice versa - same problem StatusReportCard's SEVERITY_PALETTE
-// solves by only ever rendering on its own fixed dark card. This page
-// switches with the app's light/dark toggle, so it needs both.
-const STATUS_COLORS_LIGHT: Record<
-    CoverageStatus,
-    { fg: string; bg: string; bar: string }
-> = {
-    done: { fg: "#227A3B", bg: "rgba(63,185,80,0.14)", bar: "#3fb950" },
-    "in-progress": { fg: "#8A5A00", bg: "rgba(237,161,0,0.16)", bar: "#eda100" },
-    "at-risk": { fg: "#A4262C", bg: "rgba(209,52,56,0.14)", bar: "#d13438" },
-};
-
-const STATUS_COLORS_DARK: Record<
-    CoverageStatus,
-    { fg: string; bg: string; bar: string }
-> = {
-    done: { fg: "#6bcf6b", bg: "rgba(63,185,80,0.22)", bar: "#3fb950" },
-    "in-progress": { fg: "#f4c669", bg: "rgba(237,161,0,0.22)", bar: "#eda100" },
-    "at-risk": { fg: "#ff9b93", bg: "rgba(209,52,56,0.22)", bar: "#d13438" },
-};
-
-const STATUS_ICONS: Record<CoverageStatus, typeof CheckmarkCircleRegular> = {
-    done: CheckmarkCircleRegular,
-    "in-progress": ClockRegular,
-    "at-risk": WarningRegular,
+// Shared with StatusTag's own dot so the epic pill, the coverage progress
+// bar, and each task's dot all agree on what "done"/"in-progress"/"at-risk"
+// looks like, from one theme-aware token map instead of three hardcoded ones.
+const STATUS_TONE: Record<CoverageStatus, StatusTone> = {
+    done: "success",
+    "in-progress": "warning",
+    "at-risk": "danger",
 };
 
 function initials(name: string | null): string {
@@ -57,6 +42,42 @@ const useStyles = makeStyles({
     card: {
         padding: 0,
         overflow: "hidden",
+        borderRadius: CARD_RADIUS,
+        boxShadow: tokens.shadow4,
+    },
+    filterBar: {
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: tokens.spacingHorizontalS,
+        padding: tokens.spacingHorizontalM,
+        borderBottomWidth: "1px",
+        borderBottomStyle: "solid",
+        borderBottomColor: tokens.colorNeutralStroke2,
+    },
+    searchInput: {
+        flexGrow: 1,
+        maxWidth: "320px",
+    },
+    summaryStrip: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: tokens.spacingHorizontalL,
+        padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+        fontSize: tokens.fontSizeBase200,
+        color: tokens.colorNeutralForeground2,
+        borderBottomWidth: "1px",
+        borderBottomStyle: "solid",
+        borderBottomColor: tokens.colorNeutralStroke2,
+    },
+    summaryCount: {
+        fontWeight: tokens.fontWeightSemibold,
+        color: tokens.colorNeutralForeground1,
+    },
+    noResults: {
+        padding: tokens.spacingHorizontalM,
+        color: tokens.colorNeutralForeground3,
+        fontStyle: "italic",
     },
     headerRow: {
         display: "grid",
@@ -159,16 +180,6 @@ const useStyles = makeStyles({
         fontSize: "13px",
         color: tokens.colorNeutralForeground2,
     },
-    statusPill: {
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "6px",
-        width: "fit-content",
-        padding: "4px 10px 4px 8px",
-        borderRadius: tokens.borderRadiusCircular,
-        fontSize: "12px",
-        fontWeight: 600,
-    },
     tasks: {
         display: "flex",
         flexDirection: "column",
@@ -234,39 +245,18 @@ const useStyles = makeStyles({
     },
 });
 
-function StatusPill({ status }: { status: CoverageStatus }) {
-    const styles = useStyles();
-    const { t } = useTranslation();
-    const { mode } = useThemeMode();
-    const colors = (mode === "dark" ? STATUS_COLORS_DARK : STATUS_COLORS_LIGHT)[
-        status
-    ];
-    const Icon = STATUS_ICONS[status];
-
-    return (
-        <span
-            className={styles.statusPill}
-            style={{ backgroundColor: colors.bg, color: colors.fg }}
-        >
-            <Icon fontSize={12} />
-            {t(`coverageRoadmapPage.status.${status}`)}
-        </span>
-    );
-}
-
 function TaskRow({ task }: { task: CoverageTask }) {
     const styles = useStyles();
     const { t } = useTranslation();
-    const { mode } = useThemeMode();
-    const palette = mode === "dark" ? STATUS_COLORS_DARK : STATUS_COLORS_LIGHT;
-    const colors = task.isDone
-        ? palette.done
-        : { fg: tokens.colorNeutralForeground3, bg: "", bar: tokens.colorNeutralStroke2 as string };
+    const dotColor = task.isDone
+        ? STATUS_TONE_COLOR.success
+        : (tokens.colorNeutralStroke2 as string);
+    const fgColor = task.isDone ? STATUS_TONE_COLOR.success : tokens.colorNeutralForeground3;
 
     return (
         <div className={styles.taskRow}>
             <span className={styles.taskTitle}>
-                <span className={styles.taskDot} style={{ backgroundColor: colors.bar }} />
+                <span className={styles.taskDot} style={{ backgroundColor: dotColor }} />
                 {task.url ? (
                     <a href={task.url} target="_blank" rel="noreferrer" className={styles.taskLink}>
                         {task.title}
@@ -279,7 +269,7 @@ function TaskRow({ task }: { task: CoverageTask }) {
             <span className={styles.taskAssignee}>
                 {task.assignee ?? t("coverageRoadmapPage.unassigned")}
             </span>
-            <span className={styles.taskStatus} style={{ color: colors.fg }}>
+            <span className={styles.taskStatus} style={{ color: fgColor }}>
                 {task.state}
             </span>
         </div>
@@ -297,8 +287,6 @@ function EpicRow({
 }) {
     const styles = useStyles();
     const { t, i18n } = useTranslation();
-    const { mode } = useThemeMode();
-    const palette = mode === "dark" ? STATUS_COLORS_DARK : STATUS_COLORS_LIGHT;
 
     const dueDateLabel = area.dueDate
         ? new Date(area.dueDate).toLocaleDateString(i18n.language, {
@@ -352,7 +340,7 @@ function EpicRow({
                             style={{
                                 width: `${area.currentPct}%`,
                                 height: "100%",
-                                backgroundColor: palette[area.status].bar,
+                                backgroundColor: STATUS_TONE_COLOR[STATUS_TONE[area.status]],
                             }}
                         />
                     </div>
@@ -366,7 +354,9 @@ function EpicRow({
 
                 <span className={styles.dueDate}>{dueDateLabel}</span>
 
-                <StatusPill status={area.status} />
+                <StatusTag tone={STATUS_TONE[area.status]}>
+                    {t(`coverageRoadmapPage.status.${area.status}`)}
+                </StatusTag>
 
                 <span />
             </button>
@@ -399,6 +389,8 @@ export function CoverageRoadmapTable({ areas }: { areas: CoverageArea[] }) {
     const styles = useStyles();
     const { t } = useTranslation();
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState<CoverageStatus | "">("");
 
     const toggle = (id: number) => {
         setExpandedIds((prev) => {
@@ -414,8 +406,70 @@ export function CoverageRoadmapTable({ areas }: { areas: CoverageArea[] }) {
         });
     };
 
+    const counts = useMemo(() => {
+        return {
+            total: areas.length,
+            done: areas.filter((area) => area.status === "done").length,
+            inProgress: areas.filter((area) => area.status === "in-progress").length,
+            atRisk: areas.filter((area) => area.status === "at-risk").length,
+        };
+    }, [areas]);
+
+    const filteredAreas = useMemo(() => {
+        const query = search.trim().toLowerCase();
+
+        return areas.filter((area) => {
+            const matchesStatus = !statusFilter || area.status === statusFilter;
+            const matchesQuery =
+                !query ||
+                area.title.toLowerCase().includes(query) ||
+                (area.owner ?? "").toLowerCase().includes(query);
+
+            return matchesStatus && matchesQuery;
+        });
+    }, [areas, search, statusFilter]);
+
+    const statusFilterLabel = statusFilter
+        ? t(`coverageRoadmapPage.status.${statusFilter}`)
+        : t("coverageRoadmapPage.statusFilterAll");
+
     return (
         <Card className={styles.card}>
+            <div className={styles.filterBar}>
+                <Input
+                    className={styles.searchInput}
+                    contentBefore={<SearchRegular />}
+                    placeholder={t("coverageRoadmapPage.searchPlaceholder")}
+                    value={search}
+                    onChange={(_, data) => setSearch(data.value)}
+                />
+                <Dropdown
+                    value={statusFilterLabel}
+                    selectedOptions={statusFilter ? [statusFilter] : [""]}
+                    onOptionSelect={(_, data) =>
+                        setStatusFilter((data.optionValue as CoverageStatus | "") ?? "")
+                    }
+                >
+                    <Option value="">{t("coverageRoadmapPage.statusFilterAll")}</Option>
+                    <Option value="done">{t("coverageRoadmapPage.status.done")}</Option>
+                    <Option value="in-progress">
+                        {t("coverageRoadmapPage.status.in-progress")}
+                    </Option>
+                    <Option value="at-risk">{t("coverageRoadmapPage.status.at-risk")}</Option>
+                </Dropdown>
+            </div>
+
+            <div className={styles.summaryStrip}>
+                <span className={styles.summaryCount}>
+                    {t("coverageRoadmapPage.summary.total", { count: counts.total })}
+                </span>
+                <span>{t("coverageRoadmapPage.summary.done", { count: counts.done })}</span>
+                <span>
+                    {t("coverageRoadmapPage.summary.inProgress", { count: counts.inProgress })}
+                </span>
+                <span>{t("coverageRoadmapPage.summary.atRisk", { count: counts.atRisk })}</span>
+            </div>
+
             <div className={styles.headerRow}>
                 <span className={styles.headerCell}>
                     {t("coverageRoadmapPage.columns.area")}
@@ -435,7 +489,13 @@ export function CoverageRoadmapTable({ areas }: { areas: CoverageArea[] }) {
                 <span />
             </div>
 
-            {areas.map((area) => (
+            {filteredAreas.length === 0 && (
+                <Text as="p" className={styles.noResults}>
+                    {t("coverageRoadmapPage.noResults")}
+                </Text>
+            )}
+
+            {filteredAreas.map((area) => (
                 <EpicRow
                     key={area.id}
                     area={area}

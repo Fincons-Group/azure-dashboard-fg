@@ -11,6 +11,10 @@ import type {
     AutomationKpiResponse,
     ReportExtraKpis,
     E2eHistoryResponse,
+    TestSuitesResponse,
+    TestSpecCatalogResponse,
+    TestPlanSuiteSummary,
+    QaControlCenterResponse,
 } from "../types";
 import i18n from "../i18n";
 import { loadStoredAzdoConnection } from "../azdoConnection";
@@ -143,6 +147,28 @@ export function fetchPlanOverview(
     return getJson(`/api/plans/${planId}/overview${qs}`);
 }
 
+export function fetchPlanSuites(
+    planId: number,
+    project?: string
+): Promise<TestPlanSuiteSummary[]> {
+    const qs = project ? `?project=${encodeURIComponent(project)}` : "";
+
+    return getJson(`/api/plans/${planId}/suites${qs}`);
+}
+
+export function fetchQaControlCenter(
+    planId: number,
+    suiteId: number,
+    project?: string
+): Promise<QaControlCenterResponse> {
+    const params = new URLSearchParams();
+    params.set("planId", String(planId));
+    params.set("suiteId", String(suiteId));
+    if (project) params.set("project", project);
+
+    return getJson(`/api/qa-control-center?${params.toString()}`);
+}
+
 export function fetchCoverage(project?: string): Promise<CoverageArea[]> {
     const qs = project ? `?project=${encodeURIComponent(project)}` : "";
 
@@ -163,8 +189,16 @@ export function fetchAutomationKpis(
     return getJson(`/api/automation-kpis${qs}`);
 }
 
+export function fetchTestSpecCatalog(
+    project?: string
+): Promise<TestSpecCatalogResponse> {
+    const qs = project ? `?project=${encodeURIComponent(project)}` : "";
+
+    return getJson(`/api/test-spec-catalog${qs}`);
+}
+
 // Companion call to fetchDefects/fetchPlanOverview for the Sprint Report's
-// 4 additional KPIs - see ReportExtraKpis in types.ts for why this is kept
+// Additional KPIs - see ReportExtraKpis in types.ts for why this is kept
 // as its own request instead of folded into either of those.
 export function fetchReportExtraKpis(
     project?: string,
@@ -188,6 +222,19 @@ export function fetchE2eHistory(limit?: number): Promise<E2eHistoryResponse> {
     const qs = limit ? `?limit=${limit}` : "";
 
     return getJson(`/api/e2e-history${qs}`);
+}
+
+export function fetchTestSuites(): Promise<TestSuitesResponse> {
+    return getJson("/api/test-suites");
+}
+
+// apiPath is TestSuiteRun.reportUrl itself (a gated /api/test-suites-reports/...
+// path, not a direct link) - this carries the usual PAT header to it and
+// gets back a short-lived signed Storage URL to actually open, see that
+// field's comment in types.ts.
+export async function fetchSignedReportUrl(apiPath: string): Promise<string> {
+    const { url } = await getJson<{ url: string }>(apiPath);
+    return url;
 }
 
 export function fetchDefects(

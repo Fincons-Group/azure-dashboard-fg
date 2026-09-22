@@ -19,7 +19,17 @@ import type {
 // tracking, which has nothing to do with test-case automation status.
 const AUTOMATION_STATUS_FIELD = "Microsoft.VSTS.TCM.AutomationStatus";
 const AREA_PATH_FIELD = "System.AreaPath";
-const WORK_ITEM_FIELDS = [AUTOMATION_STATUS_FIELD, AREA_PATH_FIELD];
+// Populated by src/scripts/tmp-mark-automated.ts for test cases it has
+// linked to a tagged Playwright test() block - AutomatedTestName is the
+// test's title, AutomatedTestStorage is its spec file's relative path.
+const AUTOMATED_TEST_NAME_FIELD = "Microsoft.VSTS.TCM.AutomatedTestName";
+const AUTOMATED_TEST_STORAGE_FIELD = "Microsoft.VSTS.TCM.AutomatedTestStorage";
+const WORK_ITEM_FIELDS = [
+    AUTOMATION_STATUS_FIELD,
+    AREA_PATH_FIELD,
+    AUTOMATED_TEST_NAME_FIELD,
+    AUTOMATED_TEST_STORAGE_FIELD,
+];
 
 const FLAKY_TOP_N = 10;
 
@@ -45,7 +55,11 @@ function areaPathLeaf(areaPath: string): string {
     return segments[segments.length - 1] ?? areaPath;
 }
 
-async function buildAutomationTestCaseRows(
+// Exported for testSpecCatalogData.ts - the "spec file - last 5 runs" NRT/
+// A11Y/Security catalog needs each test case's automation linkage too
+// (AutomatedTestName/Storage below), not just the coverage-KPI rollup this
+// module itself uses it for.
+export async function buildAutomationTestCaseRows(
     project?: string
 ): Promise<AutomationTestCaseRow[]> {
     const plans = await getTestPlans(project);
@@ -96,6 +110,9 @@ async function buildAutomationTestCaseRows(
                     suiteName: suite.name,
                     isAutomated:
                         fields[AUTOMATION_STATUS_FIELD] === "Automated",
+                    automatedTestName: fields[AUTOMATED_TEST_NAME_FIELD] || undefined,
+                    automatedTestStorage:
+                        fields[AUTOMATED_TEST_STORAGE_FIELD] || undefined,
                 };
             });
         }
@@ -146,16 +163,18 @@ function computeCoverageByModule(
 
 // Success rate and flaky-test detection both need every historical
 // pass/fail occurrence for automated test cases, not just their latest
-// result - getAllOutcomesByTestCase (testRunHistoryData.ts) walks every
-// test run project-wide to reconstruct that.
-async function computeSuccessRateAndFlaky(
+// result - outcomesByTestCase (from getAllOutcomesByTestCase in
+// testRunHistoryData.ts) walks every test run project-wide to reconstruct
+// that; passed in rather than fetched here so buildTestCatalog below can
+// reuse the same fetch instead of hitting Azure DevOps twice.
+function computeSuccessRateAndFlaky(
     rows: AutomationTestCaseRow[],
-    project?: string
-): Promise<{
+    outcomesByTestCase: Map<number, { outcome: string; completedDate: string }[]>
+): {
     automationSuccessRatePct: number;
     flakyTestsCount: number;
     flakyTests: FlakyTestRankItem[];
-}> {
+} {
     const automatedIds = new Set(
         rows.filter((r) => r.isAutomated).map((r) => r.testCaseId)
     );
@@ -167,7 +186,6 @@ async function computeSuccessRateAndFlaky(
     const titleById = new Map(
         rows.map((r) => [r.testCaseId, r.testCaseTitle])
     );
-    const outcomesByTestCase = await getAllOutcomesByTestCase(project);
 
     let totalPassed = 0;
     let totalFailed = 0;
@@ -224,8 +242,12 @@ async function buildAutomationKpis(
         : 0;
 
     const coverageByModule = computeCoverageByModule(rows);
+    const hasAutomatedRows = rows.some((r) => r.isAutomated);
+    const outcomesByTestCase = hasAutomatedRows
+        ? await getAllOutcomesByTestCase(project)
+        : new Map<number, { outcome: string; completedDate: string; errorMessage?: string }[]>();
     const { automationSuccessRatePct, flakyTestsCount, flakyTests } =
-        await computeSuccessRateAndFlaky(rows, project);
+        computeSuccessRateAndFlaky(rows, outcomesByTestCase);
 
     return {
         kpis: {
