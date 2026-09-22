@@ -8,11 +8,20 @@ function sanitizeFilenamePart(value: string): string {
   return value.replace(/[\\/:*?"<>|]+/g, "_").trim();
 }
 
+// Also escapes quotes, not just &/</> - this is used both for element text
+// content and, for dashboardUrl/label in lightDashboardButton's href="...",
+// inside a double-quoted HTML attribute. dashboardUrl can come straight from
+// an Azure DevOps test plan's free-text description (see
+// extractReportUrlFromDescription server-side), whose URL-matching regex
+// doesn't exclude quote characters, so leaving them unescaped would let a
+// crafted description break out of the href attribute in the emailed report.
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
