@@ -224,6 +224,15 @@ const useStyles = makeStyles({
     fontSize: "20px",
     fontWeight: 700,
   },
+  executedBreakdown: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+    marginTop: "4px",
+    fontSize: "10px",
+    fontWeight: 600,
+    lineHeight: "13px",
+  },
   kpiLabel: {
     fontSize: "10px",
     letterSpacing: "0.02em",
@@ -529,6 +538,7 @@ function SeverityChipsRow({
 // bugs. helpKey is a translation key under statusCard.kpisHelp.
 function KpiTile({
   value,
+  detail,
   color,
   labelKey,
   label,
@@ -536,6 +546,7 @@ function KpiTile({
   borderColor,
 }: {
   value: ReactNode;
+  detail?: ReactNode;
   color: string;
   labelKey?: string;
   label?: string;
@@ -567,6 +578,7 @@ function KpiTile({
           </span>
         </Tooltip>
       </span>
+      {detail}
     </div>
   );
 }
@@ -626,6 +638,8 @@ export const StatusReportCard = forwardRef<
   const {
     totalTestCases,
     totalPassed,
+    totalFailed,
+    totalBlocked,
     passedPct,
     totalNotApplicable,
     totalExecuted,
@@ -738,6 +752,13 @@ export const StatusReportCard = forwardRef<
               />
               <KpiTile
                 value={`${totalExecuted} (${executedPct}%)`}
+                detail={
+                  <div className={styles.executedBreakdown}>
+                    <span style={{ color: "#6bcf6b" }}>{totalPassed} {t("outcome.Passed")}</span>
+                    <span style={{ color: "#f17070" }}>{totalFailed} {t("outcome.Failed")}</span>
+                    <span style={{ color: "#e8b34c" }}>{totalBlocked} {t("outcome.Blocked")}</span>
+                  </div>
+                }
                 color="#6bcf6b"
                 borderColor="#6bcf6b"
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.executedCount"

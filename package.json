@@ -20,6 +20,7 @@
   "scripts": {
     "prebuild": "tsc -p tsconfig.package.json",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:kpis": "node --import tsx --test src/dashboardData.kpi.test.ts",
     "dev": "cross-env PORT=3001 tsx watch src/server.ts",
     "dev:client": "npm run dev --prefix client",
     "dev:all": "concurrently \"npm:dev\" \"npm:dev:client\"",

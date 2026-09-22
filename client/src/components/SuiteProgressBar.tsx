@@ -106,12 +106,9 @@ export function SuiteProgressBar({
     const { t } = useTranslation();
     const styles = useStyles();
 
-    // Counts NotApplicable as executed (only NotRun is excluded) - a
-    // narrower, different definition than StatusReportCard's totalExecuted
-    // (Passed+Failed+Blocked, which excludes NotApplicable). Intentionally
-    // different metrics; see the comment on totalExecuted in
-    // StatusReportCard.tsx.
-    const executed = totalTestCases - outcomeCounts.NotRun;
+    // Same definition as the report KPI and Excel exports: N/A, Paused,
+    // InProgress and NotRun do not count as executed.
+    const executed = outcomeCounts.Passed + outcomeCounts.Failed + outcomeCounts.Blocked;
     const executedPct = totalTestCases
         ? Math.round((executed / totalTestCases) * 100)
         : 0;

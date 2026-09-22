@@ -448,7 +448,7 @@
         },
         "kpisHelp": {
           "totalTestCases": "Tutti i casi di test presenti nel/i piano/i selezionato/i, qualsiasi sia il loro stato.",
-          "executedCount": "Casi con esito Passato, Fallito o Bloccato. Qualsiasi altro esito (Non Applicabile, Da eseguire, In pausa, In corso) non viene conteggiato come eseguito qui - a differenza del badge \"% Eseguiti\" di ogni suite più in basso, che conta anche i Non Applicabile come eseguiti.",
+          "executedCount": "Casi con esito Passato, Fallito o Bloccato. Non Applicabile, Da eseguire, In pausa e In corso sono esclusi, anche dalla percentuale Eseguiti delle suite.",
           "notApplicable": "Casi segnati come Non Applicabile (N/A), cioè non pertinenti per questo sprint.",
           "notRun": "Casi non ancora eseguiti: Totale meno Eseguiti meno N/A. Include anche eventuali casi In pausa o In corso, perché solo Passato/Fallito/Bloccato contano come \"eseguiti\" qui sopra.",
           "passedCount": "Numero di casi di test con esito Passato, con la percentuale sul totale dei casi. È il numeratore del Pass Rate (che invece usa come base i soli casi utili, Totale meno N/A).",
@@ -475,7 +475,7 @@
           "avgClosingTimeBusinessDays": "Giorni lavorativi medi tra apertura e chiusura del bug. Target <= 4 giorni lavorativi."
         },
         "sectionHelp": {
-          "suiteProgress": "Il \"% Eseguiti\" di ogni suite conta anche i casi Non Applicabile come eseguiti (viene escluso solo Da eseguire) - più ampio della KPI \"Casi di test eseguiti\" qui sopra, che esclude del tutto i Non Applicabile. Pass Rate = Passati ÷ (Totale meno Non Applicabile).",
+          "suiteProgress": "Il \"% Eseguiti\" usa la stessa regola della KPI: (Passati + Falliti + Bloccati) ÷ Totale. I Non Applicabile restano separati. Pass Rate = Passati ÷ (Totale meno Non Applicabile).",
           "bugStatus": "Ogni bug rilevato per questo sprint/area, compresi quelli fuori perimetro, raggruppato per stato attuale su Azure DevOps. \"Ancora aperti\" conta solo i bug effettivi (in perimetro) non ancora Chiusi - un numero più ristretto rispetto ai totali qui sopra.",
           "originBreakdown": "\"Rilevati\" conta ogni bug attribuito a questa origine, compresi quelli fuori perimetro. \"Accettati\" conta solo i bug effettivi (in perimetro) di quella stessa origine. L'origine di un bug è Test Factory di default, a meno che la suite collegata non lo identifichi come Test Agenti, Business o DSI (i bug DSI sono conteggiati nella tile KPI qui sopra, senza un pannello proprio qui)."
         },
