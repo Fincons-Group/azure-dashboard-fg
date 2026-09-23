@@ -870,7 +870,8 @@ export interface E2eHistoryResponse {
 // "security" reuses NrtRunDetail (Playwright type:security-tagged spec
 // results, same pass/fail shape as "nrt") stored on the same TestSuiteRun.nrt
 // field. DAST (ZAP dynamic scan) was removed as a separate suite - the team
-// considers it redundant with the functional security coverage here.
+// considers it redundant with the functional security coverage here - but
+// ZAP scan runs are still published into "security" (see ZapRunDetail).
 export type TestSuiteKey = "nrt" | "a11y" | "security";
 export type TestAppScope = "plurifond" | "frontOfficeAuto" | "all";
 export type TestEnvironment = "tst" | "pre" | "prd";
@@ -934,6 +935,33 @@ export interface NrtRunDetail {
   tests?: NrtTestResult[];
 }
 
+// A ZAP scan run published into the "security" folder by
+// scripts/publish-zap-run.js - not a separate suite (DAST stays folded into
+// "security", see TestSuiteKey), just a run doc carrying this instead of
+// `nrt`. Built from ZAP's own traditional-json summary: per-alert counts
+// only, never the raw instances (the summary file is tens of MB).
+export type ZapRisk = "high" | "medium" | "low" | "informational";
+
+export interface ZapAlert {
+  name: string;
+  risk: ZapRisk;
+  // ZAP's confidence code as text ("Low"/"Medium"/"High"/"Confirmed"...).
+  confidence: string;
+  instances: number;
+  pluginId: string;
+  site: string;
+}
+
+export interface ZapRunDetail {
+  // The scanned application host (e.g. "nuovafrontieratst.gruppoitas.it") -
+  // alerts from third-party hosts the scan also touched (Microsoft login
+  // pages) are still listed, with their own `site`.
+  target: string;
+  zapVersion: string;
+  alertsByRisk: Record<ZapRisk, number>;
+  alerts: ZapAlert[];
+}
+
 export interface TestSuiteRun {
   id: string;
   suite: TestSuiteKey;
@@ -950,8 +978,13 @@ export interface TestSuiteRun {
   // its usual PAT header) to get back a short-lived signed URL, rather than
   // a permanent public one - see GET /api/test-suites-reports in server.ts.
   reportUrl?: string;
+  // Italian version of the same report (ZAP runs only) - same local-file /
+  // signed-URL split as reportFile/reportUrl above.
+  reportFileIt?: string;
+  reportUrlIt?: string;
   reportTool: string;
   nrt?: NrtRunDetail;
+  zap?: ZapRunDetail;
 }
 
 export interface TestPlanSuiteSummary {

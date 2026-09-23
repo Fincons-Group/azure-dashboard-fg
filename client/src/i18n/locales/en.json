@@ -310,7 +310,7 @@
         "name": "Security",
         "full": "Security Functional Tests",
         "tool": "via playwright-smart-reporter",
-        "desc": "Playwright specs tagged type:security - functional security checks."
+        "desc": "Playwright specs tagged type:security - functional security checks - plus OWASP ZAP scan reports."
       }
     },
     "ranAt": "Ran {{time}}",
@@ -375,7 +375,24 @@
     "pastRuns": "Past runs",
     "totalRuns_one": "{{count}} run",
     "totalRuns_other": "{{count}} runs",
-    "latest": "Latest"
+    "latest": "Latest",
+    "zap": {
+      "openReportEn": "Open ZAP report (EN)",
+      "openReportIt": "Open ZAP report (IT)",
+      "alertsTitle": "ZAP alerts",
+      "target": "{{target}} · ZAP {{version}}",
+      "alertCol": "Alert",
+      "riskCol": "Risk",
+      "confidenceCol": "Confidence",
+      "siteCol": "Site",
+      "instancesCol": "Instances",
+      "risk": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "informational": "Informational"
+      }
+    }
   },
   "testPlansPage": {
     "title": "Test Plans",

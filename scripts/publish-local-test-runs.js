@@ -342,7 +342,12 @@ async function buildPlaywrightRuns(bucket) {
     const jsonDir = path.join(reportsDir, "json");
     let files = [];
     try {
-        files = readdirSync(jsonDir).filter((f) => f.endsWith(".json"));
+        // ONLY_RUN_IDS is applied here, before any upload - filtering the
+        // built runs afterwards (as this used to) still uploaded every other
+        // run's report files to Storage, leaving them orphaned without a doc.
+        files = readdirSync(jsonDir)
+            .filter((f) => f.endsWith(".json"))
+            .filter((f) => !ONLY_RUN_IDS || ONLY_RUN_IDS.has(f.replace(/\.json$/, "")));
     } catch {
         console.warn(`No json/ folder under ${reportsDir} - skipping NRT/A11Y/Security runs.`);
         return [];
@@ -444,11 +449,7 @@ if (PUBLISH_REPORTS) {
     console.log(`Report uploads enabled - publishing to gs://${bucket.name}/test-suites-reports/`);
 }
 
-let runs = await buildPlaywrightRuns(bucket);
-
-if (ONLY_RUN_IDS) {
-    runs = runs.filter((run) => ONLY_RUN_IDS.has(run.id));
-}
+const runs = await buildPlaywrightRuns(bucket);
 
 if (runs.length === 0) {
     console.log("Nothing to publish.");

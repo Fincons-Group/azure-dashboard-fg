@@ -310,7 +310,7 @@
         "name": "Security",
         "full": "Test Funzionali di Sicurezza",
         "tool": "via playwright-smart-reporter",
-        "desc": "Specifiche Playwright taggate type:security - controlli funzionali di sicurezza."
+        "desc": "Specifiche Playwright taggate type:security - controlli funzionali di sicurezza - più i report di scansione OWASP ZAP."
       }
     },
     "ranAt": "Eseguito {{time}}",
@@ -375,7 +375,24 @@
     "pastRuns": "Esecuzioni precedenti",
     "totalRuns_one": "{{count}} esecuzione",
     "totalRuns_other": "{{count}} esecuzioni",
-    "latest": "Ultima"
+    "latest": "Ultima",
+    "zap": {
+      "openReportEn": "Apri report ZAP (EN)",
+      "openReportIt": "Apri report ZAP (IT)",
+      "alertsTitle": "Alert ZAP",
+      "target": "{{target}} · ZAP {{version}}",
+      "alertCol": "Alert",
+      "riskCol": "Rischio",
+      "confidenceCol": "Confidenza",
+      "siteCol": "Sito",
+      "instancesCol": "Istanze",
+      "risk": {
+        "high": "Alto",
+        "medium": "Medio",
+        "low": "Basso",
+        "informational": "Informativo"
+      }
+    }
   },
   "testPlansPage": {
     "title": "Piani di Test",

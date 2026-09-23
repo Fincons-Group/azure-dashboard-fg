@@ -45,6 +45,8 @@ import type {
     TestRunStatus,
     TestSuiteKey,
     TestSuiteRun,
+    ZapRisk,
+    ZapRunDetail,
 } from "../types";
 
 type TabKey = "overview" | TestSuiteKey;
@@ -227,6 +229,12 @@ const useStyles = makeStyles({
         flexDirection: "column",
         alignItems: "flex-end",
         gap: tokens.spacingVerticalXS,
+    },
+    reportButtons: {
+        display: "flex",
+        flexWrap: "wrap",
+        justifyContent: "flex-end",
+        gap: tokens.spacingHorizontalS,
     },
     statRow: {
         display: "grid",
@@ -530,15 +538,17 @@ function reportHref(file: string): string {
 // ever exists), which left the blank tab permanently blank. window.opener
 // is nulled out manually instead, right after opening, which blocks the
 // same reverse-tabnabbing risk without losing the reference.
-async function openTestSuiteReport(run: TestSuiteRun): Promise<void> {
-    if (!run.reportUrl) {
-        window.open(reportHref(run.reportFile), "_blank", "noopener");
+// Takes the file/url pair rather than the run so a ZAP run's Italian report
+// (reportFileIt/reportUrlIt) opens the same way as its main one.
+async function openTestSuiteReport(reportFile: string, reportUrl: string | undefined): Promise<void> {
+    if (!reportUrl) {
+        window.open(reportHref(reportFile), "_blank", "noopener");
         return;
     }
 
     const win = window.open("", "_blank");
     if (win) win.opener = null;
-    const url = await fetchSignedReportUrl(run.reportUrl);
+    const url = await fetchSignedReportUrl(reportUrl);
     if (win) win.location.href = url;
 }
 
@@ -828,16 +838,44 @@ function SuiteDetail({
                     </div>
                 </div>
                 <div className={styles.reportCta}>
-                    <Button
-                        appearance="primary"
-                        icon={<OpenRegular />}
-                        onClick={() => {
-                            setReportError(false);
-                            openTestSuiteReport(run).catch(() => setReportError(true));
-                        }}
-                    >
-                        {t("testSuitesPage.openReport", { file: run.reportFile })}
-                    </Button>
+                    {run.zap ? (
+                        <div className={styles.reportButtons}>
+                            <Button
+                                appearance="primary"
+                                icon={<OpenRegular />}
+                                onClick={() => {
+                                    setReportError(false);
+                                    openTestSuiteReport(run.reportFile, run.reportUrl).catch(() => setReportError(true));
+                                }}
+                            >
+                                {t("testSuitesPage.zap.openReportEn")}
+                            </Button>
+                            {run.reportFileIt && (
+                                <Button
+                                    icon={<OpenRegular />}
+                                    onClick={() => {
+                                        setReportError(false);
+                                        openTestSuiteReport(run.reportFileIt!, run.reportUrlIt).catch(() =>
+                                            setReportError(true)
+                                        );
+                                    }}
+                                >
+                                    {t("testSuitesPage.zap.openReportIt")}
+                                </Button>
+                            )}
+                        </div>
+                    ) : (
+                        <Button
+                            appearance="primary"
+                            icon={<OpenRegular />}
+                            onClick={() => {
+                                setReportError(false);
+                                openTestSuiteReport(run.reportFile, run.reportUrl).catch(() => setReportError(true));
+                            }}
+                        >
+                            {t("testSuitesPage.openReport", { file: run.reportFile })}
+                        </Button>
+                    )}
                     {reportError && (
                         <Text className={styles.detailNote} style={{ color: tokens.colorPaletteRedForeground1 }}>
                             {t("testSuitesPage.openReportError")}
@@ -850,10 +888,77 @@ function SuiteDetail({
             <div className={styles.gridTwo}>
                 <div>
                     {run.nrt && <NrtDetail run={run} runs={runs} />}
+                    {run.zap && <ZapDetail detail={run.zap} />}
                 </div>
                 <RunsList runs={runs} selectedId={run.id} onSelect={onSelectRun} />
             </div>
         </>
+    );
+}
+
+const ZAP_RISK_ORDER: ZapRisk[] = ["high", "medium", "low", "informational"];
+const ZAP_RISK_TONE: Record<ZapRisk, StatusTone> = {
+    high: "danger",
+    medium: "warning",
+    low: "neutral",
+    informational: "neutral",
+};
+
+// A ZAP scan run (see scripts/publish-zap-run.js) - alert types per risk
+// level plus the full alert list. The scanned app's own alerts come first;
+// third-party hosts the browser passed through (Microsoft login) follow.
+function ZapDetail({ detail }: { detail: ZapRunDetail }) {
+    const { t } = useTranslation();
+    const styles = useStyles();
+    const alerts = [...detail.alerts].sort(
+        (a, b) => Number(b.site === detail.target) - Number(a.site === detail.target)
+    );
+
+    return (
+        <div>
+            <div className={styles.statRow}>
+                {ZAP_RISK_ORDER.map((risk) => (
+                    <StatTile key={risk} value={detail.alertsByRisk[risk]} label={t(`testSuitesPage.zap.risk.${risk}`)} />
+                ))}
+            </div>
+
+            <Card className={styles.card}>
+                <div className={styles.cardTitle}>
+                    <span>{t("testSuitesPage.zap.alertsTitle")}</span>
+                    <span className={styles.cardTitleHint}>
+                        {t("testSuitesPage.zap.target", { target: detail.target, version: detail.zapVersion })}
+                    </span>
+                </div>
+                <table className={styles.table}>
+                    <thead>
+                        <tr>
+                            <th className={styles.tableHeadCell}>{t("testSuitesPage.zap.alertCol")}</th>
+                            <th className={styles.tableHeadCell}>{t("testSuitesPage.zap.riskCol")}</th>
+                            <th className={styles.tableHeadCell}>{t("testSuitesPage.zap.confidenceCol")}</th>
+                            <th className={styles.tableHeadCell}>{t("testSuitesPage.zap.siteCol")}</th>
+                            <th className={styles.tableHeadCell} style={{ textAlign: "right" }}>
+                                {t("testSuitesPage.zap.instancesCol")}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {alerts.map((alert) => (
+                            <tr key={`${alert.site}-${alert.pluginId}-${alert.name}`}>
+                                <td className={styles.tableCell}>{alert.name}</td>
+                                <td className={styles.tableCell}>
+                                    <StatusTag tone={ZAP_RISK_TONE[alert.risk]}>
+                                        {t(`testSuitesPage.zap.risk.${alert.risk}`)}
+                                    </StatusTag>
+                                </td>
+                                <td className={styles.tableCell}>{alert.confidence}</td>
+                                <td className={styles.tableCell}>{alert.site}</td>
+                                <td className={styles.tableCellNum}>{alert.instances}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Card>
+        </div>
     );
 }
 
