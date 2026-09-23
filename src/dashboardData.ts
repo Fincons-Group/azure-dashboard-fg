@@ -93,7 +93,9 @@ export function resolveOutcome(
         return "NotApplicable";
     }
 
-    if (normalized.every((o) => o === "passed")) {
+    // Not Applicable configurations are neutral when at least one planned
+    // configuration is applicable. A Passed + N/A case is therefore Passed.
+    if (normalized.filter((o) => o !== "notapplicable").every((o) => o === "passed")) {
         return "Passed";
     }
 

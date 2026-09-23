@@ -41,4 +41,5 @@ jobs:
 
       - run: npm ci
       - run: npm ci --prefix client
+      - run: npm run test:kpis
       - run: npm run build

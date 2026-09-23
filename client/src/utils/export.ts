@@ -419,9 +419,8 @@ function lightSwatch(color: string): string {
 
 function lightSuiteRow(group: SuiteProgressGroup, t: TranslateFn): string {
   const { totalTestCases, outcomeCounts, label } = group;
-  // Counts NotApplicable as executed - see the comment on totalExecuted
-  // in StatusReportCard.tsx for why this differs from that KPI.
-  const executed = totalTestCases - outcomeCounts.NotRun;
+  // Match the report KPI, the on-screen suite row and the Excel export.
+  const executed = outcomeCounts.Passed + outcomeCounts.Failed + outcomeCounts.Blocked;
   const executedPct = totalTestCases
     ? Math.round((executed / totalTestCases) * 100)
     : 0;
@@ -1152,6 +1151,8 @@ function pdfSeverityChipsRow(
 export interface StatusCardKpis {
   totalTestCases: number;
   totalPassed: number;
+  totalFailed: number;
+  totalBlocked: number;
   // Passed as a share of all test cases (like executedPct) - not the same
   // as passRate, which divides by the decided-only total (Total minus N/A).
   passedPct: number;
@@ -1215,9 +1216,7 @@ export function computeStatusCardKpis(
     (sum, group) => sum + group.outcomeCounts.Blocked,
     0,
   );
-  // Excludes NotApplicable on purpose - see the matching comment on
-  // totalExecuted in StatusReportCard.tsx for why, and for the different
-  // (more inclusive) definition SuiteProgressBar uses.
+  // The on-screen suite rows and exports use this same cumulative rule.
   const totalExecuted = totalPassed + totalFailed + totalBlocked;
   const executedPct = totalTestCases
     ? Math.round((totalExecuted / totalTestCases) * 100)
@@ -1264,6 +1263,8 @@ export function computeStatusCardKpis(
   return {
     totalTestCases,
     totalPassed,
+    totalFailed,
+    totalBlocked,
     passedPct,
     totalNotApplicable,
     totalDecided,
@@ -1390,9 +1391,8 @@ interface SuiteProgressRowData {
 function computeSuiteProgressRowData(
   group: SuiteProgressGroup,
 ): SuiteProgressRowData {
-  // Counts NotApplicable as executed - see the comment on totalExecuted
-  // in StatusReportCard.tsx for why this differs from that KPI.
-  const executed = group.totalTestCases - group.outcomeCounts.NotRun;
+  // Match the report KPI, the on-screen suite row and the Excel export.
+  const executed = group.outcomeCounts.Passed + group.outcomeCounts.Failed + group.outcomeCounts.Blocked;
   const executedPct = group.totalTestCases
     ? Math.round((executed / group.totalTestCases) * 100)
     : 0;

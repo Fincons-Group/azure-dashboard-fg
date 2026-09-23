@@ -667,7 +667,7 @@
         },
         "kpisHelp": {
           "totalTestCases": "All test cases in the selected plan(s), regardless of their status.",
-          "executedCount": "Cases with outcome Passed, Failed, or Blocked. Any other outcome (Not Applicable, Not Run, Paused, In Progress) isn't counted as executed here - unlike each suite's own \"% Executed\" badge further down, which counts Not Applicable as executed too.",
+          "executedCount": "Cases with outcome Passed, Failed, or Blocked. Not Applicable, Not Run, Paused and In Progress are excluded from both this KPI and each suite's % Executed.",
           "notApplicable": "Cases marked Not Applicable (N/A), i.e. not relevant for this sprint.",
           "notRun": "Cases not yet executed: Total minus Executed minus N/A. This also folds in any Paused or In Progress cases, since only Passed/Failed/Blocked count as \"executed\" above.",
           "passedCount": "Number of test cases with a Passed outcome, with its share of all test cases. This is the numerator of the Pass Rate (which instead uses only the usable cases, Total minus N/A, as its base).",
@@ -694,7 +694,7 @@
           "avgClosingTimeBusinessDays": "Average business days (Mon-Fri) between bug creation and closure. Saturdays and Sundays are excluded; weekday public holidays are counted. Target <= 4 business days."
         },
         "sectionHelp": {
-          "suiteProgress": "Each suite's own \"% Executed\" counts Not Applicable as executed too (only Not Run is excluded) - broader than the \"Test Cases Executed\" KPI above, which excludes Not Applicable entirely. Pass Rate = Passed Ã· (Total minus Not Applicable).",
+          "suiteProgress": "Each suite's % Executed uses the same rule as the KPI: (Passed + Failed + Blocked) / Total. Not Applicable stays separate. Pass Rate = Passed / (Total minus Not Applicable).",
           "bugStatus": "Every bug detected for this sprint/area, including out-of-scope ones, grouped by current Azure DevOps status. \"Still open\" counts only in-scope (effective) bugs not yet Closed - narrower than the totals above it.",
           "originBreakdown": "\"Detected\" counts every bug attributed to this source, including out-of-scope ones. \"Accepted\" counts only the in-scope (effective) bugs from that same source. A bug's source is Test Factory by default, unless its linked suite identifies it as Test Agenti, Business, or DSI (DSI bugs are counted in the KPI tile above, not shown as their own panel here)."
         },
