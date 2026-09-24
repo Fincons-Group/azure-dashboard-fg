@@ -540,6 +540,14 @@ function reportHref(file: string): string {
 // same reverse-tabnabbing risk without losing the reference.
 // Takes the file/url pair rather than the run so a ZAP run's Italian report
 // (reportFileIt/reportUrlIt) opens the same way as its main one.
+// Only a dev server with TEST_SUITES_REPORTS_DIR set can serve the no-
+// reportUrl fallback above - on the hosted app that link is a guaranteed 404,
+// so the button is disabled there instead (the run's HTML was never uploaded
+// to Storage; re-publish it with PUBLISH_REPORTS_TO_FIREBASE=true).
+function canOpenReport(reportUrl: string | undefined): boolean {
+    return !!reportUrl || import.meta.env.DEV;
+}
+
 async function openTestSuiteReport(reportFile: string, reportUrl: string | undefined): Promise<void> {
     if (!reportUrl) {
         window.open(reportHref(reportFile), "_blank", "noopener");
@@ -843,6 +851,7 @@ function SuiteDetail({
                             <Button
                                 appearance="primary"
                                 icon={<OpenRegular />}
+                                disabled={!canOpenReport(run.reportUrl)}
                                 onClick={() => {
                                     setReportError(false);
                                     openTestSuiteReport(run.reportFile, run.reportUrl).catch(() => setReportError(true));
@@ -853,6 +862,7 @@ function SuiteDetail({
                             {run.reportFileIt && (
                                 <Button
                                     icon={<OpenRegular />}
+                                    disabled={!canOpenReport(run.reportUrlIt)}
                                     onClick={() => {
                                         setReportError(false);
                                         openTestSuiteReport(run.reportFileIt!, run.reportUrlIt).catch(() =>
@@ -868,6 +878,7 @@ function SuiteDetail({
                         <Button
                             appearance="primary"
                             icon={<OpenRegular />}
+                            disabled={!canOpenReport(run.reportUrl)}
                             onClick={() => {
                                 setReportError(false);
                                 openTestSuiteReport(run.reportFile, run.reportUrl).catch(() => setReportError(true));
@@ -875,6 +886,9 @@ function SuiteDetail({
                         >
                             {t("testSuitesPage.openReport", { file: run.reportFile })}
                         </Button>
+                    )}
+                    {!canOpenReport(run.reportUrl) && (
+                        <Text className={styles.detailNote}>{t("testSuitesPage.reportNotUploaded")}</Text>
                     )}
                     {reportError && (
                         <Text className={styles.detailNote} style={{ color: tokens.colorPaletteRedForeground1 }}>

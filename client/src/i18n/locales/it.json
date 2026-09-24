@@ -317,6 +317,7 @@
     "viewReports": "Vedi i report",
     "openReport": "Apri {{file}}",
     "openReportError": "Impossibile aprire il report - riprova tra un momento.",
+    "reportNotUploaded": "Il report HTML di questa esecuzione non è stato caricato, quindi non si può aprire da qui. I risultati qui sotto sono comunque completi.",
     "renderedBy": "Generato da {{tool}}",
     "linkedNoteNrt": "Questa esecuzione ha incluso anche il progetto a11y-chrome - vedi la scheda A11Y per i risultati.",
     "linkedNoteA11y": "Catturato all'interno dell'esecuzione NRT {{runId}} (il progetto a11y-chrome è girato insieme alle specifiche vit).",

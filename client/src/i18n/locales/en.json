@@ -317,6 +317,7 @@
     "viewReports": "View reports",
     "openReport": "Open {{file}}",
     "openReportError": "Couldn't open the report - try again in a moment.",
+    "reportNotUploaded": "The HTML report for this run wasn't uploaded, so it can't be opened here. The results below are still complete.",
     "renderedBy": "Rendered by {{tool}}",
     "linkedNoteNrt": "This run also carried the a11y-chrome project - see the A11Y tab for its findings.",
     "linkedNoteA11y": "Captured inside NRT run {{runId}} (a11y-chrome project ran alongside the vit specs).",
