@@ -476,6 +476,9 @@ export interface CoverageTask {
   title: string;
   url?: string;
   state: string;
+  // Kanban column as shown on the board (e.g. "Code Review" while state is
+  // still Doing) - absent when the item has never been placed on a board.
+  boardColumn?: string;
   isDone: boolean;
   assignee?: string;
 }

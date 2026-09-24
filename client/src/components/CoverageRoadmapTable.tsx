@@ -270,7 +270,7 @@ function TaskRow({ task }: { task: CoverageTask }) {
                 {task.assignee ?? t("coverageRoadmapPage.unassigned")}
             </span>
             <span className={styles.taskStatus} style={{ color: fgColor }}>
-                {task.state}
+                {task.boardColumn ?? task.state}
             </span>
         </div>
     );
