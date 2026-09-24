@@ -556,7 +556,14 @@ async function openTestSuiteReport(reportFile: string, reportUrl: string | undef
 
     const win = window.open("", "_blank");
     if (win) win.opener = null;
-    const url = await fetchSignedReportUrl(reportUrl);
+    let url: string;
+    try {
+        url = await fetchSignedReportUrl(reportUrl);
+    } catch (error) {
+        // Don't strand an empty tab - the caller shows the error inline.
+        win?.close();
+        throw error;
+    }
     if (win) win.location.href = url;
 }
 
