@@ -74,6 +74,9 @@ const CHILD_FIELDS = [
     "System.Id",
     "System.Title",
     "System.State",
+    // The Kanban column the board shows (e.g. "Code Review") - a board-only
+    // split of a real state like Doing, so System.State alone can't tell it.
+    "System.BoardColumn",
     "System.WorkItemType",
     "System.AssignedTo",
 ];
@@ -124,6 +127,7 @@ export async function buildCoverageRoadmap(
                 title: item.fields["System.Title"],
                 url: buildWorkItemUrl(item.id, project),
                 state: item.fields["System.State"],
+                boardColumn: item.fields["System.BoardColumn"],
                 isDone: isDoneState(item.fields["System.State"]),
                 assignee: item.fields["System.AssignedTo"]?.displayName,
             }));
