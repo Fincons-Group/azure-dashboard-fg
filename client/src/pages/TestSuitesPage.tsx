@@ -41,6 +41,7 @@ import type {
     NrtDomainResult,
     NrtRunDetail,
     NrtTestResult,
+    TestAppScope,
     TestEnvironment,
     TestRunStatus,
     TestSuiteKey,
@@ -730,6 +731,7 @@ export function TestSuitesPage() {
 
             {tab !== "overview" && (
                 <SuiteDetail
+                    key={tab}
                     suite={tab}
                     runs={runsBySuite.get(tab) ?? []}
                     selectedRunId={selectedRunId}
@@ -804,8 +806,13 @@ function SuiteDetail({
     const { t } = useTranslation();
     const styles = useStyles();
     const Icon = SUITE_ICONS[suite];
-    const run = runs.find((r) => r.id === selectedRunId) ?? runs[0] ?? null;
     const [reportError, setReportError] = useState(false);
+    // Security tab only: clicking a row in the per-team table (ZapTeamTable)
+    // narrows the runs list and the selected run to that team's scans.
+    const [teamFilter, setTeamFilter] = useState<TestAppScope | null>(null);
+    const hasZapRuns = suite === "security" && runs.some((r) => r.zap);
+    const visibleRuns = hasZapRuns && teamFilter ? runs.filter((r) => r.app === teamFilter) : runs;
+    const run = visibleRuns.find((r) => r.id === selectedRunId) ?? visibleRuns[0] ?? null;
 
     if (!run) {
         return (
@@ -922,12 +929,20 @@ function SuiteDetail({
                 </div>
             </div>
 
+            {hasZapRuns && (
+                <ZapTeamTable
+                    runs={runs}
+                    selected={teamFilter}
+                    onSelect={(app) => setTeamFilter((current) => (current === app ? null : app))}
+                />
+            )}
+
             <div className={styles.gridTwo}>
                 <div>
-                    {run.nrt && <NrtDetail run={run} runs={runs} />}
+                    {run.nrt && <NrtDetail run={run} runs={visibleRuns} />}
                     {run.zap && <ZapDetail detail={run.zap} />}
                 </div>
-                <RunsList runs={runs} selectedId={run.id} onSelect={onSelectRun} />
+                <RunsList runs={visibleRuns} selectedId={run.id} onSelect={onSelectRun} />
             </div>
         </>
     );
@@ -940,6 +955,73 @@ const ZAP_RISK_TONE: Record<ZapRisk, StatusTone> = {
     low: "neutral",
     informational: "neutral",
 };
+
+// ZAP's own output can't tell which team a scan belongs to (every alert is
+// on the shared host root or Microsoft login pages), so this groups whole
+// scans by the run's app, set at publish time (ZAP_APP in
+// scripts/publish-zap-run.js) - "all" is a scan nobody assigned. Risk
+// columns are the team's latest scan (runs arrive newest first), not a sum
+// across scans that mostly repeat the same alerts.
+const ZAP_TEAM_ORDER: TestAppScope[] = ["frontOfficeAuto", "plurifond", "all"];
+
+function ZapTeamTable({
+    runs,
+    selected,
+    onSelect,
+}: {
+    runs: TestSuiteRun[];
+    selected: TestAppScope | null;
+    onSelect: (app: TestAppScope) => void;
+}) {
+    const { t } = useTranslation();
+    const styles = useStyles();
+    const zapRuns = runs.filter((r) => r.zap);
+    const rows = ZAP_TEAM_ORDER.map((app) => {
+        const teamRuns = zapRuns.filter((r) => r.app === app);
+        return { app, count: teamRuns.length, latest: teamRuns[0]?.zap };
+    }).filter((row) => row.count > 0);
+
+    return (
+        <Card className={styles.card}>
+            <div className={styles.cardTitle}>
+                <span>{t("testSuitesPage.nrt.teamsTitle")}</span>
+                <span className={styles.cardTitleHint}>{zapRuns.length}</span>
+            </div>
+            <table className={styles.table}>
+                <thead>
+                    <tr>
+                        <th className={styles.tableHeadCell}>{t("testSuitesPage.nrt.teamCol")}</th>
+                        <th className={styles.tableHeadCell} style={{ textAlign: "right" }}>
+                            {t("testSuitesPage.zap.scansCol")}
+                        </th>
+                        {ZAP_RISK_ORDER.map((risk) => (
+                            <th key={risk} className={styles.tableHeadCell} style={{ textAlign: "right" }}>
+                                {t(`testSuitesPage.zap.risk.${risk}`)}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map(({ app, count, latest }) => (
+                        <tr
+                            key={app}
+                            className={mergeClasses(styles.tableRowClickable, selected === app && styles.tableRowSelected)}
+                            onClick={() => onSelect(app)}
+                        >
+                            <td className={styles.tableCell}>{t(`testSuitesPage.zap.teams.${app}`)}</td>
+                            <td className={styles.tableCellNum}>{count}</td>
+                            {ZAP_RISK_ORDER.map((risk) => (
+                                <td key={risk} className={styles.tableCellNum}>
+                                    {latest?.alertsByRisk[risk] ?? 0}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </Card>
+    );
+}
 
 // A ZAP scan run (see scripts/publish-zap-run.js) - alert types per risk
 // level plus the full alert list. The scanned app's own alerts come first;

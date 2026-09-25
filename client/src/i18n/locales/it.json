@@ -388,6 +388,12 @@
       "confidenceCol": "Confidenza",
       "siteCol": "Sito",
       "instancesCol": "Istanze",
+      "scansCol": "Scansioni",
+      "teams": {
+        "frontOfficeAuto": "Front Office Auto",
+        "plurifond": "Plurifonds",
+        "all": "Non assegnato"
+      },
       "risk": {
         "high": "Alto",
         "medium": "Medio",

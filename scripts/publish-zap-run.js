@@ -18,6 +18,11 @@
 // publish a specific one instead. Always uploads the reports (no separate
 // PUBLISH_REPORTS_TO_FIREBASE opt-in): a ZAP run doc without them has
 // nothing to open.
+//
+// ZAP_APP=plurifond|frontOfficeAuto names the team whose journeys the scan
+// covered - ZAP's own output can't tell (every alert sits on the shared
+// host root or on Microsoft login pages), and the Security tab's per-team
+// table groups scans by it. Unset leaves the scan as "all" (unassigned).
 import "dotenv/config";
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -50,6 +55,13 @@ if (!reportsDir) {
     console.error(
         "TEST_SUITES_REPORTS_DIR is not set - point it at a tst-e2e checkout's reports/ folder."
     );
+    process.exit(1);
+}
+
+const ZAP_APPS = ["plurifond", "frontOfficeAuto"];
+const zapApp = process.env.ZAP_APP || "all";
+if (zapApp !== "all" && !ZAP_APPS.includes(zapApp)) {
+    console.error(`ZAP_APP must be one of: ${ZAP_APPS.join(", ")} (got "${zapApp}").`);
     process.exit(1);
 }
 
@@ -206,7 +218,7 @@ const { branch, commitSha } = gitInfo(tstE2eRoot);
 const run = {
     id,
     suite: "security",
-    app: "all",
+    app: zapApp,
     env,
     branch,
     ...(commitSha ? { commitSha } : {}),
