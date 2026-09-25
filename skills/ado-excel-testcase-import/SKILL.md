@@ -61,10 +61,14 @@ Write `slugs.json` as `{ "<sheet>!<row>": "<slug>" }`. Slug rules:
 - **never include the app name** (the spec folder already carries it, e.g. `plurifonds/`)
 - a descriptive slug (`comparto-scelta-versamento`), the functional code (`nf-cens-004`), or both
   (`cens-004-barra-avanzamento-wizard`), whichever the team picked
+- **Code when available** (`--code-when-available`): the name is the title's functional code, in
+  lower case and **without the TC id**. `NF-CENS-035 - ...` gives `feature/nrt-nf-cens-035` and
+  `nrt-nf-cens-035-fe.spec.ts`. Cases without a code become `<prefix>-<slug>`, so only they need an
+  entry in `slugs.json`.
 
 Write `epics.json` as `[{"title": "E2E - <tab>", "sheets": ["<tab>"], "existing": <id, optional>}]` and
 confirm the titles, then run:
-`python scripts/create_epics.py --epics epics.json --slugs slugs.json --tags "<tags>" --prefix <e2e|nrt>`
+`python scripts/create_epics.py --epics epics.json --slugs slugs.json --tags "<tags>" --prefix <e2e|nrt> [--code-when-available]`
 - Each Issue is of type **Issue** and titled `feature/<prefix>-<tcId>-<slug>`. Its parent is the Epic,
   it has a Tested By link to the TC, and its description links the TC and names the spec
   `<prefix>-<tcId>-<slug>-fe.spec.ts`.
