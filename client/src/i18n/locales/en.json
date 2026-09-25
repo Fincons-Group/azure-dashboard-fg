@@ -316,6 +316,7 @@
     "ranAt": "Ran {{time}}",
     "viewReports": "View reports",
     "openReport": "Open {{file}}",
+    "openA11yReport": "Open axe report",
     "openReportError": "Couldn't open the report - try again in a moment.",
     "reportNotUploaded": "The HTML report for this run wasn't uploaded, so it can't be opened here. The results below are still complete.",
     "renderedBy": "Rendered by {{tool}}",
