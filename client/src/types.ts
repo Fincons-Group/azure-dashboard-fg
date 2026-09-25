@@ -476,6 +476,9 @@ export interface CoverageTask {
   title: string;
   url?: string;
   state: string;
+  // Kanban column as shown on the board (e.g. "Code Review" while state is
+  // still Doing) - absent when the item has never been placed on a board.
+  boardColumn?: string;
   isDone: boolean;
   assignee?: string;
 }
@@ -703,7 +706,8 @@ export interface IterationNode {
 // "security" reuses NrtRunDetail on TestSuiteRun.nrt (Playwright
 // type:security-tagged spec results) - see server-side mirror in
 // src/types.ts for the full rationale. DAST (ZAP dynamic scan) was removed
-// as a separate suite - considered redundant with this functional coverage.
+// as a separate suite - considered redundant with this functional coverage -
+// but ZAP scan runs are still published into "security" (see ZapRunDetail).
 export type TestSuiteKey = "nrt" | "a11y" | "security";
 
 // Which product the run covers. "plurifond"/"frontOfficeAuto" mirror the
@@ -773,6 +777,33 @@ export interface NrtRunDetail {
   tests?: NrtTestResult[];
 }
 
+// A ZAP scan run published into the "security" folder by
+// scripts/publish-zap-run.js - not a separate suite (DAST stays folded into
+// "security", see TestSuiteKey), just a run doc carrying this instead of
+// `nrt`. Built from ZAP's own traditional-json summary: per-alert counts
+// only, never the raw instances (the summary file is tens of MB).
+export type ZapRisk = "high" | "medium" | "low" | "informational";
+
+export interface ZapAlert {
+  name: string;
+  risk: ZapRisk;
+  // ZAP's confidence code as text ("Low"/"Medium"/"High"/"Confirmed"...).
+  confidence: string;
+  instances: number;
+  pluginId: string;
+  site: string;
+}
+
+export interface ZapRunDetail {
+  // The scanned application host (e.g. "nuovafrontieratst.gruppoitas.it") -
+  // alerts from third-party hosts the scan also touched (Microsoft login
+  // pages) are still listed, with their own `site`.
+  target: string;
+  zapVersion: string;
+  alertsByRisk: Record<ZapRisk, number>;
+  alerts: ZapAlert[];
+}
+
 export interface TestSuiteRun {
   // e.g. "nrt_20260910_0857_tst_full_core_v1.0" - mirrors the run-folder
   // naming already used under tst-e2e/reports/runs/.
@@ -798,8 +829,17 @@ export interface TestSuiteRun {
   // reportFile/reportHref() when present - see openTestSuiteReport in
   // TestSuitesPage.tsx.
   reportUrl?: string;
+  // Italian version of the same report (ZAP runs only) - same local-file /
+  // signed-URL split as reportFile/reportUrl above.
+  reportFileIt?: string;
+  reportUrlIt?: string;
+  // Axe summary report (A11Y runs only) - same local-file / signed-URL
+  // split as reportFile/reportUrl above.
+  reportFileA11y?: string;
+  reportUrlA11y?: string;
   reportTool: string;
   nrt?: NrtRunDetail;
+  zap?: ZapRunDetail;
 }
 
 export interface TestSuitesResponse {
