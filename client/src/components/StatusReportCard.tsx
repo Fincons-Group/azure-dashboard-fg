@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { Tooltip, makeStyles } from "@fluentui/react-components";
 import { InfoRegular } from "@fluentui/react-icons";
 import { SuiteProgressBar } from "./SuiteProgressBar";
-import { OUTCOME_COLORS } from "./outcomeColors";
 import {
   bugsClosedLabel,
   bugsToCloseLabel,
@@ -205,6 +204,16 @@ const useStyles = makeStyles({
     gridTemplateColumns: "repeat(4, 1fr)",
     gap: "8px",
   },
+  kpiGrid3: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "8px",
+  },
+  kpiGrid1: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: "8px",
+  },
   kpiTile: {
     display: "flex",
     flexDirection: "column",
@@ -223,20 +232,6 @@ const useStyles = makeStyles({
   kpiValue: {
     fontSize: "20px",
     fontWeight: 700,
-  },
-  executedBreakdown: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: "4px 18px",
-    minHeight: "24px",
-    padding: "4px 8px",
-    borderRadius: "5px",
-    backgroundColor: "#252525",
-    fontSize: "10px",
-    fontWeight: 600,
-    lineHeight: "13px",
   },
   kpiLabel: {
     fontSize: "10px",
@@ -640,8 +635,6 @@ export const StatusReportCard = forwardRef<
   const {
     totalTestCases,
     totalPassed,
-    totalFailed,
-    totalBlocked,
     passedPct,
     totalNotApplicable,
     totalExecuted,
@@ -788,17 +781,6 @@ export const StatusReportCard = forwardRef<
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.passRate"
               />
             </div>
-            <div className={styles.executedBreakdown}>
-              <span style={{ color: OUTCOME_COLORS.Passed }}>
-                {totalPassed} {t("outcome.Passed")}
-              </span>
-              <span style={{ color: OUTCOME_COLORS.Failed }}>
-                {totalFailed} {t("outcome.Failed")}
-              </span>
-              <span style={{ color: OUTCOME_COLORS.Blocked }}>
-                {totalBlocked} {t("outcome.Blocked")}
-              </span>
-            </div>
           </div>
 
           {/* Stato bug */}
@@ -838,32 +820,24 @@ export const StatusReportCard = forwardRef<
                 label={bugsToCloseLabel(t, toCloseOutOfScopeCount)}
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsToClose"
               />
+            </div>
 
-              {includeDsiSource ? (
-                <>
-                  <KpiTile
-                    value={bugsByUs}
-                    color="#6bcf6b"
-                    borderColor="#6bcf6b"
-                    labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByUs"
-                    helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByUs"
-                  />
-                  <KpiTile
-                    value={bugsByDsi}
-                    color="#3aa0f3"
-                    borderColor="#3aa0f3"
-                    labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByDsi"
-                    helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByDsi"
-                  />
-                  <KpiTile
-                    value={bugsByBusiness}
-                    color="#6bcf6b"
-                    borderColor="#6bcf6b"
-                    labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"
-                    helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByBusiness"
-                  />
-                </>
-              ) : (
+            {includeDsiSource ? (
+              <div className={styles.kpiGrid3}>
+                <KpiTile
+                  value={bugsByUs}
+                  color="#6bcf6b"
+                  borderColor="#6bcf6b"
+                  labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByUs"
+                  helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByUs"
+                />
+                <KpiTile
+                  value={bugsByDsi}
+                  color="#3aa0f3"
+                  borderColor="#3aa0f3"
+                  labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByDsi"
+                  helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByDsi"
+                />
                 <KpiTile
                   value={bugsByBusiness}
                   color="#6bcf6b"
@@ -871,8 +845,20 @@ export const StatusReportCard = forwardRef<
                   labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"
                   helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByBusiness"
                 />
-              )}
+              </div>
+            ) : (
+              <div className={styles.kpiGrid1}>
+                <KpiTile
+                  value={bugsByBusiness}
+                  color="#6bcf6b"
+                  borderColor="#6bcf6b"
+                  labelKey="defectManagementPage.sprintReport.statusCard.kpis.bugsByBusiness"
+                  helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.bugsByBusiness"
+                />
+              </div>
+            )}
 
+            <div className={styles.kpiGrid4}>
               <KpiTile
                 value={criticalCount}
                 color="#ff6b6b"
