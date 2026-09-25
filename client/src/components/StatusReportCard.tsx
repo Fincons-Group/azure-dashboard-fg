@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Tooltip, makeStyles } from "@fluentui/react-components";
 import { InfoRegular } from "@fluentui/react-icons";
 import { SuiteProgressBar } from "./SuiteProgressBar";
+import { OUTCOME_COLORS } from "./outcomeColors";
 import {
   bugsClosedLabel,
   bugsToCloseLabel,
@@ -222,6 +223,20 @@ const useStyles = makeStyles({
   kpiValue: {
     fontSize: "20px",
     fontWeight: 700,
+  },
+  executedBreakdown: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: "4px 18px",
+    minHeight: "24px",
+    padding: "4px 8px",
+    borderRadius: "5px",
+    backgroundColor: "#252525",
+    fontSize: "10px",
+    fontWeight: 600,
+    lineHeight: "13px",
   },
   kpiLabel: {
     fontSize: "10px",
@@ -625,6 +640,8 @@ export const StatusReportCard = forwardRef<
   const {
     totalTestCases,
     totalPassed,
+    totalFailed,
+    totalBlocked,
     passedPct,
     totalNotApplicable,
     totalExecuted,
@@ -770,6 +787,17 @@ export const StatusReportCard = forwardRef<
                 labelKey="defectManagementPage.sprintReport.statusCard.kpis.passRate"
                 helpKey="defectManagementPage.sprintReport.statusCard.kpisHelp.passRate"
               />
+            </div>
+            <div className={styles.executedBreakdown}>
+              <span style={{ color: OUTCOME_COLORS.Passed }}>
+                {totalPassed} {t("outcome.Passed")}
+              </span>
+              <span style={{ color: OUTCOME_COLORS.Failed }}>
+                {totalFailed} {t("outcome.Failed")}
+              </span>
+              <span style={{ color: OUTCOME_COLORS.Blocked }}>
+                {totalBlocked} {t("outcome.Blocked")}
+              </span>
             </div>
           </div>
 
