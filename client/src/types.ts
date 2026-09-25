@@ -833,6 +833,10 @@ export interface TestSuiteRun {
   // signed-URL split as reportFile/reportUrl above.
   reportFileIt?: string;
   reportUrlIt?: string;
+  // Axe summary report (A11Y runs only) - same local-file / signed-URL
+  // split as reportFile/reportUrl above.
+  reportFileA11y?: string;
+  reportUrlA11y?: string;
   reportTool: string;
   nrt?: NrtRunDetail;
   zap?: ZapRunDetail;

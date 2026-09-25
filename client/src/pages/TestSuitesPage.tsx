@@ -882,17 +882,33 @@ function SuiteDetail({
                             )}
                         </div>
                     ) : (
-                        <Button
-                            appearance="primary"
-                            icon={<OpenRegular />}
-                            disabled={!canOpenReport(run.reportUrl)}
-                            onClick={() => {
-                                setReportError(false);
-                                openTestSuiteReport(run.reportFile, run.reportUrl).catch(() => setReportError(true));
-                            }}
-                        >
-                            {t("testSuitesPage.openReport", { file: run.reportFile })}
-                        </Button>
+                        <div className={styles.reportButtons}>
+                            <Button
+                                appearance="primary"
+                                icon={<OpenRegular />}
+                                disabled={!canOpenReport(run.reportUrl)}
+                                onClick={() => {
+                                    setReportError(false);
+                                    openTestSuiteReport(run.reportFile, run.reportUrl).catch(() => setReportError(true));
+                                }}
+                            >
+                                {t("testSuitesPage.openReport", { file: run.reportFile })}
+                            </Button>
+                            {run.reportFileA11y && (
+                                <Button
+                                    icon={<OpenRegular />}
+                                    disabled={!canOpenReport(run.reportUrlA11y)}
+                                    onClick={() => {
+                                        setReportError(false);
+                                        openTestSuiteReport(run.reportFileA11y!, run.reportUrlA11y).catch(() =>
+                                            setReportError(true)
+                                        );
+                                    }}
+                                >
+                                    {t("testSuitesPage.openA11yReport")}
+                                </Button>
+                            )}
+                        </div>
                     )}
                     {!canOpenReport(run.reportUrl) && (
                         <Text className={styles.detailNote}>{t("testSuitesPage.reportNotUploaded")}</Text>

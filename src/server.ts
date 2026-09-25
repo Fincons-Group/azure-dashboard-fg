@@ -396,6 +396,9 @@ const REPORT_FILENAME_ALLOWLIST = new Set([
     // HTML per language.
     "zap-report-en.html",
     "zap-report-it.html",
+    // A11Y runs' axe summary (tst-e2e reports/a11y/index.html), uploaded
+    // alongside smart-report.html - self-contained, see publish-local-test-runs.js.
+    "a11y-report.html",
 ]);
 
 app.get("/api/test-suites-reports/runs/:runId/:filename", async (req, res) => {
