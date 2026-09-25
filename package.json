@@ -12,7 +12,8 @@
   "files": [
     "dist",
     "bin",
-    "server"
+    "server",
+    "skills"
   ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

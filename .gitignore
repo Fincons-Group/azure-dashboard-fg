@@ -1,5 +1,7 @@
 node_modules/
-.claude/
+.claude/*
+!.claude/skills/
+__pycache__/
 .env
 sprint-dsi-analysis.html
 src/scripts/_debugWiql.mjs
