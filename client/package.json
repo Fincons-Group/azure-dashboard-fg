@@ -33,7 +33,7 @@
     "@univerjs/sheets-sort": "0.25.1",
     "@univerjs/sheets-sort-ui": "0.25.1",
     "@univerjs/sheets-ui": "0.25.1",
-    "@univerjs/themes": "0.25.1",
+    "@univerjs/themes": "0.25.2",
     "@univerjs/ui": "0.25.1",
     "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
