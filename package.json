@@ -51,7 +51,7 @@
     "jwks-rsa": "^4.1.0",
     "open": "^11.0.4",
     "sirv": "^3.0.2",
-    "tsx": "^4.23.13"
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
