@@ -34,7 +34,7 @@
     "@univerjs/sheets-sort-ui": "0.25.1",
     "@univerjs/sheets-ui": "0.25.1",
     "@univerjs/themes": "0.25.1",
-    "@univerjs/ui": "0.25.1",
+    "@univerjs/ui": "0.25.2",
     "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
     "i18next": "^26.4.2",
