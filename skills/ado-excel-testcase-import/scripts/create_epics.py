@@ -2,23 +2,27 @@
 
 usage: create_epics.py --epics epics.json --slugs slugs.json --tags "E2E; FrontOfficeAuto"
                        [--cases cases.json] [--state state.json] [--epic-state epics_state.json]
-                       [--prefix e2e] [--set-priority]
+                       [--prefix e2e] [--code-when-available] [--set-priority]
 
 epics.json: [{"title": "E2E - <tab name>", "sheets": ["TabName"], "existing": 13856 (optional)}, ...]
             A group may use "areas": [...] instead of "sheets" (only if the user asks for an area split).
 slugs.json: {"<sheet>!<row>": "area-capability-kebab", ...}. Written by Claude. It never includes the
             app name, because the spec folder already carries it.
+--code-when-available: if the title starts with a functional code ("NF-CENS-035 - ..."), use the code
+            as-is instead of the slug (feature/nrt-15200-NF-CENS-035). Cases without a code still need a slug.
 Names: Issue title  feature/<prefix>-<tcId>-<slug>
        spec file    <prefix>-<tcId>-<slug>-fe.spec.ts
 The Epic description gets a table of its features with a suggested priority marked optional.
 The Priority field is only set with --set-priority.
 """
-import argparse, html, sys
+import argparse, html, re, sys
 from ado import BASE, PROJECT, call, get_item, load_json, save_json
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--epics", required=True)
-ap.add_argument("--slugs", required=True)
+ap.add_argument("--slugs", default="slugs.json")
+ap.add_argument("--code-when-available", action="store_true",
+                help="use the title's functional code (e.g. NF-CENS-035) instead of the slug when present")
 ap.add_argument("--tags", required=True)
 ap.add_argument("--cases", default="cases.json")
 ap.add_argument("--state", default="state.json")
@@ -31,7 +35,15 @@ cases = {c["key"]: c for c in load_json(a.cases, [])}
 tcs = load_json(a.state, {})
 slugs = load_json(a.slugs, {})
 st = load_json(a.epic_state, {"epics": {}, "issues": {}})
-missing = [k for k in cases if k in tcs and k not in slugs]
+CODE = re.compile(r"^([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\s+-\s+")
+
+
+def name_part(c):
+    m = CODE.match(c["title"]) if a.code_when_available else None
+    return m.group(1) if m else slugs.get(c["key"])
+
+
+missing = [k for k, c in cases.items() if k in tcs and not name_part(c)]
 if missing:
     sys.exit(f"slugs.json is missing keys: {missing}")
 
@@ -59,7 +71,7 @@ for grp in load_json(a.epics, []):
     rows = []
     for c in members:
         tc = tcs[c["key"]]["id"]
-        name = f"{a.prefix}-{tc}-{slugs[c['key']]}"
+        name = f"{a.prefix}-{tc}-{name_part(c)}"
         feature, spec = f"feature/{name}", f"{name}-fe.spec.ts"
         if str(tc) not in st["issues"]:
             tc_url = f"{BASE}/{PROJECT}/_workitems/edit/{tc}"
