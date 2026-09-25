@@ -61,9 +61,10 @@ Write `slugs.json` as `{ "<sheet>!<row>": "<slug>" }`. Slug rules:
 - **never include the app name** (the spec folder already carries it, e.g. `plurifonds/`)
 - a descriptive slug (`comparto-scelta-versamento`), the functional code (`nf-cens-004`), or both
   (`cens-004-barra-avanzamento-wizard`), whichever the team picked
-- **Code when available:** pass `--code-when-available` to use the title's functional code exactly as
-  written (`NF-CENS-035 - ...` gives `feature/nrt-15200-NF-CENS-035`). Only cases without a code need
-  an entry in `slugs.json`.
+- **Code when available** (`--code-when-available`): the name is the title's functional code, in
+  lower case and **without the TC id**. `NF-CENS-035 - ...` gives `feature/nrt-nf-cens-035` and
+  `nrt-nf-cens-035-fe.spec.ts`. Cases without a code become `<prefix>-<slug>`, so only they need an
+  entry in `slugs.json`.
 
 Write `epics.json` as `[{"title": "E2E - <tab>", "sheets": ["<tab>"], "existing": <id, optional>}]` and
 confirm the titles, then run:
